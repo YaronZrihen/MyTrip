@@ -13,12 +13,14 @@ import {
 /*  Display face "Frank Ruhl Libre", UI/data face "Heebo" (tabular nums).  */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "2.3.0";
+const APP_VERSION = "2.4.0";
 const ICONS = { Plane, PlaneTakeoff, Car, BedDouble, Footprints, Users, Sun, Ship, KeySquare, Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music };
 const HE_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 const EN_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const FRAME_COLORS = ["#256D64", "#3E7CB1", "#8B6F47", "#7A5C9E", "#C1443A", "#5B8C5A"];
 const CURRENCIES = ["₪", "$", "€", "£"];
+const CURRENCY_CODE_MAP = { "₪": "ILS", "$": "USD", "€": "EUR", "£": "GBP" };
+const FALLBACK_RATES = { ILS: 1, USD: 0.27, EUR: 0.25, GBP: 0.21 }; // used only if the live rate fetch fails
 
 const DEFAULT_TYPES = [
   { id: "flight", name: "טיסה", icon: "Plane", color: "#256D64" },
@@ -67,6 +69,7 @@ const T_DICT = {
     frameStart: "תאריך התחלה", frameEnd: "תאריך סיום", parentFrame: "שייכת למסגרת",
     addSubFrame: "הוסף מסגרת-משנה", suggestPrefix: "זוהו", suggestMid: "טיסות ללא מסגרת:",
     suggestBtn: "צור מסגרת טיול אוטומטית", suggestDismiss: "התעלם",
+    fxApprox: "לפי שער מקורב (אין חיבור לאינטרנט)", fxLive: "לפי שער עדכני",
   },
   en: {
     appName: "MyTrip", addRow: "Add row", addDay: "Add day", newFrame: "New frame",
@@ -85,6 +88,7 @@ const T_DICT = {
     frameStart: "Start date", frameEnd: "End date", parentFrame: "Belongs to frame",
     addSubFrame: "Add sub-frame", suggestPrefix: "Found", suggestMid: "flights without a frame:",
     suggestBtn: "Auto-create a trip frame", suggestDismiss: "Dismiss",
+    fxApprox: "Approximate rate (no internet connection)", fxLive: "Live rate",
   }
 };
 
@@ -135,8 +139,33 @@ export default function MyTripApp() {
   const [frameDraft, setFrameDraft] = useState(null);
   const [dragId, setDragId] = useState(null);
   const [dismissedKey, setDismissedKey] = useState("");
+  const [displayCurrency, setDisplayCurrency] = useState("₪");
+  const [fxRates, setFxRates] = useState(null);
+  const [fxIsLive, setFxIsLive] = useState(false);
   const dir = lang === "he" ? "rtl" : "ltr";
   const T = T_DICT[lang];
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("https://open.er-api.com/v6/latest/ILS")
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled || !data || !data.rates) throw new Error("bad response");
+        setFxRates(data.rates);
+        setFxIsLive(true);
+      })
+      .catch(() => { if (!cancelled) { setFxRates(FALLBACK_RATES); setFxIsLive(false); } });
+    return () => { cancelled = true; };
+  }, []);
+
+  function convertAmount(amount, fromSymbol, toSymbol) {
+    const rates = fxRates || FALLBACK_RATES;
+    const fromCode = CURRENCY_CODE_MAP[fromSymbol], toCode = CURRENCY_CODE_MAP[toSymbol];
+    const fromRate = rates[fromCode], toRate = rates[toCode];
+    if (!fromRate || !toRate) return amount;
+    const inILS = amount / fromRate;
+    return inILS * toRate;
+  }
 
   useEffect(() => {
     function onResize() { setNarrowScreen(window.innerWidth < 780); }
@@ -194,6 +223,10 @@ export default function MyTripApp() {
     rows.forEach((r) => { const amt = Number(r.costAmount) || 0; if (!amt) return; t[r.costCurrency] = (t[r.costCurrency] || 0) + amt; });
     return t;
   }, [rows]);
+
+  const convertedGrandTotal = useMemo(() => {
+    return Object.entries(grandTotals).reduce((sum, [cur, amt]) => sum + convertAmount(amt, cur, displayCurrency), 0);
+  }, [grandTotals, displayCurrency, fxRates]);
 
   const unassignedFlights = useMemo(
     () => rows.filter((r) => !r.parentId && !r.frameId && (r.typeId === "flight" || r.typeId === "domestic-flight")).sort((a, b) => a.date.localeCompare(b.date)),
@@ -379,17 +412,13 @@ export default function MyTripApp() {
             })}
           </div>
         ) : (
+          <div className="mt-table-wrap">
           <table className="mt-table">
-            <colgroup>
-              <col style={{ width: "26px" }} />
-              {visibleColumns.map((c) => <col key={c.key} style={{ width: colWidth(c.key) }} />)}
-              <col style={{ width: "64px" }} />
-            </colgroup>
             <thead>
               <tr>
-                <th></th>
-                {visibleColumns.map((c) => <th key={c.key}>{lang === "he" ? c.label_he : c.label_en}</th>)}
-                <th></th>
+                <th className="handle"></th>
+                {visibleColumns.map((c) => <th key={c.key} className={c.key} title={lang === "he" ? c.label_he : c.label_en}>{lang === "he" ? c.label_he : c.label_en}</th>)}
+                <th className="actions"></th>
               </tr>
             </thead>
             <tbody>
@@ -405,14 +434,10 @@ export default function MyTripApp() {
               ))}
             </tbody>
           </table>
+          </div>
         ))}
       </div>
     );
-  }
-
-  function colWidth(key) {
-    const map = { date: "9%", day: "6%", icon: "5%", type: "12%", from: "10%", to: "10%", startTime: "6%", duration: "6%", endTime: "6%", destination: "16%", link: "5%", cost: "9%" };
-    return map[key] || "10%";
   }
 
   function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse }) {
@@ -426,7 +451,7 @@ export default function MyTripApp() {
         case "icon": return <span className="mt-type-icon" style={{ background: tm.color }}><Icon /></span>;
         case "type": return (
           <div style={{ position: "relative" }}>
-            <button className="mt-type-btn" onClick={() => setTypeMenuOpen(typeMenuOpen === row.id ? null : row.id)}>
+            <button className="mt-type-btn" title={tm.name} onClick={() => setTypeMenuOpen(typeMenuOpen === row.id ? null : row.id)}>
               <span className="mt-type-text">{tm.name}</span> <ChevronDown size={12} />
             </button>
             {typeMenuOpen === row.id && (
@@ -450,12 +475,12 @@ export default function MyTripApp() {
             )}
           </div>
         );
-        case "from": return <input className="mt-editable" value={row.from} onChange={(e) => updateRow(row.id, { from: e.target.value })} />;
-        case "to": return <input className="mt-editable" value={row.to} onChange={(e) => updateRow(row.id, { to: e.target.value })} />;
-        case "startTime": return <input className="mt-editable" type="time" value={row.startTime} onChange={(e) => updateRow(row.id, { startTime: e.target.value })} />;
-        case "duration": return <span style={{ color: dur === null ? "var(--danger)" : "var(--muted)", fontSize: 12 }}>{dur === null ? "!" : dur}</span>;
-        case "endTime": return <input className="mt-editable" type="time" value={row.endTime} onChange={(e) => updateRow(row.id, { endTime: e.target.value })} />;
-        case "destination": return <input className="mt-editable" value={row.destination} onChange={(e) => updateRow(row.id, { destination: e.target.value })} />;
+        case "from": return <input className="mt-editable" title={row.from} value={row.from} onChange={(e) => updateRow(row.id, { from: e.target.value })} />;
+        case "to": return <input className="mt-editable" title={row.to} value={row.to} onChange={(e) => updateRow(row.id, { to: e.target.value })} />;
+        case "startTime": return <input className="mt-editable mt-time" type="time" value={row.startTime} onChange={(e) => updateRow(row.id, { startTime: e.target.value })} />;
+        case "duration": return <span title={dur === null ? "" : dur} style={{ color: dur === null ? "var(--danger)" : "var(--muted)", fontSize: 12 }}>{dur === null ? "!" : dur}</span>;
+        case "endTime": return <input className="mt-editable mt-time" type="time" value={row.endTime} onChange={(e) => updateRow(row.id, { endTime: e.target.value })} />;
+        case "destination": return <input className="mt-editable" title={row.destination} value={row.destination} onChange={(e) => updateRow(row.id, { destination: e.target.value })} />;
         case "link": return row.link ? (
           <a className="mt-link-icon" href={row.link} target="_blank" rel="noreferrer" title={row.link}><Link2 size={14} /></a>
         ) : (
@@ -463,25 +488,25 @@ export default function MyTripApp() {
         );
         case "cost": return (
           <span className="mt-cost">{row.costCurrency}
-            <input className="mt-editable" type="number" style={{ width: 52, fontWeight: 600, color: "var(--amber)" }} value={row.costAmount} onChange={(e) => updateRow(row.id, { costAmount: e.target.value })} />
+            <input className="mt-editable" type="number" title={String(row.costAmount)} style={{ width: 52, fontWeight: 600, color: "var(--amber)" }} value={row.costAmount} onChange={(e) => updateRow(row.id, { costAmount: e.target.value })} />
           </span>
         );
         default:
-          if (col.custom) return <input className="mt-editable" value={(row.custom && row.custom[col.key]) || ""} onChange={(e) => updateRow(row.id, { custom: { ...row.custom, [col.key]: e.target.value } })} />;
+          if (col.custom) return <input className="mt-editable" title={(row.custom && row.custom[col.key]) || ""} value={(row.custom && row.custom[col.key]) || ""} onChange={(e) => updateRow(row.id, { custom: { ...row.custom, [col.key]: e.target.value } })} />;
           return null;
       }
     }
 
     return (
       <tr className={depth > 0 ? "is-sub" : ""} draggable onDragStart={() => setDragId(row.id)} onDragOver={(e) => e.preventDefault()} onDrop={() => onDropRow(row.id)} style={{ opacity: dragId === row.id ? 0.4 : 1 }}>
-        <td>
+        <td className="handle">
           <div style={{ display: "flex", alignItems: "center", gap: 3, paddingInlineStart: depth * 14 }}>
             <span className="mt-drag-handle" title={T.dragHint}><GripVertical size={13} /></span>
             {hasChildren && <button onClick={toggleCollapse} style={{ border: "none", background: "none", display: "flex", color: "var(--muted)" }}>{collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}</button>}
           </div>
         </td>
         {visibleColumns.map((col) => <td key={col.key} className={col.key}>{renderCell(col)}</td>)}
-        <td>
+        <td className="actions">
           <div className="mt-row-actions">
             <button onClick={() => openCard(row)} title={T.editRecord}><Pencil /></button>
             {depth === 0 && <button onClick={() => addRow(row.date, row.id, row.frameId)} title={T.addSub}><Plus /></button>}
@@ -521,7 +546,7 @@ export default function MyTripApp() {
         .mt-columns-menu label { display:flex; align-items:center; gap:7px; padding:4px 4px; font-size:12.5px; border-radius:6px; }
         .mt-columns-menu label:hover { background:var(--bg); }
         .mt-columns-menu .divider { height:1px; background:var(--border); margin:6px 0; }
-        .mt-columns-menu input[type=text] { width:100%; border:1px solid var(--border); border-radius:6px; padding:5px 7px; font-size:12.5px; margin-bottom:6px; }
+        .mt-columns-menu input[type=text] { width:100%; border:1px solid var(--border); border-radius:6px; padding:5px 7px; font-size:12.5px; margin-bottom:6px; color:var(--ink); background:#fff; }
         .mt-content { padding:0 20px 40px; }
         .mt-suggest { display:flex; align-items:center; gap:10px; background:var(--amber-tint); border:1px solid #EAC896; color:#7A4E17; padding:9px 14px; border-radius:10px; margin:14px 0; font-size:12.5px; flex-wrap:wrap; }
         .mt-suggest svg { width:15px; height:15px; flex-shrink:0; }
@@ -540,9 +565,21 @@ export default function MyTripApp() {
         .mt-group-day { background:var(--teal-tint); color:var(--teal-dark); font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; }
         .mt-group-add { margin-inline-start:auto; font-size:12px; color:var(--teal); display:flex; align-items:center; gap:3px; background:none; border:none; font-weight:600; }
         .mt-group-add:hover { text-decoration:underline; }
-        table.mt-table { width:100%; table-layout:fixed; border-collapse:separate; border-spacing:0; background:var(--surface); border-radius:10px; overflow:hidden; border:1px solid var(--border); }
-        .mt-table thead th { text-align:start; font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); font-weight:600; padding:7px 7px; background:#FAFCFB; border-bottom:1px solid var(--border); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .mt-table tbody td { padding:5px 7px; font-size:12.8px; border-bottom:1px solid var(--border); vertical-align:middle; position:relative; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+        .mt-table-wrap { width:100%; overflow-x:auto; border-radius:10px; }
+        table.mt-table { width:100%; table-layout:auto; border-collapse:separate; border-spacing:0; background:var(--surface); border-radius:10px; overflow:hidden; border:1px solid var(--border); }
+        .mt-table thead th { text-align:start; font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); font-weight:600; padding:7px 8px; background:#FAFCFB; border-bottom:1px solid var(--border); white-space:nowrap; }
+        .mt-table tbody td { padding:5px 8px; font-size:12.8px; border-bottom:1px solid var(--border); vertical-align:middle; position:relative; white-space:nowrap; }
+        .mt-table th.handle, .mt-table td.handle, .mt-table th.icon, .mt-table td.icon { width:1%; white-space:nowrap; }
+        .mt-table th.link, .mt-table td.link, .mt-table th.actions, .mt-table td.actions { width:1%; white-space:nowrap; text-align:center; }
+        .mt-table th.duration, .mt-table td.duration { width:1%; white-space:nowrap; }
+        .mt-table th.startTime, .mt-table td.startTime, .mt-table th.endTime, .mt-table td.endTime { min-width:84px; width:1%; }
+        .mt-table th.date, .mt-table td.date { min-width:80px; width:1%; }
+        .mt-table th.day, .mt-table td.day { min-width:52px; width:1%; }
+        .mt-table th.cost, .mt-table td.cost { min-width:80px; width:1%; }
+        .mt-table th.type, .mt-table td.type { min-width:118px; }
+        .mt-table th.from, .mt-table td.from, .mt-table th.to, .mt-table td.to { min-width:90px; }
+        .mt-table th.destination, .mt-table td.destination { min-width:140px; width:auto; }
+        .mt-table td.destination, .mt-table td.from, .mt-table td.to, .mt-table td.type { overflow:hidden; text-overflow:ellipsis; }
         .mt-table tbody tr:last-child td { border-bottom:none; }
         .mt-table tbody tr:hover { background:#FBFDFC; }
         .mt-type-chip { display:flex; align-items:center; gap:6px; }
@@ -552,7 +589,9 @@ export default function MyTripApp() {
         .mt-type-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .mt-editable { border:1px solid transparent; border-radius:6px; padding:3px 5px; font-size:12.8px; width:100%; background:transparent; font-family:inherit; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .mt-editable:hover { border-color:var(--border); }
-        .mt-editable:focus { outline:none; border-color:var(--teal); background:#fff; position:absolute; z-index:15; inset-inline-start:2px; top:2px; width:max-content; min-width:140px; max-width:280px; white-space:normal; box-shadow:0 6px 18px rgba(20,40,35,.18); }
+        .mt-editable:focus:not(.mt-time):not([type=number]) { outline:none; border-color:var(--teal); background:#fff; position:absolute; z-index:15; inset-inline-start:2px; top:2px; width:max-content; min-width:140px; max-width:280px; white-space:normal; box-shadow:0 6px 18px rgba(20,40,35,.18); }
+        .mt-editable.mt-time:focus, .mt-editable[type=number]:focus { outline:none; border-color:var(--teal); background:#fff; }
+        .mt-editable.mt-time { min-width:76px; }
         .mt-cost { display:flex; align-items:center; gap:3px; font-weight:600; color:var(--amber); }
         .mt-link-icon { color:var(--teal); display:flex; align-items:center; justify-content:center; border:none; background:none; padding:2px; }
         .mt-link-icon.empty { color:var(--border); }
@@ -569,6 +608,9 @@ export default function MyTripApp() {
         .mt-summary-label { font-size:12px; color:var(--muted); font-weight:600; }
         .mt-chip { background:var(--amber-tint); color:#8A5A1F; font-weight:700; font-size:12.5px; padding:4px 11px; border-radius:20px; }
         .mt-chip.small { font-size:11px; padding:2px 8px; font-weight:600; }
+        .mt-chip-total { font-size:15px; padding:6px 14px; }
+        .mt-fx-select { border:1px solid var(--border); border-radius:8px; padding:5px 8px; font-size:12.5px; background:#fff; color:var(--ink); }
+        .mt-fx-note { font-size:10.5px; color:var(--muted); font-style:italic; }
         .mt-type-menu { position:absolute; z-index:50; background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 8px 24px rgba(20,40,35,.14); padding:6px; min-width:190px; margin-top:4px; }
         .mt-type-menu button.opt { width:100%; display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:7px; background:none; border:none; font-size:12.5px; text-align:start; }
         .mt-type-menu button.opt:hover { background:var(--bg); }
@@ -586,7 +628,7 @@ export default function MyTripApp() {
         .mt-modal-title { font-family:'Frank Ruhl Libre',serif; font-size:17px; font-weight:700; }
         .mt-modal-body { padding:16px 18px; display:flex; flex-direction:column; gap:12px; }
         .mt-field label { display:block; font-size:11.5px; font-weight:600; color:var(--muted); margin-bottom:4px; }
-        .mt-field input, .mt-field select { width:100%; border:1px solid var(--border); border-radius:8px; padding:7px 9px; font-size:13px; font-family:inherit; background:#fff; }
+        .mt-field input, .mt-field select { width:100%; border:1px solid var(--border); border-radius:8px; padding:7px 9px; font-size:13px; font-family:inherit; background:#fff; color:var(--ink); }
         .mt-field input:focus, .mt-field select:focus { outline:none; border-color:var(--teal); }
         .mt-field-row { display:flex; gap:9px; }
         .mt-field-row > div { flex:1; }
@@ -666,11 +708,25 @@ export default function MyTripApp() {
 
         <div className="mt-summary">
           <span className="mt-summary-label">{T.totalPerCurrency}:</span>
-          {Object.keys(grandTotals).length === 0 && <span style={{ fontSize: 12.5, color: "var(--muted)" }}>—</span>}
-          {Object.entries(grandTotals).map(([cur, amt]) => <span className="mt-chip" key={cur}>{cur} {amt.toLocaleString()}</span>)}
+          {Object.keys(grandTotals).length === 0 ? (
+            <span style={{ fontSize: 12.5, color: "var(--muted)" }}>—</span>
+          ) : (
+            <>
+              <span className="mt-chip mt-chip-total">
+                {displayCurrency} {convertedGrandTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              </span>
+              <select className="mt-fx-select" value={displayCurrency} onChange={(e) => setDisplayCurrency(e.target.value)}>
+                {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <span className="mt-fx-note">{fxIsLive ? T.fxLive : T.fxApprox}</span>
+              <span style={{ width: "100%" }} />
+              {Object.entries(grandTotals).map(([cur, amt]) => <span className="mt-chip small" key={cur}>{cur} {amt.toLocaleString()}</span>)}
+            </>
+          )}
         </div>
         <div className="mt-note">{loggedIn ? T.mockNote : ""}</div>
       </div>
+
 
       {/* record card modal */}
       {cardDraft && (
