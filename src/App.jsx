@@ -13,6 +13,7 @@ import {
 /*  Display face "Frank Ruhl Libre", UI/data face "Heebo" (tabular nums).  */
 /* ---------------------------------------------------------------------- */
 
+const APP_VERSION = "2.3.0";
 const ICONS = { Plane, PlaneTakeoff, Car, BedDouble, Footprints, Users, Sun, Ship, KeySquare, Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music };
 const HE_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 const EN_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -505,7 +506,9 @@ export default function MyTripApp() {
         .mt-brand-mark { width:32px; height:32px; border-radius:9px; background:var(--teal); display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; }
         .mt-brand-mark::after { content:''; position:absolute; width:44px; height:44px; border:2px solid rgba(255,255,255,.35); border-radius:50%; top:-14px; inset-inline-start:-8px; }
         .mt-brand-mark svg { color:#fff; width:17px; height:17px; z-index:1; }
+        .mt-brand-text { display:flex; flex-direction:column; line-height:1.15; }
         .mt-brand-name { font-family:'Frank Ruhl Libre',serif; font-size:20px; font-weight:700; }
+        .mt-brand-version { font-size:10px; color:var(--muted); font-weight:600; letter-spacing:.02em; }
         .mt-header-actions { display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
         .mt-icon-btn { border:1px solid var(--border); background:var(--surface); color:var(--ink); border-radius:8px; padding:6px 9px; display:flex; align-items:center; gap:5px; font-size:12.5px; font-weight:500; }
         .mt-icon-btn:hover { background:var(--teal-tint); border-color:var(--teal); }
@@ -606,7 +609,13 @@ export default function MyTripApp() {
       `}</style>
 
       <div className="mt-header">
-        <div className="mt-brand"><div className="mt-brand-mark"><Plane /></div><span className="mt-brand-name">{T.appName}</span></div>
+        <div className="mt-brand">
+          <div className="mt-brand-mark"><Plane /></div>
+          <div className="mt-brand-text">
+            <span className="mt-brand-name">{T.appName}</span>
+            <span className="mt-brand-version">v{APP_VERSION}</span>
+          </div>
+        </div>
         <div className="mt-header-actions">
           <button className="mt-icon-btn" onClick={() => setLang(lang === "he" ? "en" : "he")}><Globe /> {T.lang}</button>
           <button className={"mt-icon-btn" + (viewMode === "desktop" ? " active" : "")} onClick={() => setViewMode("desktop")} title={T.desktop}><Monitor /></button>
