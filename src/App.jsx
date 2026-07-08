@@ -1,19 +1,19 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   Plane, PlaneTakeoff, Car, BedDouble, Footprints, Users, Sun, Ship, KeySquare,
   Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music, ChevronDown, ChevronRight,
   Plus, X, Settings2, Pencil, Trash2, Link2, Globe, LogIn, User,
   Smartphone, Monitor, AlertTriangle, GripVertical, Check, FolderPlus, Sparkles,
-  Route, Waypoints, Download
+  Route, Waypoints, Download, MapPin, Search, CircleCheck, Clock, ArrowDownUp
 } from "lucide-react";
 
 /* ---------------------------------------------------------------------- */
 /*  MyTrip — trip-planning table prototype                                 */
-/*  v3: hoisted row/day/frame components (fixes the "one character" typing */
-/*  bug), date-range guarded frames, route links, and various UX fixes.    */
+/*  v4: chronology warnings, repositioned menus, location verification     */
+/*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "3.0.0";
+const APP_VERSION = "4.0.0";
 const ICONS = { Plane, PlaneTakeoff, Car, BedDouble, Footprints, Users, Sun, Ship, KeySquare, Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music };
 const HE_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 const EN_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -21,7 +21,7 @@ const FRAME_COLORS = ["#256D64", "#3E7CB1", "#8B6F47", "#7A5C9E", "#C1443A", "#5
 const CURRENCIES = ["₪", "$", "€", "£"];
 const CURRENCY_CODE_MAP = { "₪": "ILS", "$": "USD", "€": "EUR", "£": "GBP" };
 const FALLBACK_RATES = { ILS: 1, USD: 0.27, EUR: 0.25, GBP: 0.21 };
-const FLIGHT_LOOKUP_ENABLED = false; // set to true and wire a real provider (e.g. AeroDataBox/AviationStack) once you have an API key + backend proxy
+const FLIGHT_LOOKUP_ENABLED = false; // needs a real flight-data provider (e.g. AeroDataBox) + API key + server proxy
 
 const DEFAULT_TYPES = [
   { id: "flight", name: "טיסה", icon: "Plane", color: "#256D64" },
@@ -36,6 +36,7 @@ const DEFAULT_TYPES = [
 ];
 const ICON_PALETTE = ["Tag", "Star", "Flag", "Camera", "Utensils", "ShoppingBag", "Music"];
 const CUSTOM_COLOR_ROTATION = ["#7A5C9E", "#C1443A", "#3E7CB1", "#5B8C5A", "#8B6F47", "#D98E3F"];
+const TZ_HINT_TYPES = ["flight", "domestic-flight", "ferry"];
 
 const DEFAULT_COLUMNS = [
   { key: "date", label_he: "תאריך", label_en: "Date", visible: false },
@@ -56,7 +57,7 @@ const DEFAULT_COLUMNS = [
 const T_DICT = {
   he: {
     appName: "MyTrip", addRow: "הוסף רשומה", addDay: "הוסף יום", newFrame: "מסגרת חדשה",
-    columns: "עמודות", addColumn: "הוסף עמודה",
+    columns: "עמודות", addColumn: "הוסף עמודה", addType: "הוסף תיאור",
     login: "התחברות עם Google", logout: "יציאה",
     desktop: "מחשב", mobile: "סלולר", lang: "English", editRecord: "כרטיס רשומה",
     save: "שמירה", cancel: "ביטול", delete: "מחיקה", addSub: "הוסף תת-רשומה",
@@ -78,10 +79,15 @@ const T_DICT = {
     rowOutOfFrame: "התאריך חייב להיות בתוך טווח המסגרת שאליה הרשומה משויכת",
     routeTooltip: "פתח מסלול בגוגל מפות", dayRoute: "מסלול היום", noRoute: "אין מספיק נתוני מיקום",
     fetchFlightData: "משוך נתונים לפי מספר טיסה", flightApiMissing: "לצורך משיכה אוטומטית יש לחבר ספק נתוני טיסות (כגון AeroDataBox) עם מפתח API ופרוקסי בצד השרת. שדה זה מוכן לחיבור עתידי.",
+    chronoWarning: "סדר הרשומות ביום זה אינו כרונולוגי לפי שעה", sortByTime: "מיין לפי שעה",
+    addDayModalTitle: "הוספת יום חדש", addDayDate: "תאריך", confirmAdd: "הוסף",
+    verify: "אמת מול מפות", verified: "מאומת", openMap: "פתח במפה", pickFromMap: "בחר מהמפה",
+    locPickerTitle: "חיפוש מיקום", locSearch: "חפש", locSearching: "מחפש...", locNoResults: "לא נמצאו תוצאות",
+    flightPlaceholder: "עיר (קוד שדה תעופה, למשל TLV)", tzNote: "התאמת שעון אוטומטית לפי אזורי זמן דורשת חיבור ל-API מסחרי (כגון Google Time Zone) עם מפתח — לא מיושמת בפרוטוטייפ. יש לוודא ידנית שהשעות מוזנות לפי השעון המקומי בכל מיקום.",
   },
   en: {
     appName: "MyTrip", addRow: "Add record", addDay: "Add day", newFrame: "New frame",
-    columns: "Columns", addColumn: "Add column",
+    columns: "Columns", addColumn: "Add column", addType: "Add description",
     login: "Sign in with Google", logout: "Sign out",
     desktop: "Desktop", mobile: "Mobile", lang: "עברית", editRecord: "Record card",
     save: "Save", cancel: "Cancel", delete: "Delete", addSub: "Add sub-record",
@@ -103,10 +109,15 @@ const T_DICT = {
     rowOutOfFrame: "The date must fall inside the frame this record belongs to",
     routeTooltip: "Open route in Google Maps", dayRoute: "Day route", noRoute: "Not enough location data",
     fetchFlightData: "Fetch data by flight number", flightApiMissing: "Live lookup needs a flight-data provider (e.g. AeroDataBox) with an API key and a server-side proxy. This field is ready to be wired up later.",
+    chronoWarning: "Records on this day are not in chronological time order", sortByTime: "Sort by time",
+    addDayModalTitle: "Add a new day", addDayDate: "Date", confirmAdd: "Add",
+    verify: "Verify with Maps", verified: "Verified", openMap: "Open in Maps", pickFromMap: "Pick from map",
+    locPickerTitle: "Location search", locSearch: "Search", locSearching: "Searching...", locNoResults: "No results found",
+    flightPlaceholder: "City (airport code, e.g. TLV)", tzNote: "Automatic time-zone adjustment needs a commercial API (e.g. Google Time Zone) with a key — not implemented in this prototype. Please double-check that times are entered in each location's local time.",
   }
 };
 
-/* ---------- pure helpers (module scope — safe to call from anywhere) ---------- */
+/* ---------- pure helpers ---------- */
 function uid() { return Math.random().toString(36).slice(2, 10); }
 function heDay(dateStr, lang) { if (!dateStr) return "—"; const d = new Date(dateStr + "T00:00:00"); if (isNaN(d)) return "—"; return lang === "he" ? HE_DAYS[d.getDay()] : EN_DAYS[d.getDay()]; }
 function fmtDate(dateStr, lang) { if (!dateStr) return "—"; const d = new Date(dateStr + "T00:00:00"); if (isNaN(d)) return dateStr; const dd = String(d.getDate()).padStart(2, "0"); const mm = String(d.getMonth() + 1).padStart(2, "0"); return `${dd}/${mm}/${d.getFullYear()}`; }
@@ -185,6 +196,15 @@ function dayRouteUrl(rowsInDay) {
   if (deduped.length < 2) return null;
   return "https://www.google.com/maps/dir/" + deduped.map((p) => encodeURIComponent(p)).join("/");
 }
+function isChronological(rowsList) {
+  let last = null;
+  for (const r of rowsList) {
+    if (!r.startTime) continue;
+    if (last !== null && r.startTime < last) return false;
+    last = r.startTime;
+  }
+  return true;
+}
 function initialRows() {
   const base = [
     { date: "2026-09-10", typeId: "flight", from: "תל אביב TLV", to: "רומא FCO", startTime: "07:40", endTime: "10:35", destination: "פיומיצ׳ינו", link: "https://www.google.com/flights", costAmount: 1450, costCurrency: "₪", flightNumber: "LY386" },
@@ -194,12 +214,11 @@ function initialRows() {
     { date: "2026-09-11", typeId: "self-tour", from: "", to: "", startTime: "16:00", endTime: "19:30", destination: "טרסטבר — שיטוט וקניות", costAmount: 0, costCurrency: "€" },
     { date: "2026-09-14", typeId: "flight", from: "רומא FCO", to: "תל אביב TLV", startTime: "18:20", endTime: "21:50", destination: "נתב״ג", costAmount: 1390, costCurrency: "₪", flightNumber: "LY387" },
   ];
-  return base.map((r) => ({ id: uid(), parentId: null, frameId: null, overnight: false, notes: "", mapLink: "", custom: {}, ...r }));
+  return base.map((r) => ({ id: uid(), parentId: null, frameId: null, overnight: false, notes: "", mapLink: "", fromVerifiedUrl: "", fromVerifiedText: "", toVerifiedUrl: "", toVerifiedText: "", custom: {}, ...r }));
 }
 
 /* ================================================================= */
-/*  Hoisted display components (stable identity — never redefined on  */
-/*  re-render, which is what keeps inline editing from losing focus)  */
+/*  Hoisted display components                                        */
 /* ================================================================= */
 
 function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, ctx }) {
@@ -209,6 +228,8 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
   const Icon = ICONS[tm.icon] || Tag;
   const dur = computeDuration(row.startTime, row.endTime, row.overnight);
   const routeUrl = depth === 0 ? segmentRouteUrl(prevRow, row) : null;
+  const fromVerified = row.fromVerifiedUrl && row.fromVerifiedText === row.from;
+  const toVerified = row.toVerifiedUrl && row.toVerifiedText === row.to;
 
   function renderCell(col) {
     switch (col.key) {
@@ -216,7 +237,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
       case "day": return depth === 0 ? heDay(row.date, lang) : "";
       case "icon": return <span className="mt-type-icon" style={{ background: tm.color }}><Icon /></span>;
       case "type": return (
-        <div style={{ position: "relative" }}>
+        <div className="mt-type-wrap">
           <button className="mt-type-btn" title={tm.name} onClick={() => setTypeMenuOpen(typeMenuOpen === row.id ? null : row.id)}>
             <span className="mt-type-text">{tm.name}</span> <ChevronDown size={12} />
           </button>
@@ -241,8 +262,18 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
           )}
         </div>
       );
-      case "from": return <input className="mt-editable" title={row.from} value={row.from} onChange={(e) => updateRow(row.id, { from: e.target.value })} />;
-      case "to": return <input className="mt-editable" title={row.to} value={row.to} onChange={(e) => updateRow(row.id, { to: e.target.value })} />;
+      case "from": return (
+        <span className="mt-loc-cell">
+          <input className="mt-editable" title={row.from} value={row.from} onChange={(e) => updateRow(row.id, { from: e.target.value })} />
+          {fromVerified && <a className="mt-loc-badge" href={row.fromVerifiedUrl} target="_blank" rel="noreferrer" title={T.openMap}><MapPin size={11} /></a>}
+        </span>
+      );
+      case "to": return (
+        <span className="mt-loc-cell">
+          <input className="mt-editable" title={row.to} value={row.to} onChange={(e) => updateRow(row.id, { to: e.target.value })} />
+          {toVerified && <a className="mt-loc-badge" href={row.toVerifiedUrl} target="_blank" rel="noreferrer" title={T.openMap}><MapPin size={11} /></a>}
+        </span>
+      );
       case "startTime": return <input className="mt-editable mt-time" type="time" value={row.startTime} onChange={(e) => updateRow(row.id, { startTime: e.target.value })} />;
       case "duration": return <span title={dur === null ? "" : dur} style={{ color: dur === null ? "var(--danger)" : "var(--muted)", fontSize: 12 }}>{dur === null ? "!" : dur}</span>;
       case "endTime": return <input className="mt-editable mt-time" type="time" value={row.endTime} onChange={(e) => updateRow(row.id, { endTime: e.target.value })} />;
@@ -269,7 +300,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
   return (
     <tr className={depth > 0 ? "is-sub" : ""} draggable onDragStart={() => setDragId(row.id)} onDragOver={(e) => e.preventDefault()} onDrop={() => onDropRow(row.id)} style={{ opacity: dragId === row.id ? 0.4 : 1 }}>
       <td className="handle">
-        <div style={{ display: "flex", alignItems: "center", gap: 3, paddingInlineStart: depth * 14 }}>
+        <div className="mt-handle-wrap" style={{ paddingInlineStart: depth * 14 }}>
           <span className="mt-drag-handle" title={T.dragHint}><GripVertical size={13} /></span>
           {hasChildren && <button onClick={toggleCollapse} style={{ border: "none", background: "none", display: "flex", color: "var(--muted)" }}>{collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}</button>}
         </div>
@@ -288,12 +319,13 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
 
 function DayGroup({ g, fid, depth, ctx }) {
   const { T, lang, effectiveMobile, collapsedGroups, setCollapsedGroups, collapsedParents, setCollapsedParents,
-    addRow, openCard, types, visibleColumns, nextDateInContext, rows } = ctx;
+    addRow, openCard, types, visibleColumns, openAddDayModal, rows, sortDayByTime } = ctx;
   const gk = (fid || "root") + "__" + g.date;
   const collapsed = !!collapsedGroups[gk];
   const childrenOf = (pid) => childrenOfPure(rows, pid);
   const allRowsHere = g.rows.flatMap((r) => [r, ...childrenOf(r.id)]);
   const dayRoute = dayRouteUrl(g.rows);
+  const chronoOk = isChronological(g.rows);
 
   return (
     <div className="mt-group">
@@ -303,7 +335,7 @@ function DayGroup({ g, fid, depth, ctx }) {
         <span className="mt-group-day">{heDay(g.date, lang)}</span>
         <div className="mt-group-actions" onClick={(e) => e.stopPropagation()}>
           <button className="mt-group-add" onClick={() => addRow(g.date, null, fid)}><Plus size={13} /> {T.addRow}</button>
-          <button className="mt-group-add" onClick={() => addRow(nextDateInContext(fid), null, fid)}><Plus size={13} /> {T.addDay}</button>
+          <button className="mt-group-add" onClick={() => openAddDayModal(fid)}><Plus size={13} /> {T.addDay}</button>
           {dayRoute ? (
             <a className="mt-group-add" href={dayRoute} target="_blank" rel="noreferrer"><Waypoints size={13} /> {T.dayRoute}</a>
           ) : (
@@ -311,6 +343,12 @@ function DayGroup({ g, fid, depth, ctx }) {
           )}
         </div>
       </div>
+      {!chronoOk && (
+        <div className="mt-chrono-warning">
+          <Clock size={13} /> {T.chronoWarning}
+          <button className="mt-btn ghost" style={{ marginInlineStart: "auto" }} onClick={() => sortDayByTime(fid, g.date)}><ArrowDownUp size={12} /> {T.sortByTime}</button>
+        </div>
+      )}
       {!collapsed && (effectiveMobile ? (
         <div className="mt-cards">
           {allRowsHere.map((r) => {
@@ -363,7 +401,7 @@ function DayGroup({ g, fid, depth, ctx }) {
 }
 
 function FrameBlock({ frame, depth, ctx, renderContext }) {
-  const { T, lang, toggleFrameCollapse, openFrameModal, deleteFrame, addRow, nextDateInContext, frameTotals } = ctx;
+  const { T, lang, toggleFrameCollapse, openFrameModal, deleteFrame, openAddDayModal, frameTotals } = ctx;
   const totals = frameTotals(frame.id);
   const color = FRAME_COLORS[depth % FRAME_COLORS.length];
   return (
@@ -376,7 +414,7 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
           <span className="mt-chip small" key={cur}>{cur} {amt.toLocaleString()}</span>
         ))}
         <span className="mt-frame-actions" onClick={(e) => e.stopPropagation()}>
-          <button onClick={() => addRow(nextDateInContext(frame.id), null, frame.id)} title={T.addDay}><Plus size={14} /></button>
+          <button onClick={() => openAddDayModal(frame.id)} title={T.addDay}><Plus size={14} /></button>
           <button onClick={() => openFrameModal(null, frame.id)} title={T.addSubFrame}><FolderPlus size={14} /></button>
           <button onClick={() => openFrameModal(frame)} title={T.editRecord}><Pencil size={13} /></button>
           <button onClick={() => deleteFrame(frame.id)} title={T.delete}><Trash2 size={13} /></button>
@@ -403,18 +441,26 @@ export default function MyTripApp() {
   const [collapsedGroups, setCollapsedGroups] = useState({});
   const [collapsedParents, setCollapsedParents] = useState({});
   const [colMenuOpen, setColMenuOpen] = useState(false);
+  const [colMenuPos, setColMenuPos] = useState({ top: 0, left: 0 });
   const [newColName, setNewColName] = useState("");
   const [typeMenuOpen, setTypeMenuOpen] = useState(null);
   const [newTypeDraft, setNewTypeDraft] = useState({ name: "", icon: "Tag" });
+  const [addTypeOpen, setAddTypeOpen] = useState(false);
+  const [addTypePos, setAddTypePos] = useState({ top: 0, left: 0 });
+  const [addTypeDraft, setAddTypeDraft] = useState({ name: "", icon: "Tag" });
   const [cardRowId, setCardRowId] = useState(null);
   const [cardDraft, setCardDraft] = useState(null);
   const [flightLookupMsg, setFlightLookupMsg] = useState("");
   const [frameDraft, setFrameDraft] = useState(null);
+  const [addDayCtx, setAddDayCtx] = useState(null); // { fid, date }
+  const [locPicker, setLocPicker] = useState(null); // { field, query, results, loading }
   const [dragId, setDragId] = useState(null);
   const [dismissedKey, setDismissedKey] = useState("");
   const [displayCurrency, setDisplayCurrency] = useState("₪");
   const [fxRates, setFxRates] = useState(null);
   const [fxIsLive, setFxIsLive] = useState(false);
+  const columnsBtnRef = useRef(null);
+  const addTypeBtnRef = useRef(null);
   const dir = lang === "he" ? "rtl" : "ltr";
   const T = T_DICT[lang];
 
@@ -444,7 +490,7 @@ export default function MyTripApp() {
   const effectiveMobile = viewMode === "mobile" || (viewMode === "auto" && narrowScreen);
   const visibleColumns = columns.filter((c) => c.visible);
 
-  /* ---------- bound data helpers (thin wrappers over the pure functions) ---------- */
+  /* ---------- bound data helpers ---------- */
   function childFrames(pid) { return childFramesPure(frames, pid); }
   function rowsAt(fid) { return rowsAtPure(rows, fid); }
   function dayGroupsAt(fid) { return dayGroupsAtPure(rows, fid); }
@@ -501,10 +547,22 @@ export default function MyTripApp() {
       id: uid(), parentId, frameId, date: date || new Date().toISOString().slice(0, 10),
       typeId: "unset", from: "", to: "", startTime: "", endTime: "", overnight: false,
       destination: "", link: "", mapLink: "", flightNumber: "", costAmount: 0, costCurrency: "₪",
-      notes: "", custom: {},
+      notes: "", fromVerifiedUrl: "", fromVerifiedText: "", toVerifiedUrl: "", toVerifiedText: "", custom: {},
     };
     setRows((prev) => [...prev, nr]);
     return nr.id;
+  }
+  function sortDayByTime(fid, date) {
+    setRows((prev) => {
+      const topRows = prev.filter((r) => !r.parentId && (r.frameId || null) === (fid || null) && r.date === date);
+      const usedIds = new Set();
+      const blocks = topRows.map((p) => { const children = prev.filter((c) => c.parentId === p.id); usedIds.add(p.id); children.forEach((c) => usedIds.add(c.id)); return { parent: p, children }; });
+      const sortedBlocks = [...blocks].sort((a, b) => (a.parent.startTime || "99:99").localeCompare(b.parent.startTime || "99:99"));
+      const flattened = sortedBlocks.flatMap((b) => [b.parent, ...b.children]);
+      const result = []; let inserted = false;
+      prev.forEach((r) => { if (usedIds.has(r.id)) { if (!inserted) { result.push(...flattened); inserted = true; } } else result.push(r); });
+      return result;
+    });
   }
   function onDropRow(targetId) {
     if (!dragId || dragId === targetId) return;
@@ -515,6 +573,17 @@ export default function MyTripApp() {
       const ti = arr.findIndex((r) => r.id === targetId); arr.splice(ti, 0, moved); return arr;
     });
     setDragId(null);
+  }
+
+  /* ---------- add-day modal ---------- */
+  function openAddDayModal(fid) { setAddDayCtx({ fid, date: nextDateInContext(fid) }); }
+  function closeAddDayModal() { setAddDayCtx(null); }
+  const addDayFrame = addDayCtx && addDayCtx.fid ? frames.find((f) => f.id === addDayCtx.fid) : null;
+  const addDayIssue = addDayCtx && addDayFrame && (addDayCtx.date < addDayFrame.startDate || addDayCtx.date > addDayFrame.endDate) ? T.rowOutOfFrame : null;
+  function confirmAddDay() {
+    if (!addDayCtx || !addDayCtx.date || addDayIssue) return;
+    addRow(addDayCtx.date, null, addDayCtx.fid);
+    closeAddDayModal();
   }
 
   /* ---------- columns / types ---------- */
@@ -533,10 +602,49 @@ export default function MyTripApp() {
     if (rowIdToApply) updateRow(rowIdToApply, { typeId: id });
     setNewTypeDraft({ name: "", icon: "Tag" }); setTypeMenuOpen(null);
   }
+  function openColumnsMenu() {
+    if (columnsBtnRef.current) { const r = columnsBtnRef.current.getBoundingClientRect(); setColMenuPos({ top: r.bottom + 8, left: r.left }); }
+    setColMenuOpen((v) => !v);
+  }
+  function openAddTypeMenu() {
+    if (addTypeBtnRef.current) { const r = addTypeBtnRef.current.getBoundingClientRect(); setAddTypePos({ top: r.bottom + 8, left: r.left }); }
+    setAddTypeOpen((v) => !v);
+  }
+  function submitAddType() {
+    if (!addTypeDraft.name.trim()) return;
+    const id = "custom-" + uid();
+    const color = CUSTOM_COLOR_ROTATION[types.length % CUSTOM_COLOR_ROTATION.length];
+    setTypes((prev) => [...prev, { id, name: addTypeDraft.name, icon: addTypeDraft.icon, color }]);
+    setAddTypeDraft({ name: "", icon: "Tag" }); setAddTypeOpen(false);
+  }
+
+  /* ---------- location verification (OpenStreetMap Nominatim — free, no API key) ---------- */
+  function openLocationPicker(field) {
+    const initialQuery = cardDraft ? (cardDraft[field] || "") : "";
+    setLocPicker({ field, query: initialQuery, results: [], loading: false });
+    if (initialQuery.trim()) runLocationSearch(initialQuery);
+  }
+  function runLocationSearch(queryOverride) {
+    const q = (queryOverride !== undefined ? queryOverride : locPicker && locPicker.query) || "";
+    if (!q.trim()) return;
+    setLocPicker((p) => ({ ...p, loading: true }));
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(q)}`)
+      .then((r) => r.json())
+      .then((data) => setLocPicker((p) => ({ ...p, loading: false, results: Array.isArray(data) ? data : [] })))
+      .catch(() => setLocPicker((p) => ({ ...p, loading: false, results: [] })));
+  }
+  function pickLocation(result) {
+    const label = result.display_name.split(",").slice(0, 2).join(",").trim();
+    const mapUrl = `https://www.google.com/maps/search/?api=1&query=${result.lat},${result.lon}`;
+    if (locPicker.field === "from") setCardDraft((d) => ({ ...d, from: label, fromVerifiedUrl: mapUrl, fromVerifiedText: label }));
+    else if (locPicker.field === "to") setCardDraft((d) => ({ ...d, to: label, toVerifiedUrl: mapUrl, toVerifiedText: label }));
+    else if (locPicker.field === "destination") setCardDraft((d) => ({ ...d, destination: label, mapLink: mapUrl }));
+    setLocPicker(null);
+  }
 
   /* ---------- record card ---------- */
   function openCard(row) { setCardRowId(row.id); setCardDraft({ ...row }); setFlightLookupMsg(""); }
-  function closeCard() { setCardRowId(null); setCardDraft(null); setFlightLookupMsg(""); }
+  function closeCard() { setCardRowId(null); setCardDraft(null); setFlightLookupMsg(""); setLocPicker(null); }
   const cardHasTimeError = cardDraft && cardDraft.startTime && cardDraft.endTime && computeDuration(cardDraft.startTime, cardDraft.endTime, cardDraft.overnight) === null;
   const cardFrameIssue = cardDraft ? rowFrameIssue(cardDraft, frames, T) : null;
   function saveCard() {
@@ -575,6 +683,7 @@ export default function MyTripApp() {
     typeMenuOpen, setTypeMenuOpen, newTypeDraft, setNewTypeDraft, addCustomType,
     collapsedParents, setCollapsedParents, collapsedGroups, setCollapsedGroups,
     toggleFrameCollapse, openFrameModal, deleteFrame, nextDateInContext, frameTotals,
+    openAddDayModal, sortDayByTime,
   };
 
   function renderContext(fid, depth) {
@@ -588,7 +697,7 @@ export default function MyTripApp() {
       return (
         <div className="mt-empty">
           {T.noRows}
-          <button className="mt-btn ghost" style={{ marginTop: 8 }} onClick={() => addRow(nextDateInContext(fid), null, fid)}>
+          <button className="mt-btn ghost" style={{ marginTop: 8 }} onClick={() => openAddDayModal(fid)}>
             <Plus size={13} /> {T.addDay}
           </button>
         </div>
@@ -606,6 +715,11 @@ export default function MyTripApp() {
         onClick={(e) => { if (e.target.showPicker) { try { e.target.showPicker(); } catch (err) {} } }} />
     );
   }
+
+  const showFlightHint = cardDraft && (cardDraft.typeId === "flight" || cardDraft.typeId === "domestic-flight");
+  const showTzHint = cardDraft && TZ_HINT_TYPES.includes(cardDraft.typeId);
+  const fromVerifiedCard = cardDraft && cardDraft.fromVerifiedUrl && cardDraft.fromVerifiedText === cardDraft.from;
+  const toVerifiedCard = cardDraft && cardDraft.toVerifiedUrl && cardDraft.toVerifiedText === cardDraft.to;
 
   /* ---------- render ---------- */
   return (
@@ -634,10 +748,11 @@ export default function MyTripApp() {
         .mt-avatar { width:26px; height:26px; border-radius:50%; background:var(--teal-tint); color:var(--teal-dark); display:flex; align-items:center; justify-content:center; border:1px solid var(--border); }
         .mt-toolbar { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 20px; flex-wrap:wrap; }
         .mt-toolbar-group { display:flex; gap:7px; align-items:center; flex-wrap:wrap; }
-        .mt-columns-menu { position:absolute; margin-top:6px; background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 8px 24px rgba(20,40,35,.12); padding:9px; z-index:60; min-width:220px; max-width:90vw; max-height:60vh; overflow-y:auto; }
-        .mt-columns-menu-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
-        .mt-columns-menu-head strong { font-size:12.5px; }
-        .mt-columns-backdrop { position:fixed; inset:0; z-index:55; background:transparent; }
+        .mt-floating-menu { position:fixed; background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 12px 32px rgba(20,40,35,.18); padding:10px; z-index:200; max-width:92vw; max-height:70vh; overflow-y:auto; }
+        .mt-floating-backdrop { position:fixed; inset:0; z-index:190; background:transparent; }
+        .mt-menu-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:7px; }
+        .mt-menu-head strong { font-size:12.5px; }
+        .mt-columns-menu { min-width:220px; }
         .mt-columns-menu label { display:flex; align-items:center; gap:7px; padding:4px 4px; font-size:12.5px; border-radius:6px; }
         .mt-columns-menu label:hover { background:var(--bg); }
         .mt-columns-menu .divider { height:1px; background:var(--border); margin:6px 0; }
@@ -662,28 +777,35 @@ export default function MyTripApp() {
         .mt-group-add { font-size:12px; color:var(--teal); display:flex; align-items:center; gap:3px; background:none; border:none; font-weight:600; text-decoration:none; }
         .mt-group-add:hover { text-decoration:underline; }
         .mt-group-add.disabled { color:var(--border); cursor:default; }
+        .mt-chrono-warning { display:flex; align-items:center; gap:7px; background:#FBEAE8; color:var(--danger); font-size:11.5px; padding:6px 10px; border-radius:8px; margin:0 4px 8px; }
         .mt-table-wrap { width:100%; overflow-x:auto; border-radius:10px; }
         table.mt-table { width:100%; table-layout:auto; border-collapse:separate; border-spacing:0; background:var(--surface); border-radius:10px; overflow:hidden; border:1px solid var(--border); }
         .mt-table thead th { text-align:start; font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); font-weight:600; padding:7px 8px; background:#FAFCFB; border-bottom:1px solid var(--border); white-space:nowrap; }
         .mt-table tbody td { padding:5px 8px; font-size:12.8px; border-bottom:1px solid var(--border); vertical-align:middle; position:relative; white-space:nowrap; }
         .mt-table tbody tr:last-child td { border-bottom:none; }
         .mt-table tbody tr:hover { background:#FBFDFC; }
-        .mt-table th.handle, .mt-table td.handle, .mt-table th.icon, .mt-table td.icon, .mt-table th.route, .mt-table td.route { width:1%; white-space:nowrap; text-align:center; }
+        .mt-table th.handle, .mt-table td.handle { width:44px; min-width:44px; max-width:44px; white-space:nowrap; }
+        .mt-table th.icon, .mt-table td.icon, .mt-table th.route, .mt-table td.route { width:1%; white-space:nowrap; text-align:center; }
         .mt-table th.link, .mt-table td.link, .mt-table th.actions, .mt-table td.actions { width:1%; white-space:nowrap; text-align:center; }
         .mt-table th.duration, .mt-table td.duration { width:1%; white-space:nowrap; }
         .mt-table th.startTime, .mt-table td.startTime, .mt-table th.endTime, .mt-table td.endTime { min-width:86px; width:1%; }
         .mt-table th.date, .mt-table td.date { min-width:80px; width:1%; }
         .mt-table th.day, .mt-table td.day { min-width:52px; width:1%; }
         .mt-table th.cost, .mt-table td.cost { min-width:96px; }
-        .mt-table th.type, .mt-table td.type { min-width:118px; }
-        .mt-table th.from, .mt-table td.from, .mt-table th.to, .mt-table td.to { min-width:96px; }
+        .mt-table th.type, .mt-table td.type { min-width:118px; overflow:visible; }
+        .mt-table th.from, .mt-table td.from, .mt-table th.to, .mt-table td.to { min-width:104px; }
         .mt-table th.destination, .mt-table td.destination { min-width:140px; width:auto; }
-        .mt-table td.destination, .mt-table td.from, .mt-table td.to, .mt-table td.type { overflow:hidden; text-overflow:ellipsis; }
+        .mt-table td.destination, .mt-table td.from, .mt-table td.to { overflow:hidden; text-overflow:ellipsis; }
+        .mt-handle-wrap { display:flex; align-items:center; gap:3px; }
+        .mt-type-wrap { position:relative; }
         .mt-type-chip { display:flex; align-items:center; gap:6px; }
         .mt-type-icon { width:22px; height:22px; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
         .mt-type-icon svg { width:12px; height:12px; color:#fff; }
         .mt-type-btn { border:none; background:none; padding:0; display:flex; align-items:center; gap:5px; font-size:12.8px; font-weight:500; color:var(--ink); max-width:100%; }
         .mt-type-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .mt-loc-cell { display:flex; align-items:center; gap:3px; }
+        .mt-loc-cell .mt-editable { flex:1; }
+        .mt-loc-badge { color:#3E8E5A; display:flex; flex-shrink:0; }
         .mt-editable { border:1px solid transparent; border-radius:6px; padding:3px 5px; font-size:12.8px; width:100%; background:transparent; font-family:inherit; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .mt-editable:hover { border-color:var(--border); }
         .mt-editable:focus:not(.mt-time):not([type=number]) { outline:none; border-color:var(--teal); background:#fff; position:absolute; z-index:15; inset-inline-start:2px; top:2px; width:max-content; min-width:140px; max-width:280px; white-space:normal; box-shadow:0 6px 18px rgba(20,40,35,.18); }
@@ -699,8 +821,8 @@ export default function MyTripApp() {
         .mt-row-actions button { border:none; background:none; color:var(--muted); padding:3px; border-radius:5px; display:flex; }
         .mt-row-actions button:hover { background:var(--teal-tint); color:var(--teal-dark); }
         .mt-row-actions svg { width:13px; height:13px; }
-        .mt-drag-handle { cursor:grab; color:var(--border); }
-        .mt-drag-handle:hover { color:var(--muted); }
+        .mt-drag-handle { cursor:grab; color:#9FB0AA; }
+        .mt-drag-handle:hover { color:var(--teal-dark); }
         .mt-empty { padding:16px; text-align:center; color:var(--muted); font-size:12.5px; background:var(--surface); border:1px dashed var(--border); border-radius:12px; }
         .mt-summary { margin-top:20px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
         .mt-summary-label { font-size:12px; color:var(--muted); font-weight:600; }
@@ -722,6 +844,7 @@ export default function MyTripApp() {
         .mt-icon-pick svg { width:12px; height:12px; color:var(--muted); }
         .mt-modal-backdrop { position:fixed; inset:0; background:rgba(20,35,32,.4); display:flex; align-items:center; justify-content:center; z-index:100; padding:20px; }
         .mt-modal { background:var(--surface); border-radius:16px; width:100%; max-width:440px; max-height:86vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,.25); }
+        .mt-modal.narrow { max-width:360px; }
         .mt-modal-header { display:flex; align-items:center; justify-content:space-between; padding:15px 18px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--surface); }
         .mt-modal-title { font-family:'Frank Ruhl Libre',serif; font-size:17px; font-weight:700; }
         .mt-modal-body { padding:16px 18px; display:flex; flex-direction:column; gap:12px; }
@@ -736,12 +859,16 @@ export default function MyTripApp() {
         .mt-error { display:flex; gap:6px; align-items:flex-start; background:#FBEAE8; color:var(--danger); font-size:11.5px; padding:7px 9px; border-radius:8px; }
         .mt-error svg { width:13px; height:13px; flex-shrink:0; margin-top:1px; }
         .mt-hint { font-size:11px; color:var(--muted); }
+        .mt-verified-row { display:flex; align-items:center; gap:5px; font-size:11px; color:#3E8E5A; margin-top:3px; }
         .mt-modal-footer { display:flex; justify-content:flex-end; gap:7px; padding:13px 18px; border-top:1px solid var(--border); position:sticky; bottom:0; background:var(--surface); flex-wrap:wrap; }
         .mt-btn { border-radius:8px; padding:7px 14px; font-size:12.5px; font-weight:600; border:1px solid var(--border); background:#fff; display:inline-flex; align-items:center; gap:5px; }
         .mt-btn.primary { background:var(--teal); color:#fff; border-color:var(--teal); }
         .mt-btn.primary:disabled { opacity:.5; cursor:not-allowed; }
         .mt-btn.ghost { border-color:transparent; color:var(--muted); }
         .mt-btn.danger { color:var(--danger); border-color:transparent; }
+        .mt-loc-results { display:flex; flex-direction:column; gap:5px; max-height:220px; overflow-y:auto; }
+        .mt-loc-result { text-align:start; border:1px solid var(--border); border-radius:8px; padding:7px 9px; font-size:12px; background:#fff; }
+        .mt-loc-result:hover { background:var(--teal-tint); border-color:var(--teal); }
         .mt-cards { display:flex; flex-direction:column; gap:9px; }
         .mt-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:11px 13px; display:flex; flex-direction:column; gap:5px; }
         .mt-card-top { display:flex; align-items:center; justify-content:space-between; }
@@ -775,31 +902,46 @@ export default function MyTripApp() {
         <div className="mt-toolbar-group">
           <button className="mt-icon-btn" onClick={() => openFrameModal(null, null)}><FolderPlus /> {T.newFrame}</button>
         </div>
-        <div className="mt-toolbar-group" style={{ position: "relative" }}>
-          <button className="mt-icon-btn" onClick={() => setColMenuOpen((v) => !v)}><Settings2 /> {T.columns}</button>
-          {colMenuOpen && (
-            <>
-              <div className="mt-columns-backdrop" onClick={() => setColMenuOpen(false)} />
-              <div className="mt-columns-menu" style={{ insetInlineEnd: 0 }}>
-                <div className="mt-columns-menu-head">
-                  <strong>{T.columns}</strong>
-                  <button className="mt-btn ghost" style={{ padding: "2px 6px" }} onClick={() => setColMenuOpen(false)}><X size={14} /></button>
-                </div>
-                {columns.map((c) => (
-                  <label key={c.key}>
-                    <input type="checkbox" checked={c.visible} onChange={() => toggleColumn(c.key)} />
-                    {lang === "he" ? c.label_he : c.label_en}
-                    {c.custom && <button className="mt-btn ghost" style={{ padding: "2px 6px", marginInlineStart: "auto" }} onClick={(e) => { e.preventDefault(); removeCustomColumn(c.key); }}><X size={12} /></button>}
-                  </label>
-                ))}
-                <div className="divider" />
-                <input type="text" placeholder={T.addColumn} value={newColName} onChange={(e) => setNewColName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addCustomColumn()} />
-                <button className="mt-btn primary" style={{ width: "100%" }} onClick={addCustomColumn}><Plus size={13} /> {T.addColumn}</button>
-              </div>
-            </>
-          )}
+        <div className="mt-toolbar-group">
+          <button className="mt-icon-btn" ref={addTypeBtnRef} onClick={openAddTypeMenu}><Plus /> {T.addType}</button>
+          <button className="mt-icon-btn" ref={columnsBtnRef} onClick={openColumnsMenu}><Settings2 /> {T.columns}</button>
         </div>
       </div>
+
+      {colMenuOpen && (
+        <>
+          <div className="mt-floating-backdrop" onClick={() => setColMenuOpen(false)} />
+          <div className="mt-floating-menu mt-columns-menu" style={{ top: colMenuPos.top, left: colMenuPos.left }}>
+            <div className="mt-menu-head"><strong>{T.columns}</strong><button className="mt-btn ghost" style={{ padding: "2px 6px" }} onClick={() => setColMenuOpen(false)}><X size={14} /></button></div>
+            {columns.map((c) => (
+              <label key={c.key}>
+                <input type="checkbox" checked={c.visible} onChange={() => toggleColumn(c.key)} />
+                {lang === "he" ? c.label_he : c.label_en}
+                {c.custom && <button className="mt-btn ghost" style={{ padding: "2px 6px", marginInlineStart: "auto" }} onClick={(e) => { e.preventDefault(); removeCustomColumn(c.key); }}><X size={12} /></button>}
+              </label>
+            ))}
+            <div className="divider" />
+            <input type="text" placeholder={T.addColumn} value={newColName} onChange={(e) => setNewColName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addCustomColumn()} />
+            <button className="mt-btn primary" style={{ width: "100%" }} onClick={addCustomColumn}><Plus size={13} /> {T.addColumn}</button>
+          </div>
+        </>
+      )}
+
+      {addTypeOpen && (
+        <>
+          <div className="mt-floating-backdrop" onClick={() => setAddTypeOpen(false)} />
+          <div className="mt-floating-menu" style={{ top: addTypePos.top, left: addTypePos.left, minWidth: 200 }}>
+            <div className="mt-menu-head"><strong>{T.newType}</strong><button className="mt-btn ghost" style={{ padding: "2px 6px" }} onClick={() => setAddTypeOpen(false)}><X size={14} /></button></div>
+            <input type="text" placeholder={T.typeName} value={addTypeDraft.name} onChange={(e) => setAddTypeDraft({ ...addTypeDraft, name: e.target.value })} style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 6, padding: "5px 7px", fontSize: 12.5, marginBottom: 8, color: "var(--ink)" }} />
+            <div className="mt-icon-pick-row">
+              {ICON_PALETTE.map((ic) => { const PI = ICONS[ic]; return (
+                <button key={ic} className={"mt-icon-pick" + (addTypeDraft.icon === ic ? " sel" : "")} onClick={() => setAddTypeDraft({ ...addTypeDraft, icon: ic })}><PI /></button>
+              ); })}
+            </div>
+            <button className="mt-btn primary" style={{ width: "100%" }} onClick={submitAddType}><Plus size={13} /> {T.add}</button>
+          </div>
+        </>
+      )}
 
       <div className="mt-content">
         {showSuggestion && (
@@ -832,6 +974,45 @@ export default function MyTripApp() {
         <div className="mt-note">{loggedIn ? T.mockNote : ""}</div>
       </div>
 
+      {/* add-day modal */}
+      {addDayCtx && (
+        <div className="mt-modal-backdrop" onClick={closeAddDayModal}>
+          <div className="mt-modal narrow" onClick={(e) => e.stopPropagation()}>
+            <div className="mt-modal-header"><span className="mt-modal-title">{T.addDayModalTitle}</span><button className="mt-btn ghost" onClick={closeAddDayModal}><X size={16} /></button></div>
+            <div className="mt-modal-body">
+              <div className="mt-field"><label>{T.addDayDate}</label><DateField value={addDayCtx.date} onChange={(e) => setAddDayCtx({ ...addDayCtx, date: e.target.value })} /></div>
+              {addDayIssue && <div className="mt-error"><AlertTriangle /> {addDayIssue}</div>}
+            </div>
+            <div className="mt-modal-footer">
+              <button className="mt-btn ghost" onClick={closeAddDayModal}>{T.cancel}</button>
+              <button className="mt-btn primary" disabled={!addDayCtx.date || !!addDayIssue} onClick={confirmAddDay}><Check size={13} /> {T.confirmAdd}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* location picker modal */}
+      {locPicker && (
+        <div className="mt-modal-backdrop" onClick={() => setLocPicker(null)}>
+          <div className="mt-modal narrow" onClick={(e) => e.stopPropagation()}>
+            <div className="mt-modal-header"><span className="mt-modal-title">{T.locPickerTitle}</span><button className="mt-btn ghost" onClick={() => setLocPicker(null)}><X size={16} /></button></div>
+            <div className="mt-modal-body">
+              <div className="mt-field-inline">
+                <div><input value={locPicker.query} onChange={(e) => setLocPicker({ ...locPicker, query: e.target.value })} onKeyDown={(e) => e.key === "Enter" && runLocationSearch()} /></div>
+                <button className="mt-btn primary" onClick={() => runLocationSearch()}><Search size={13} /> {T.locSearch}</button>
+              </div>
+              {locPicker.loading && <div className="mt-hint">{T.locSearching}</div>}
+              {!locPicker.loading && locPicker.results.length === 0 && <div className="mt-hint">{T.locNoResults}</div>}
+              <div className="mt-loc-results">
+                {locPicker.results.map((r, i) => (
+                  <button key={i} className="mt-loc-result" onClick={() => pickLocation(r)}>{r.display_name}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* record card modal */}
       {cardDraft && (
         <div className="mt-modal-backdrop" onClick={closeCard}>
@@ -856,18 +1037,44 @@ export default function MyTripApp() {
                 </select>
               </div>
               {cardFrameIssue && <div className="mt-error"><AlertTriangle /> {cardFrameIssue}</div>}
+
               <div className="mt-field-row">
-                <div className="mt-field"><label>{T.from}</label><input value={cardDraft.from} onChange={(e) => setCardDraft({ ...cardDraft, from: e.target.value })} /></div>
-                <div className="mt-field"><label>{T.to}</label><input value={cardDraft.to} onChange={(e) => setCardDraft({ ...cardDraft, to: e.target.value })} /></div>
+                <div className="mt-field">
+                  <label>{T.from}</label>
+                  <div className="mt-field-inline">
+                    <div><input value={cardDraft.from} placeholder={showFlightHint ? T.flightPlaceholder : ""} onChange={(e) => setCardDraft({ ...cardDraft, from: e.target.value })} /></div>
+                    <button className="mt-btn ghost" title={T.verify} onClick={() => openLocationPicker("from")}><MapPin size={13} /></button>
+                  </div>
+                  {fromVerifiedCard && <div className="mt-verified-row"><CircleCheck size={12} /> {T.verified} — <a href={cardDraft.fromVerifiedUrl} target="_blank" rel="noreferrer">{T.openMap}</a></div>}
+                </div>
+                <div className="mt-field">
+                  <label>{T.to}</label>
+                  <div className="mt-field-inline">
+                    <div><input value={cardDraft.to} placeholder={showFlightHint ? T.flightPlaceholder : ""} onChange={(e) => setCardDraft({ ...cardDraft, to: e.target.value })} /></div>
+                    <button className="mt-btn ghost" title={T.verify} onClick={() => openLocationPicker("to")}><MapPin size={13} /></button>
+                  </div>
+                  {toVerifiedCard && <div className="mt-verified-row"><CircleCheck size={12} /> {T.verified} — <a href={cardDraft.toVerifiedUrl} target="_blank" rel="noreferrer">{T.openMap}</a></div>}
+                </div>
               </div>
+
               <div className="mt-field-row">
                 <div className="mt-field"><label>{T.start}</label><input type="time" value={cardDraft.startTime} onChange={(e) => setCardDraft({ ...cardDraft, startTime: e.target.value })} /></div>
                 <div className="mt-field"><label>{T.end}</label><input type="time" value={cardDraft.endTime} onChange={(e) => setCardDraft({ ...cardDraft, endTime: e.target.value })} /></div>
               </div>
               <label className="mt-checkbox-row"><input type="checkbox" checked={!!cardDraft.overnight} onChange={(e) => setCardDraft({ ...cardDraft, overnight: e.target.checked })} />{T.overnight}</label>
               {cardHasTimeError && <div className="mt-error"><AlertTriangle /> {T.timeError}</div>}
-              <div className="mt-field"><label>{T.destination}</label><input value={cardDraft.destination} onChange={(e) => setCardDraft({ ...cardDraft, destination: e.target.value })} /></div>
-              {(cardDraft.typeId === "flight" || cardDraft.typeId === "domestic-flight") && (
+              {showTzHint && <div className="mt-hint">{T.tzNote}</div>}
+
+              <div className="mt-field">
+                <label>{T.destination}</label>
+                <div className="mt-field-inline">
+                  <div><input value={cardDraft.destination} onChange={(e) => setCardDraft({ ...cardDraft, destination: e.target.value })} /></div>
+                  <button className="mt-btn ghost" title={T.pickFromMap} onClick={() => openLocationPicker("destination")}><MapPin size={13} /></button>
+                </div>
+                {cardDraft.mapLink && <div className="mt-verified-row"><CircleCheck size={12} /> <a href={cardDraft.mapLink} target="_blank" rel="noreferrer">{T.openMap}</a></div>}
+              </div>
+
+              {showFlightHint && (
                 <div className="mt-field">
                   <label>{T.flightNo}</label>
                   <div className="mt-field-inline">
