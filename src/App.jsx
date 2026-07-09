@@ -13,7 +13,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "4.2.0";
+const APP_VERSION = "4.3.0";
 const ICONS = { Plane, PlaneTakeoff, Car, BedDouble, Footprints, Users, Sun, Ship, KeySquare, Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music };
 const HE_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 const EN_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -211,12 +211,12 @@ function isChronological(rowsList) {
 }
 function initialRows() {
   const base = [
-    { date: "2026-09-10", typeId: "flight", from: "תל אביב TLV", to: "רומא FCO", startTime: "07:40", endTime: "10:35", destination: "פיומיצ׳ינו", link: "https://www.google.com/flights", costAmount: 1450, costCurrency: "₪", flightNumber: "LY386" },
+    { date: "2026-09-10", typeId: "flight", from: "תל אביב (TLV)", to: "רומא (FCO)", startTime: "07:40", endTime: "10:35", destination: "פיומיצ׳ינו", link: "https://www.google.com/flights", costAmount: 1450, costCurrency: "₪", flightNumber: "LY386" },
     { date: "2026-09-10", typeId: "taxi", from: "שדה תעופה", to: "מלון רומא", startTime: "11:15", endTime: "12:00", destination: "רומא — טרסטבר", costAmount: 45, costCurrency: "€" },
     { date: "2026-09-10", typeId: "hotel", from: "", to: "", startTime: "15:00", endTime: "", destination: "Hotel Trastevere", link: "https://www.booking.com", costAmount: 620, costCurrency: "€" },
     { date: "2026-09-11", typeId: "guided-tour", from: "", to: "", startTime: "09:00", endTime: "13:00", destination: "הקולוסיאום ופורום רומאנום", link: "https://maps.google.com", costAmount: 280, costCurrency: "€" },
     { date: "2026-09-11", typeId: "self-tour", from: "", to: "", startTime: "16:00", endTime: "19:30", destination: "טרסטבר — שיטוט וקניות", costAmount: 0, costCurrency: "€" },
-    { date: "2026-09-14", typeId: "flight", from: "רומא FCO", to: "תל אביב TLV", startTime: "18:20", endTime: "21:50", destination: "נתב״ג", costAmount: 1390, costCurrency: "₪", flightNumber: "LY387" },
+    { date: "2026-09-14", typeId: "flight", from: "רומא (FCO)", to: "תל אביב (TLV)", startTime: "18:20", endTime: "21:50", destination: "נתב״ג", costAmount: 1390, costCurrency: "₪", flightNumber: "LY387" },
   ];
   return base.map((r) => ({ id: uid(), parentId: null, frameId: null, overnight: false, notes: "", mapLink: "", fromVerifiedUrl: "", fromVerifiedText: "", toVerifiedUrl: "", toVerifiedText: "", custom: {}, ...r }));
 }
@@ -234,6 +234,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
   const routeUrl = depth === 0 ? segmentRouteUrl(prevRow, row) : null;
   const fromVerified = row.fromVerifiedUrl && row.fromVerifiedText === row.from;
   const toVerified = row.toVerifiedUrl && row.toVerifiedText === row.to;
+  const isFlightType = row.typeId === "flight" || row.typeId === "domestic-flight";
   const typeBtnRef = useRef(null);
   const [typeMenuPos, setTypeMenuPos] = useState({ top: 0, left: 0 });
 
@@ -279,13 +280,13 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
       );
       case "from": return (
         <span className="mt-loc-cell">
-          <input className="mt-editable" title={row.from} value={row.from} onChange={(e) => updateRow(row.id, { from: e.target.value })} />
+          <input className="mt-editable" title={row.from} placeholder={isFlightType ? T.flightPlaceholder : ""} value={row.from} onChange={(e) => updateRow(row.id, { from: e.target.value })} />
           {fromVerified && <a className="mt-loc-badge" href={row.fromVerifiedUrl} target="_blank" rel="noreferrer" title={T.openMap}><MapPin size={11} /></a>}
         </span>
       );
       case "to": return (
         <span className="mt-loc-cell">
-          <input className="mt-editable" title={row.to} value={row.to} onChange={(e) => updateRow(row.id, { to: e.target.value })} />
+          <input className="mt-editable" title={row.to} placeholder={isFlightType ? T.flightPlaceholder : ""} value={row.to} onChange={(e) => updateRow(row.id, { to: e.target.value })} />
           {toVerified && <a className="mt-loc-badge" href={row.toVerifiedUrl} target="_blank" rel="noreferrer" title={T.openMap}><MapPin size={11} /></a>}
         </span>
       );
