@@ -13,7 +13,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "4.0.0";
+const APP_VERSION = "4.1.0";
 const ICONS = { Plane, PlaneTakeoff, Car, BedDouble, Footprints, Users, Sun, Ship, KeySquare, Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music };
 const HE_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 const EN_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -65,7 +65,7 @@ const T_DICT = {
     destination: "שם היעד", link: "קישור להזמנה", maplink: "קישור למיקום / מסלול",
     flightNo: "מספר טיסה", cost: "עלות", currency: "מטבע", notes: "הערות", frame: "מסגרת",
     noFrame: "ללא מסגרת (רמה עליונה)", selectType: "בחר...",
-    newType: "סוג חדש", typeName: "שם הסוג", add: "הוספה",
+    newType: "תיאור חדש", typeName: "שם תיאור", add: "הוספה",
     totalPerCurrency: "סה״כ טיול", timeError: "שעת סיום לפני שעת ההתחלה — סמן \"חוצה חצות\" אם מדובר בלילה",
     noRows: "אין עדיין רשומות כאן", dragHint: "גרירה לשינוי סדר", mockNote: "*הדמיית התחברות בלבד בפרוטוטייפ",
     frameModalNew: "מסגרת טיול חדשה", frameModalEdit: "עריכת מסגרת", frameName: "שם המסגרת",
@@ -95,7 +95,7 @@ const T_DICT = {
     destination: "Venue", link: "Booking link", maplink: "Map / route link",
     flightNo: "Flight number", cost: "Cost", currency: "Currency", notes: "Notes", frame: "Frame",
     noFrame: "No frame (top level)", selectType: "Select...",
-    newType: "New type", typeName: "Type name", add: "Add",
+    newType: "New description", typeName: "Description name", add: "Add",
     totalPerCurrency: "Trip total", timeError: "End time is before start time — check \"crosses midnight\" for overnight legs",
     noRows: "No records here yet", dragHint: "Drag to reorder", mockNote: "*Sign-in is a prototype mock only",
     frameModalNew: "New trip frame", frameModalEdit: "Edit frame", frameName: "Frame name",
@@ -230,6 +230,14 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
   const routeUrl = depth === 0 ? segmentRouteUrl(prevRow, row) : null;
   const fromVerified = row.fromVerifiedUrl && row.fromVerifiedText === row.from;
   const toVerified = row.toVerifiedUrl && row.toVerifiedText === row.to;
+  const typeBtnRef = useRef(null);
+  const [typeMenuPos, setTypeMenuPos] = useState({ top: 0, left: 0 });
+
+  function toggleTypeMenu() {
+    if (typeMenuOpen === row.id) { setTypeMenuOpen(null); return; }
+    if (typeBtnRef.current) { const r = typeBtnRef.current.getBoundingClientRect(); setTypeMenuPos({ top: r.bottom + 4, left: r.left }); }
+    setTypeMenuOpen(row.id);
+  }
 
   function renderCell(col) {
     switch (col.key) {
@@ -238,27 +246,30 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
       case "icon": return <span className="mt-type-icon" style={{ background: tm.color }}><Icon /></span>;
       case "type": return (
         <div className="mt-type-wrap">
-          <button className="mt-type-btn" title={tm.name} onClick={() => setTypeMenuOpen(typeMenuOpen === row.id ? null : row.id)}>
+          <button className="mt-type-btn" ref={typeBtnRef} title={tm.name} onClick={toggleTypeMenu}>
             <span className="mt-type-text">{tm.name}</span> <ChevronDown size={12} />
           </button>
           {typeMenuOpen === row.id && (
-            <div className="mt-type-menu">
-              {types.map((t) => { const TI = ICONS[t.icon] || Tag; return (
-                <button key={t.id} className="opt" onClick={() => { updateRow(row.id, { typeId: t.id }); setTypeMenuOpen(null); }}>
-                  <span className="mt-type-icon" style={{ background: t.color, width: 20, height: 20 }}><TI size={11} /></span>{t.name}
-                </button>
-              ); })}
-              <div className="divider" />
-              <div className="mt-type-new-form">
-                <input type="text" placeholder={T.typeName} value={newTypeDraft.name} onChange={(e) => setNewTypeDraft({ ...newTypeDraft, name: e.target.value })} />
-                <div className="mt-icon-pick-row">
-                  {ICON_PALETTE.map((ic) => { const PI = ICONS[ic]; return (
-                    <button key={ic} className={"mt-icon-pick" + (newTypeDraft.icon === ic ? " sel" : "")} onClick={() => setNewTypeDraft({ ...newTypeDraft, icon: ic })}><PI /></button>
-                  ); })}
+            <>
+              <div className="mt-floating-backdrop" onClick={() => setTypeMenuOpen(null)} />
+              <div className="mt-type-menu" style={{ top: typeMenuPos.top, left: typeMenuPos.left }}>
+                {types.map((t) => { const TI = ICONS[t.icon] || Tag; return (
+                  <button key={t.id} className="opt" onClick={() => { updateRow(row.id, { typeId: t.id }); setTypeMenuOpen(null); }}>
+                    <span className="mt-type-icon" style={{ background: t.color, width: 20, height: 20 }}><TI size={11} /></span>{t.name}
+                  </button>
+                ); })}
+                <div className="divider" />
+                <div className="mt-type-new-form">
+                  <input type="text" placeholder={T.typeName} value={newTypeDraft.name} onChange={(e) => setNewTypeDraft({ ...newTypeDraft, name: e.target.value })} />
+                  <div className="mt-icon-pick-row">
+                    {ICON_PALETTE.map((ic) => { const PI = ICONS[ic]; return (
+                      <button key={ic} className={"mt-icon-pick" + (newTypeDraft.icon === ic ? " sel" : "")} onClick={() => setNewTypeDraft({ ...newTypeDraft, icon: ic })}><PI /></button>
+                    ); })}
+                  </div>
+                  <button className="mt-btn primary" style={{ width: "100%" }} onClick={() => addCustomType(row.id)}><Plus size={12} /> {T.add}</button>
                 </div>
-                <button className="mt-btn primary" style={{ width: "100%" }} onClick={() => addCustomType(row.id)}><Plus size={12} /> {T.add}</button>
               </div>
-            </div>
+            </>
           )}
         </div>
       );
@@ -727,9 +738,14 @@ export default function MyTripApp() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700&family=Frank+Ruhl+Libre:wght@500;700&display=swap');
         .mytrip-app { --bg:#F5F8F6; --surface:#FFFFFF; --ink:#1E2A28; --muted:#6B7C76; --border:#DEE7E2; --teal:#256D64; --teal-dark:#174C45; --teal-tint:#E6F0EE; --amber:#D98E3F; --amber-tint:#FBEEDD; --danger:#C1443A;
-          font-family:'Heebo',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-variant-numeric:tabular-nums; }
+          font-family:'Heebo',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-variant-numeric:tabular-nums; color-scheme:light; }
         .mytrip-app * { box-sizing:border-box; }
         .mytrip-app button { font-family:inherit; cursor:pointer; }
+        .mytrip-app ::-webkit-scrollbar { height:11px; width:11px; }
+        .mytrip-app ::-webkit-scrollbar-track { background:#FFFFFF; }
+        .mytrip-app ::-webkit-scrollbar-thumb { background:#C7D3CE; border-radius:8px; border:2px solid #FFFFFF; }
+        .mytrip-app ::-webkit-scrollbar-thumb:hover { background:#9FB0AA; }
+        .mytrip-app * { scrollbar-color:#C7D3CE #FFFFFF; }
         .mytrip-app input[type=date], .mytrip-app input[type=time] { appearance:auto; -webkit-appearance:auto; color-scheme:light; }
         .mytrip-app input[type=date]::-webkit-calendar-picker-indicator, .mytrip-app input[type=time]::-webkit-calendar-picker-indicator { opacity:1; cursor:pointer; }
         .mt-header { display:flex; align-items:center; justify-content:space-between; padding:12px 20px; background:var(--surface); border-bottom:1px solid var(--border); position:sticky; top:0; z-index:30; flex-wrap:wrap; gap:8px; }
@@ -748,7 +764,7 @@ export default function MyTripApp() {
         .mt-avatar { width:26px; height:26px; border-radius:50%; background:var(--teal-tint); color:var(--teal-dark); display:flex; align-items:center; justify-content:center; border:1px solid var(--border); }
         .mt-toolbar { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 20px; flex-wrap:wrap; }
         .mt-toolbar-group { display:flex; gap:7px; align-items:center; flex-wrap:wrap; }
-        .mt-floating-menu { position:fixed; background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 12px 32px rgba(20,40,35,.18); padding:10px; z-index:200; max-width:92vw; max-height:70vh; overflow-y:auto; }
+        .mt-floating-menu { position:fixed; background:var(--surface); color:var(--ink); border:1px solid var(--border); border-radius:10px; box-shadow:0 12px 32px rgba(20,40,35,.18); padding:10px; z-index:200; max-width:92vw; max-height:70vh; overflow-y:auto; }
         .mt-floating-backdrop { position:fixed; inset:0; z-index:190; background:transparent; }
         .mt-menu-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:7px; }
         .mt-menu-head strong { font-size:12.5px; }
@@ -761,8 +777,8 @@ export default function MyTripApp() {
         .mt-suggest { display:flex; align-items:center; gap:10px; background:var(--amber-tint); border:1px solid #EAC896; color:#7A4E17; padding:9px 14px; border-radius:10px; margin:14px 0; font-size:12.5px; flex-wrap:wrap; }
         .mt-suggest svg { width:15px; height:15px; flex-shrink:0; }
         .mt-suggest .mt-btn { margin-inline-start:auto; }
-        .mt-frame-block { border:1px solid var(--border); border-inline-start:4px solid var(--frame-color,var(--teal)); border-radius:12px; margin-top:16px; overflow:hidden; background:var(--surface); }
-        .mt-frame-header { display:flex; align-items:center; gap:9px; padding:10px 12px; cursor:pointer; user-select:none; flex-wrap:wrap; background:#FBFDFC; }
+        .mt-frame-block { border:1px solid var(--border); border-inline-start:4px solid var(--frame-color,var(--teal)); border-radius:12px; margin-top:16px; background:var(--surface); }
+        .mt-frame-header { display:flex; align-items:center; gap:9px; padding:10px 12px; cursor:pointer; user-select:none; flex-wrap:wrap; background:#FBFDFC; border-radius:11px 11px 0 0; }
         .mt-frame-name { font-weight:700; font-size:14px; font-family:'Frank Ruhl Libre',serif; }
         .mt-frame-range { font-size:11.5px; color:var(--muted); background:var(--bg); padding:2px 8px; border-radius:20px; }
         .mt-frame-actions { display:flex; gap:2px; margin-inline-start:auto; }
@@ -808,7 +824,7 @@ export default function MyTripApp() {
         .mt-loc-badge { color:#3E8E5A; display:flex; flex-shrink:0; }
         .mt-editable { border:1px solid transparent; border-radius:6px; padding:3px 5px; font-size:12.8px; width:100%; background:transparent; font-family:inherit; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .mt-editable:hover { border-color:var(--border); }
-        .mt-editable:focus:not(.mt-time):not([type=number]) { outline:none; border-color:var(--teal); background:#fff; position:absolute; z-index:15; inset-inline-start:2px; top:2px; width:max-content; min-width:140px; max-width:280px; white-space:normal; box-shadow:0 6px 18px rgba(20,40,35,.18); }
+        .mt-editable:focus { outline:none; border-color:var(--teal); background:#fff; }
         .mt-editable.mt-time:focus, .mt-editable[type=number]:focus { outline:none; border-color:var(--teal); background:#fff; }
         .mt-editable.mt-time { min-width:76px; }
         .mt-editable[type=number] { min-width:64px; }
@@ -831,8 +847,8 @@ export default function MyTripApp() {
         .mt-chip-total { font-size:15px; padding:6px 14px; }
         .mt-fx-select { border:1px solid var(--border); border-radius:8px; padding:5px 8px; font-size:12.5px; background:#fff; color:var(--ink); }
         .mt-fx-note { font-size:10.5px; color:var(--muted); font-style:italic; }
-        .mt-type-menu { position:absolute; z-index:50; background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 8px 24px rgba(20,40,35,.14); padding:6px; min-width:190px; margin-top:4px; }
-        .mt-type-menu button.opt { width:100%; display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:7px; background:none; border:none; font-size:12.5px; text-align:start; }
+        .mt-type-menu { position:fixed; z-index:200; background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 12px 32px rgba(20,40,35,.18); padding:6px; min-width:190px; max-height:70vh; overflow-y:auto; color:var(--ink); }
+        .mt-type-menu button.opt { width:100%; display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:7px; background:none; border:none; font-size:12.5px; text-align:start; color:var(--ink); }
         .mt-type-menu button.opt:hover { background:var(--bg); }
         .mt-type-menu .divider { height:1px; background:var(--border); margin:6px 2px; }
         .mt-type-new-form { padding:6px 4px; }
@@ -932,7 +948,7 @@ export default function MyTripApp() {
           <div className="mt-floating-backdrop" onClick={() => setAddTypeOpen(false)} />
           <div className="mt-floating-menu" style={{ top: addTypePos.top, left: addTypePos.left, minWidth: 200 }}>
             <div className="mt-menu-head"><strong>{T.newType}</strong><button className="mt-btn ghost" style={{ padding: "2px 6px" }} onClick={() => setAddTypeOpen(false)}><X size={14} /></button></div>
-            <input type="text" placeholder={T.typeName} value={addTypeDraft.name} onChange={(e) => setAddTypeDraft({ ...addTypeDraft, name: e.target.value })} style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 6, padding: "5px 7px", fontSize: 12.5, marginBottom: 8, color: "var(--ink)" }} />
+            <input type="text" placeholder={T.typeName} value={addTypeDraft.name} onChange={(e) => setAddTypeDraft({ ...addTypeDraft, name: e.target.value })} style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 6, padding: "5px 7px", fontSize: 12.5, marginBottom: 8, color: "var(--ink)", background: "#fff" }} />
             <div className="mt-icon-pick-row">
               {ICON_PALETTE.map((ic) => { const PI = ICONS[ic]; return (
                 <button key={ic} className={"mt-icon-pick" + (addTypeDraft.icon === ic ? " sel" : "")} onClick={() => setAddTypeDraft({ ...addTypeDraft, icon: ic })}><PI /></button>
