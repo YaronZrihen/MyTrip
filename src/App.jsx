@@ -13,7 +13,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "4.4.0";
+const APP_VERSION = "5.0.0";
 const ICONS = { Plane, PlaneTakeoff, Car, BedDouble, Footprints, Users, Sun, Ship, KeySquare, Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music };
 const HE_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 const EN_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -48,7 +48,6 @@ const DEFAULT_COLUMNS = [
   { key: "startTime", label_he: "בשעה", label_en: "At", visible: true },
   { key: "duration", label_he: "משך", label_en: "Dur.", visible: true },
   { key: "endTime", label_he: "עד שעה", label_en: "Until", visible: true },
-  { key: "destination", label_he: "שם היעד", label_en: "Venue", visible: true },
   { key: "route", label_he: "מסלול", label_en: "Route", visible: true },
   { key: "link", label_he: "קישור", label_en: "Link", visible: true },
   { key: "cost", label_he: "עלות", label_en: "Cost", visible: true },
@@ -82,6 +81,8 @@ const T_DICT = {
     chronoWarning: "סדר הרשומות ביום זה אינו כרונולוגי לפי שעה", sortByTime: "מיין לפי שעה",
     addDayModalTitle: "הוספת יום חדש", addDayDate: "תאריך", confirmAdd: "הוסף",
     verify: "אמת מול מפות", verified: "מאומת", openMap: "פתח במפה", pickFromMap: "בחר מהמפה",
+    fromAlias: "כינוי למוצא (יוצג בעמודה במקום הטקסט המלא)", toAlias: "כינוי ליעד (יוצג בעמודה במקום הטקסט המלא)",
+    locHint: "טיפ: אם החיפוש לא מוצא תוצאה בעברית, נסה לחפש בשם המקומי/אנגלי (למשל \"Fiumicino Airport\" ולא \"פיומיצ׳ינו\").",
     locPickerTitle: "חיפוש מיקום", locSearch: "חפש", locSearching: "מחפש...", locNoResults: "לא נמצאו תוצאות",
     locError: "החיפוש נכשל (בעיית רשת/CORS מול שירות המיקומים). אפשר לפתוח חיפוש ידני בגוגל מפות במקום:",
     openInGoogleSearch: "פתח חיפוש בגוגל מפות",
@@ -114,6 +115,8 @@ const T_DICT = {
     chronoWarning: "Records on this day are not in chronological time order", sortByTime: "Sort by time",
     addDayModalTitle: "Add a new day", addDayDate: "Date", confirmAdd: "Add",
     verify: "Verify with Maps", verified: "Verified", openMap: "Open in Maps", pickFromMap: "Pick from map",
+    fromAlias: "Origin nickname (shown in the table instead of the full text)", toAlias: "Destination nickname (shown in the table instead of the full text)",
+    locHint: "Tip: if the search finds nothing in Hebrew, try the local/English name instead (e.g. \"Fiumicino Airport\").",
     locPickerTitle: "Location search", locSearch: "Search", locSearching: "Searching...", locNoResults: "No results found",
     locError: "Search failed (network/CORS issue reaching the location service). You can open a manual Google Maps search instead:",
     openInGoogleSearch: "Open Google Maps search",
@@ -185,8 +188,8 @@ function rowFrameIssue(draft, frames, T) {
   if (draft.date < f.startDate || draft.date > f.endDate) return T.rowOutOfFrame;
   return null;
 }
-function rowStartPoint(row) { return ((row.from && row.from.trim()) || (row.destination && row.destination.trim()) || ""); }
-function rowEndPoint(row) { return ((row.to && row.to.trim()) || (row.destination && row.destination.trim()) || ""); }
+function rowStartPoint(row) { return (row.from && row.from.trim()) || ""; }
+function rowEndPoint(row) { return (row.to && row.to.trim()) || ""; }
 function segmentRouteUrl(prevRow, row) {
   if (!prevRow) return null;
   const origin = rowEndPoint(prevRow), dest = rowStartPoint(row);
@@ -280,20 +283,27 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
       );
       case "from": return (
         <span className="mt-loc-cell">
-          <input className="mt-editable" title={row.from} placeholder={isFlightType ? T.flightPlaceholder : ""} value={row.from} onChange={(e) => updateRow(row.id, { from: e.target.value })} />
+          {row.fromAlias ? (
+            <span className="mt-alias-display" title={row.from}>{row.fromAlias}</span>
+          ) : (
+            <input className="mt-editable" title={row.from} placeholder={isFlightType ? T.flightPlaceholder : ""} value={row.from} onChange={(e) => updateRow(row.id, { from: e.target.value })} />
+          )}
           {fromVerified && <a className="mt-loc-badge" href={row.fromVerifiedUrl} target="_blank" rel="noreferrer" title={T.openMap}><MapPin size={11} /></a>}
         </span>
       );
       case "to": return (
         <span className="mt-loc-cell">
-          <input className="mt-editable" title={row.to} placeholder={isFlightType ? T.flightPlaceholder : ""} value={row.to} onChange={(e) => updateRow(row.id, { to: e.target.value })} />
+          {row.toAlias ? (
+            <span className="mt-alias-display" title={row.to}>{row.toAlias}</span>
+          ) : (
+            <input className="mt-editable" title={row.to} placeholder={isFlightType ? T.flightPlaceholder : ""} value={row.to} onChange={(e) => updateRow(row.id, { to: e.target.value })} />
+          )}
           {toVerified && <a className="mt-loc-badge" href={row.toVerifiedUrl} target="_blank" rel="noreferrer" title={T.openMap}><MapPin size={11} /></a>}
         </span>
       );
       case "startTime": return <input className="mt-editable mt-time" type="time" value={row.startTime} onChange={(e) => updateRow(row.id, { startTime: e.target.value })} />;
       case "duration": return <span title={dur === null ? "" : dur} style={{ color: dur === null ? "var(--danger)" : "var(--muted)", fontSize: 12 }}>{dur === null ? "!" : dur}</span>;
       case "endTime": return <input className="mt-editable mt-time" type="time" value={row.endTime} onChange={(e) => updateRow(row.id, { endTime: e.target.value })} />;
-      case "destination": return <input className="mt-editable" title={row.destination} value={row.destination} onChange={(e) => updateRow(row.id, { destination: e.target.value })} />;
       case "route": return routeUrl ? (
         <a className="mt-link-icon" href={routeUrl} target="_blank" rel="noreferrer" title={T.routeTooltip}><Route size={14} /></a>
       ) : <span className="mt-link-icon empty" title={T.noRoute}><Route size={14} /></span>;
@@ -378,7 +388,7 @@ function DayGroup({ g, fid, depth, ctx }) {
                   </div>
                   <span className="mt-card-times">{r.startTime || "—"}{r.endTime ? ` – ${r.endTime}` : ""}</span>
                 </div>
-                <div className="mt-card-dest">{r.destination || "—"}</div>
+                <div className="mt-card-dest">{r.toAlias || r.to || r.fromAlias || r.from || "—"}</div>
                 <div className="mt-card-bottom">
                   <span style={{ fontSize: 12, color: "var(--muted)" }}>{r.from}{r.from && r.to ? " → " : ""}{r.to}</span>
                   {Number(r.costAmount) > 0 && <span className="mt-cost">{r.costCurrency}{r.costAmount}</span>}
@@ -562,7 +572,7 @@ export default function MyTripApp() {
     const nr = {
       id: uid(), parentId, frameId, date: date || new Date().toISOString().slice(0, 10),
       typeId: "unset", from: "", to: "", startTime: "", endTime: "", overnight: false,
-      destination: "", link: "", mapLink: "", flightNumber: "", costAmount: 0, costCurrency: "₪",
+      destination: "", link: "", mapLink: "", flightNumber: "", costAmount: 0, costCurrency: "₪", fromAlias: "", toAlias: "",
       notes: "", fromVerifiedUrl: "", fromVerifiedText: "", toVerifiedUrl: "", toVerifiedText: "", custom: {},
     };
     setRows((prev) => [...prev, nr]);
@@ -644,7 +654,7 @@ export default function MyTripApp() {
     const q = (queryOverride !== undefined ? queryOverride : locPicker && locPicker.query) || "";
     if (!q.trim()) return;
     setLocPicker((p) => ({ ...p, loading: true, error: null }));
-    fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=0&limit=5&q=${encodeURIComponent(q)}`, { headers: { Accept: "application/json" } })
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=0&limit=5&accept-language=he,en&q=${encodeURIComponent(q)}`, { headers: { Accept: "application/json" } })
       .then((r) => { if (!r.ok) throw new Error("http-" + r.status); return r.json(); })
       .then((data) => setLocPicker((p) => (p ? { ...p, loading: false, error: null, results: Array.isArray(data) ? data : [] } : p)))
       .catch((err) => setLocPicker((p) => (p ? { ...p, loading: false, results: [], error: (err && err.message) || "network" } : p)));
@@ -654,7 +664,8 @@ export default function MyTripApp() {
     const mapUrl = `https://www.google.com/maps/search/?api=1&query=${result.lat},${result.lon}`;
     if (locPicker.field === "from") setCardDraft((d) => ({ ...d, from: label, fromVerifiedUrl: mapUrl, fromVerifiedText: label }));
     else if (locPicker.field === "to") setCardDraft((d) => ({ ...d, to: label, toVerifiedUrl: mapUrl, toVerifiedText: label }));
-    else if (locPicker.field === "destination") setCardDraft((d) => ({ ...d, destination: label, mapLink: mapUrl }));
+    else if (locPicker.field === "fromAlias") setCardDraft((d) => ({ ...d, fromAlias: label }));
+    else if (locPicker.field === "toAlias") setCardDraft((d) => ({ ...d, toAlias: label }));
     setLocPicker(null);
   }
 
@@ -826,6 +837,7 @@ export default function MyTripApp() {
         .mt-type-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .mt-loc-cell { display:flex; align-items:center; gap:3px; }
         .mt-loc-cell .mt-editable { flex:1; }
+        .mt-alias-display { flex:1; font-size:12.8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:3px 5px; }
         .mt-loc-badge { color:#3E8E5A; display:flex; flex-shrink:0; }
         .mt-editable { border:1px solid transparent; border-radius:6px; padding:3px 5px; font-size:12.8px; width:100%; background:transparent; font-family:inherit; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .mt-editable:hover { border-color:var(--border); }
@@ -1022,6 +1034,7 @@ export default function MyTripApp() {
                 <div><input value={locPicker.query} onChange={(e) => setLocPicker({ ...locPicker, query: e.target.value })} onKeyDown={(e) => e.key === "Enter" && runLocationSearch()} /></div>
                 <button className="mt-btn primary" onClick={() => runLocationSearch()}><Search size={13} /> {T.locSearch}</button>
               </div>
+              <div className="mt-hint">{T.locHint}</div>
               {locPicker.loading && <div className="mt-hint">{T.locSearching}</div>}
               {!locPicker.loading && locPicker.error && (
                 <div className="mt-error">
@@ -1073,6 +1086,13 @@ export default function MyTripApp() {
                     <button className="mt-btn ghost" title={T.verify} onClick={() => openLocationPicker("from")}><MapPin size={13} /></button>
                   </div>
                   {fromVerifiedCard && <div className="mt-verified-row"><CircleCheck size={12} /> {T.verified} — <a href={cardDraft.fromVerifiedUrl} target="_blank" rel="noreferrer">{T.openMap}</a></div>}
+                  <div className="mt-field" style={{ marginTop: 6 }}>
+                    <label>{T.fromAlias}</label>
+                    <div className="mt-field-inline">
+                      <div><input value={cardDraft.fromAlias || ""} onChange={(e) => setCardDraft({ ...cardDraft, fromAlias: e.target.value })} /></div>
+                      <button className="mt-btn ghost" title={T.pickFromMap} onClick={() => openLocationPicker("fromAlias")}><MapPin size={13} /></button>
+                    </div>
+                  </div>
                 </div>
                 <div className="mt-field">
                   <label>{T.to}</label>
@@ -1081,6 +1101,13 @@ export default function MyTripApp() {
                     <button className="mt-btn ghost" title={T.verify} onClick={() => openLocationPicker("to")}><MapPin size={13} /></button>
                   </div>
                   {toVerifiedCard && <div className="mt-verified-row"><CircleCheck size={12} /> {T.verified} — <a href={cardDraft.toVerifiedUrl} target="_blank" rel="noreferrer">{T.openMap}</a></div>}
+                  <div className="mt-field" style={{ marginTop: 6 }}>
+                    <label>{T.toAlias}</label>
+                    <div className="mt-field-inline">
+                      <div><input value={cardDraft.toAlias || ""} onChange={(e) => setCardDraft({ ...cardDraft, toAlias: e.target.value })} /></div>
+                      <button className="mt-btn ghost" title={T.pickFromMap} onClick={() => openLocationPicker("toAlias")}><MapPin size={13} /></button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -1091,15 +1118,6 @@ export default function MyTripApp() {
               <label className="mt-checkbox-row"><input type="checkbox" checked={!!cardDraft.overnight} onChange={(e) => setCardDraft({ ...cardDraft, overnight: e.target.checked })} />{T.overnight}</label>
               {cardHasTimeError && <div className="mt-error"><AlertTriangle /> {T.timeError}</div>}
               {showTzHint && <div className="mt-hint">{T.tzNote}</div>}
-
-              <div className="mt-field">
-                <label>{T.destination}</label>
-                <div className="mt-field-inline">
-                  <div><input value={cardDraft.destination} onChange={(e) => setCardDraft({ ...cardDraft, destination: e.target.value })} /></div>
-                  <button className="mt-btn ghost" title={T.pickFromMap} onClick={() => openLocationPicker("destination")}><MapPin size={13} /></button>
-                </div>
-                {cardDraft.mapLink && <div className="mt-verified-row"><CircleCheck size={12} /> <a href={cardDraft.mapLink} target="_blank" rel="noreferrer">{T.openMap}</a></div>}
-              </div>
 
               {showFlightHint && (
                 <div className="mt-field">
