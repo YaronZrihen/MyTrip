@@ -1,4 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import {
   Plane, PlaneTakeoff, Car, BedDouble, Footprints, Users, Sun, Ship, KeySquare,
   Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music, ChevronDown, ChevronRight,
@@ -13,7 +16,17 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "5.0.0";
+const APP_VERSION = "5.1.0";
+
+// Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
+// references relative image paths. Point it at the CDN copies instead.
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+});
+const DEFAULT_MAP_CENTER = [41.9, 12.49]; // Rome — reasonable default for this itinerary
 const ICONS = { Plane, PlaneTakeoff, Car, BedDouble, Footprints, Users, Sun, Ship, KeySquare, Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music };
 const HE_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 const EN_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -451,6 +464,11 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
   );
 }
 
+function MapClickCapture({ onPick }) {
+  useMapEvents({ click(e) { onPick(e.latlng.lat, e.latlng.lng); } });
+  return null;
+}
+
 /* ================================================================= */
 /*  Main app                                                          */
 /* ================================================================= */
@@ -647,7 +665,7 @@ export default function MyTripApp() {
   /* ---------- location verification (OpenStreetMap Nominatim — free, no API key) ---------- */
   function openLocationPicker(field) {
     const initialQuery = cardDraft ? (cardDraft[field] || "") : "";
-    setLocPicker({ field, query: initialQuery, results: [], loading: false, error: null });
+    setLocPicker({ field, mode: "search", query: initialQuery, results: [], loading: false, error: null, mapMarker: null, mapCenter: DEFAULT_MAP_CENTER });
     if (initialQuery.trim()) runLocationSearch(initialQuery);
   }
   function runLocationSearch(queryOverride) {
@@ -658,6 +676,19 @@ export default function MyTripApp() {
       .then((r) => { if (!r.ok) throw new Error("http-" + r.status); return r.json(); })
       .then((data) => setLocPicker((p) => (p ? { ...p, loading: false, error: null, results: Array.isArray(data) ? data : [] } : p)))
       .catch((err) => setLocPicker((p) => (p ? { ...p, loading: false, results: [], error: (err && err.message) || "network" } : p)));
+  }
+  function setLocPickerMode(mode) { setLocPicker((p) => ({ ...p, mode })); }
+  function handleMapPick(lat, lng) {
+    setLocPicker((p) => ({ ...p, mapMarker: { lat, lng, label: null, loading: true, error: null }, mapCenter: [lat, lng] }));
+    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=he,en`, { headers: { Accept: "application/json" } })
+      .then((r) => { if (!r.ok) throw new Error("http-" + r.status); return r.json(); })
+      .then((data) => setLocPicker((p) => (p ? { ...p, mapMarker: { lat, lng, label: data.display_name || null, loading: false, error: data.display_name ? null : "no-name" } } : p)))
+      .catch(() => setLocPicker((p) => (p ? { ...p, mapMarker: { lat, lng, label: null, loading: false, error: "network" } } : p)));
+  }
+  function confirmMapPick() {
+    if (!locPicker || !locPicker.mapMarker) return;
+    const m = locPicker.mapMarker;
+    pickLocation({ display_name: m.label || `${m.lat.toFixed(5)}, ${m.lng.toFixed(5)}`, lat: m.lat, lon: m.lng });
   }
   function pickLocation(result) {
     const label = result.display_name.split(",").slice(0, 2).join(",").trim();
