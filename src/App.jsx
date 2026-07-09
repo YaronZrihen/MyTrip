@@ -13,7 +13,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "4.1.0";
+const APP_VERSION = "4.2.0";
 const ICONS = { Plane, PlaneTakeoff, Car, BedDouble, Footprints, Users, Sun, Ship, KeySquare, Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music };
 const HE_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 const EN_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -83,6 +83,8 @@ const T_DICT = {
     addDayModalTitle: "הוספת יום חדש", addDayDate: "תאריך", confirmAdd: "הוסף",
     verify: "אמת מול מפות", verified: "מאומת", openMap: "פתח במפה", pickFromMap: "בחר מהמפה",
     locPickerTitle: "חיפוש מיקום", locSearch: "חפש", locSearching: "מחפש...", locNoResults: "לא נמצאו תוצאות",
+    locError: "החיפוש נכשל (בעיית רשת/CORS מול שירות המיקומים). אפשר לפתוח חיפוש ידני בגוגל מפות במקום:",
+    openInGoogleSearch: "פתח חיפוש בגוגל מפות",
     flightPlaceholder: "עיר (קוד שדה תעופה, למשל TLV)", tzNote: "התאמת שעון אוטומטית לפי אזורי זמן דורשת חיבור ל-API מסחרי (כגון Google Time Zone) עם מפתח — לא מיושמת בפרוטוטייפ. יש לוודא ידנית שהשעות מוזנות לפי השעון המקומי בכל מיקום.",
   },
   en: {
@@ -113,6 +115,8 @@ const T_DICT = {
     addDayModalTitle: "Add a new day", addDayDate: "Date", confirmAdd: "Add",
     verify: "Verify with Maps", verified: "Verified", openMap: "Open in Maps", pickFromMap: "Pick from map",
     locPickerTitle: "Location search", locSearch: "Search", locSearching: "Searching...", locNoResults: "No results found",
+    locError: "Search failed (network/CORS issue reaching the location service). You can open a manual Google Maps search instead:",
+    openInGoogleSearch: "Open Google Maps search",
     flightPlaceholder: "City (airport code, e.g. TLV)", tzNote: "Automatic time-zone adjustment needs a commercial API (e.g. Google Time Zone) with a key — not implemented in this prototype. Please double-check that times are entered in each location's local time.",
   }
 };
@@ -632,17 +636,17 @@ export default function MyTripApp() {
   /* ---------- location verification (OpenStreetMap Nominatim — free, no API key) ---------- */
   function openLocationPicker(field) {
     const initialQuery = cardDraft ? (cardDraft[field] || "") : "";
-    setLocPicker({ field, query: initialQuery, results: [], loading: false });
+    setLocPicker({ field, query: initialQuery, results: [], loading: false, error: null });
     if (initialQuery.trim()) runLocationSearch(initialQuery);
   }
   function runLocationSearch(queryOverride) {
     const q = (queryOverride !== undefined ? queryOverride : locPicker && locPicker.query) || "";
     if (!q.trim()) return;
-    setLocPicker((p) => ({ ...p, loading: true }));
-    fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(q)}`)
-      .then((r) => r.json())
-      .then((data) => setLocPicker((p) => ({ ...p, loading: false, results: Array.isArray(data) ? data : [] })))
-      .catch(() => setLocPicker((p) => ({ ...p, loading: false, results: [] })));
+    setLocPicker((p) => ({ ...p, loading: true, error: null }));
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=0&limit=5&q=${encodeURIComponent(q)}`, { headers: { Accept: "application/json" } })
+      .then((r) => { if (!r.ok) throw new Error("http-" + r.status); return r.json(); })
+      .then((data) => setLocPicker((p) => (p ? { ...p, loading: false, error: null, results: Array.isArray(data) ? data : [] } : p)))
+      .catch((err) => setLocPicker((p) => (p ? { ...p, loading: false, results: [], error: (err && err.message) || "network" } : p)));
   }
   function pickLocation(result) {
     const label = result.display_name.split(",").slice(0, 2).join(",").trim();
@@ -1018,7 +1022,13 @@ export default function MyTripApp() {
                 <button className="mt-btn primary" onClick={() => runLocationSearch()}><Search size={13} /> {T.locSearch}</button>
               </div>
               {locPicker.loading && <div className="mt-hint">{T.locSearching}</div>}
-              {!locPicker.loading && locPicker.results.length === 0 && <div className="mt-hint">{T.locNoResults}</div>}
+              {!locPicker.loading && locPicker.error && (
+                <div className="mt-error">
+                  <AlertTriangle />
+                  <span>{T.locError} <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locPicker.query)}`} target="_blank" rel="noreferrer">{T.openInGoogleSearch}</a></span>
+                </div>
+              )}
+              {!locPicker.loading && !locPicker.error && locPicker.results.length === 0 && <div className="mt-hint">{T.locNoResults}</div>}
               <div className="mt-loc-results">
                 {locPicker.results.map((r, i) => (
                   <button key={i} className="mt-loc-result" onClick={() => pickLocation(r)}>{r.display_name}</button>
