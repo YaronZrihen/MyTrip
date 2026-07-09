@@ -13,7 +13,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "4.3.0";
+const APP_VERSION = "4.4.0";
 const ICONS = { Plane, PlaneTakeoff, Car, BedDouble, Footprints, Users, Sun, Ship, KeySquare, Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music };
 const HE_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 const EN_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -1012,10 +1012,10 @@ export default function MyTripApp() {
         </div>
       )}
 
-      {/* location picker modal */}
+      {/* location picker modal (must stack above the record-card modal it's opened from) */}
       {locPicker && (
-        <div className="mt-modal-backdrop" onClick={() => setLocPicker(null)}>
-          <div className="mt-modal narrow" onClick={(e) => e.stopPropagation()}>
+        <div className="mt-modal-backdrop" style={{ zIndex: 150 }} onClick={() => setLocPicker(null)}>
+          <div className="mt-modal narrow" style={{ zIndex: 151 }} onClick={(e) => e.stopPropagation()}>
             <div className="mt-modal-header"><span className="mt-modal-title">{T.locPickerTitle}</span><button className="mt-btn ghost" onClick={() => setLocPicker(null)}><X size={16} /></button></div>
             <div className="mt-modal-body">
               <div className="mt-field-inline">
