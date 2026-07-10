@@ -16,7 +16,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "5.1.0";
+const APP_VERSION = "5.2.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -96,6 +96,9 @@ const T_DICT = {
     verify: "אמת מול מפות", verified: "מאומת", openMap: "פתח במפה", pickFromMap: "בחר מהמפה",
     fromAlias: "כינוי למוצא (יוצג בעמודה במקום הטקסט המלא)", toAlias: "כינוי ליעד (יוצג בעמודה במקום הטקסט המלא)",
     locHint: "טיפ: אם החיפוש לא מוצא תוצאה בעברית, נסה לחפש בשם המקומי/אנגלי (למשל \"Fiumicino Airport\" ולא \"פיומיצ׳ינו\").",
+    tabSearch: "חיפוש טקסט", tabMap: "בחירה במפה", mapPickHint: "לחץ במקום הרצוי על המפה כדי לסמן אותו",
+    mapResolving: "מזהה כתובת...", mapNoName: "לא נמצאה כתובת מדויקת לנקודה זו — ניתן עדיין לבחור לפי הקואורדינטות",
+    confirmLocation: "אשר מיקום זה",
     locPickerTitle: "חיפוש מיקום", locSearch: "חפש", locSearching: "מחפש...", locNoResults: "לא נמצאו תוצאות",
     locError: "החיפוש נכשל (בעיית רשת/CORS מול שירות המיקומים). אפשר לפתוח חיפוש ידני בגוגל מפות במקום:",
     openInGoogleSearch: "פתח חיפוש בגוגל מפות",
@@ -130,6 +133,9 @@ const T_DICT = {
     verify: "Verify with Maps", verified: "Verified", openMap: "Open in Maps", pickFromMap: "Pick from map",
     fromAlias: "Origin nickname (shown in the table instead of the full text)", toAlias: "Destination nickname (shown in the table instead of the full text)",
     locHint: "Tip: if the search finds nothing in Hebrew, try the local/English name instead (e.g. \"Fiumicino Airport\").",
+    tabSearch: "Text search", tabMap: "Pick on map", mapPickHint: "Click anywhere on the map to mark it",
+    mapResolving: "Resolving address...", mapNoName: "No exact address found for this point — you can still pick it by coordinates",
+    confirmLocation: "Confirm this location",
     locPickerTitle: "Location search", locSearch: "Search", locSearching: "Searching...", locNoResults: "No results found",
     locError: "Search failed (network/CORS issue reaching the location service). You can open a manual Google Maps search instead:",
     openInGoogleSearch: "Open Google Maps search",
@@ -930,6 +936,12 @@ export default function MyTripApp() {
         .mt-btn.primary:disabled { opacity:.5; cursor:not-allowed; }
         .mt-btn.ghost { border-color:transparent; color:var(--muted); }
         .mt-btn.danger { color:var(--danger); border-color:transparent; }
+        .mt-loc-tabs { display:flex; gap:6px; padding:10px 18px 0; }
+        .mt-loc-tab { flex:1; border:1px solid var(--border); background:#fff; color:var(--muted); border-radius:8px; padding:7px; font-size:12.5px; font-weight:600; }
+        .mt-loc-tab.active { background:var(--teal-tint); color:var(--teal-dark); border-color:var(--teal); }
+        .mt-map-wrap { border-radius:10px; overflow:hidden; border:1px solid var(--border); }
+        .mt-map-result { margin-top:8px; }
+        .mt-loc-result.static { cursor:default; background:var(--teal-tint); border-color:var(--teal); }
         .mt-loc-results { display:flex; flex-direction:column; gap:5px; max-height:220px; overflow-y:auto; }
         .mt-loc-result { text-align:start; border:1px solid var(--border); border-radius:8px; padding:7px 9px; font-size:12px; background:#fff; }
         .mt-loc-result:hover { background:var(--teal-tint); border-color:var(--teal); }
@@ -1060,26 +1072,60 @@ export default function MyTripApp() {
         <div className="mt-modal-backdrop" style={{ zIndex: 150 }} onClick={() => setLocPicker(null)}>
           <div className="mt-modal narrow" style={{ zIndex: 151 }} onClick={(e) => e.stopPropagation()}>
             <div className="mt-modal-header"><span className="mt-modal-title">{T.locPickerTitle}</span><button className="mt-btn ghost" onClick={() => setLocPicker(null)}><X size={16} /></button></div>
-            <div className="mt-modal-body">
-              <div className="mt-field-inline">
-                <div><input value={locPicker.query} onChange={(e) => setLocPicker({ ...locPicker, query: e.target.value })} onKeyDown={(e) => e.key === "Enter" && runLocationSearch()} /></div>
-                <button className="mt-btn primary" onClick={() => runLocationSearch()}><Search size={13} /> {T.locSearch}</button>
-              </div>
-              <div className="mt-hint">{T.locHint}</div>
-              {locPicker.loading && <div className="mt-hint">{T.locSearching}</div>}
-              {!locPicker.loading && locPicker.error && (
-                <div className="mt-error">
-                  <AlertTriangle />
-                  <span>{T.locError} <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locPicker.query)}`} target="_blank" rel="noreferrer">{T.openInGoogleSearch}</a></span>
-                </div>
-              )}
-              {!locPicker.loading && !locPicker.error && locPicker.results.length === 0 && <div className="mt-hint">{T.locNoResults}</div>}
-              <div className="mt-loc-results">
-                {locPicker.results.map((r, i) => (
-                  <button key={i} className="mt-loc-result" onClick={() => pickLocation(r)}>{r.display_name}</button>
-                ))}
-              </div>
+            <div className="mt-loc-tabs">
+              <button className={"mt-loc-tab" + (locPicker.mode === "search" ? " active" : "")} onClick={() => setLocPickerMode("search")}>{T.tabSearch}</button>
+              <button className={"mt-loc-tab" + (locPicker.mode === "map" ? " active" : "")} onClick={() => setLocPickerMode("map")}>{T.tabMap}</button>
             </div>
+            {locPicker.mode === "search" ? (
+              <div className="mt-modal-body">
+                <div className="mt-field-inline">
+                  <div><input value={locPicker.query} onChange={(e) => setLocPicker({ ...locPicker, query: e.target.value })} onKeyDown={(e) => e.key === "Enter" && runLocationSearch()} /></div>
+                  <button className="mt-btn primary" onClick={() => runLocationSearch()}><Search size={13} /> {T.locSearch}</button>
+                </div>
+                <div className="mt-hint">{T.locHint}</div>
+                {locPicker.loading && <div className="mt-hint">{T.locSearching}</div>}
+                {!locPicker.loading && locPicker.error && (
+                  <div className="mt-error">
+                    <AlertTriangle />
+                    <span>{T.locError} <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locPicker.query)}`} target="_blank" rel="noreferrer">{T.openInGoogleSearch}</a></span>
+                  </div>
+                )}
+                {!locPicker.loading && !locPicker.error && locPicker.results.length === 0 && <div className="mt-hint">{T.locNoResults}</div>}
+                <div className="mt-loc-results">
+                  {locPicker.results.map((r, i) => (
+                    <button key={i} className="mt-loc-result" onClick={() => pickLocation(r)}>{r.display_name}</button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="mt-modal-body">
+                <div className="mt-hint">{T.mapPickHint}</div>
+                <div className="mt-map-wrap">
+                  <MapContainer center={locPicker.mapCenter} zoom={locPicker.mapMarker ? 13 : 5} style={{ height: 260, width: "100%", borderRadius: 10 }} scrollWheelZoom={true}>
+                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' />
+                    <MapClickCapture onPick={handleMapPick} />
+                    {locPicker.mapMarker && <Marker position={[locPicker.mapMarker.lat, locPicker.mapMarker.lng]} />}
+                  </MapContainer>
+                </div>
+                {locPicker.mapMarker && (
+                  <div className="mt-map-result">
+                    {locPicker.mapMarker.loading ? (
+                      <div className="mt-hint">{T.mapResolving}</div>
+                    ) : locPicker.mapMarker.label ? (
+                      <>
+                        <div className="mt-loc-result static">{locPicker.mapMarker.label}</div>
+                        <button className="mt-btn primary" style={{ width: "100%", marginTop: 6 }} onClick={confirmMapPick}><Check size={13} /> {T.confirmLocation}</button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="mt-hint">{T.mapNoName}</div>
+                        <button className="mt-btn primary" style={{ width: "100%", marginTop: 6 }} onClick={confirmMapPick}><Check size={13} /> {T.confirmLocation}</button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
