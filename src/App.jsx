@@ -7,7 +7,7 @@ import {
   Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music, ChevronDown, ChevronRight,
   Plus, X, Settings2, Pencil, Trash2, Link2, Globe, LogIn, User,
   Smartphone, Monitor, AlertTriangle, GripVertical, Check, FolderPlus, Sparkles,
-  Route, Waypoints, Download, MapPin, Search, CircleCheck, Clock, ArrowDownUp
+  Route, Waypoints, Download, MapPin, Search, CircleCheck, Clock, ArrowDownUp, Copy
 } from "lucide-react";
 
 /* ---------------------------------------------------------------------- */
@@ -16,7 +16,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "5.3.0";
+const APP_VERSION = "5.4.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -95,7 +95,7 @@ const T_DICT = {
     addDayModalTitle: "הוספת יום חדש", addDayDate: "תאריך", confirmAdd: "הוסף",
     verify: "אמת מול מפות", verified: "מאומת", openMap: "פתח במפה", pickFromMap: "בחר מהמפה",
     fromAlias: "כינוי למוצא (יוצג בעמודה במקום הטקסט המלא)", toAlias: "כינוי ליעד (יוצג בעמודה במקום הטקסט המלא)",
-    flightAliasPlaceholder: "לדוגמה: תל אביב (TLV)",
+    flightAliasPlaceholder: "לדוגמה: תל אביב (TLV)", copyPrevDest: "העתק יעד משורה קודמת",
     locHint: "טיפ: אם החיפוש לא מוצא תוצאה בעברית, נסה לחפש בשם המקומי/אנגלי (למשל \"Fiumicino Airport\" ולא \"פיומיצ׳ינו\").",
     tabSearch: "חיפוש טקסט", tabMap: "בחירה במפה", mapPickHint: "לחץ במקום הרצוי על המפה כדי לסמן אותו",
     mapResolving: "מזהה כתובת...", mapNoName: "לא נמצאה כתובת מדויקת לנקודה זו — ניתן עדיין לבחור לפי הקואורדינטות",
@@ -133,7 +133,7 @@ const T_DICT = {
     addDayModalTitle: "Add a new day", addDayDate: "Date", confirmAdd: "Add",
     verify: "Verify with Maps", verified: "Verified", openMap: "Open in Maps", pickFromMap: "Pick from map",
     fromAlias: "Origin nickname (shown in the table instead of the full text)", toAlias: "Destination nickname (shown in the table instead of the full text)",
-    flightAliasPlaceholder: "e.g. Tel Aviv (TLV)",
+    flightAliasPlaceholder: "e.g. Tel Aviv (TLV)", copyPrevDest: "Copy previous row's destination",
     locHint: "Tip: if the search finds nothing in Hebrew, try the local/English name instead (e.g. \"Fiumicino Airport\").",
     tabSearch: "Text search", tabMap: "Pick on map", mapPickHint: "Click anywhere on the map to mark it",
     mapResolving: "Resolving address...", mapNoName: "No exact address found for this point — you can still pick it by coordinates",
@@ -711,6 +711,25 @@ export default function MyTripApp() {
   /* ---------- record card ---------- */
   function openCard(row) { setCardRowId(row.id); setCardDraft({ ...row }); setFlightLookupMsg(""); }
   function closeCard() { setCardRowId(null); setCardDraft(null); setFlightLookupMsg(""); setLocPicker(null); }
+  function findPrevRowInDay(rowId) {
+    const row = rows.find((r) => r.id === rowId);
+    if (!row || row.parentId) return null;
+    const siblings = rows.filter((r) => !r.parentId && r.date === row.date && (r.frameId || null) === (row.frameId || null));
+    const idx = siblings.findIndex((r) => r.id === row.id);
+    if (idx <= 0) return null;
+    return siblings[idx - 1];
+  }
+  const prevRowForCard = cardDraft ? findPrevRowInDay(cardRowId) : null;
+  function copyPrevDestinationToFrom() {
+    if (!prevRowForCard) return;
+    setCardDraft((d) => ({
+      ...d,
+      from: prevRowForCard.to || d.from,
+      fromAlias: prevRowForCard.toAlias || "",
+      fromVerifiedUrl: prevRowForCard.toVerifiedUrl || "",
+      fromVerifiedText: prevRowForCard.toVerifiedUrl ? (prevRowForCard.toVerifiedText || prevRowForCard.to) : "",
+    }));
+  }
   const cardHasTimeError = cardDraft && cardDraft.startTime && cardDraft.endTime && computeDuration(cardDraft.startTime, cardDraft.endTime, cardDraft.overnight) === null;
   const cardFrameIssue = cardDraft ? rowFrameIssue(cardDraft, frames, T) : null;
   function saveCard() {
@@ -938,6 +957,7 @@ export default function MyTripApp() {
         .mt-btn { border-radius:8px; padding:7px 14px; font-size:12.5px; font-weight:600; border:1px solid var(--border); background:#fff; display:inline-flex; align-items:center; gap:5px; }
         .mt-btn.primary { background:var(--teal); color:#fff; border-color:var(--teal); }
         .mt-btn.primary:disabled { opacity:.5; cursor:not-allowed; }
+        .mt-btn:disabled { opacity:.4; cursor:not-allowed; }
         .mt-btn.ghost { border-color:transparent; color:var(--muted); }
         .mt-btn.danger { color:var(--danger); border-color:transparent; }
         .mt-loc-tabs { display:flex; gap:6px; padding:10px 18px 0; }
@@ -1165,6 +1185,7 @@ export default function MyTripApp() {
                   <div className="mt-field-inline">
                     <div><input value={cardDraft.from} placeholder={showFlightHint ? T.flightPlaceholder : ""} onChange={(e) => setCardDraft({ ...cardDraft, from: e.target.value })} /></div>
                     <button className="mt-btn ghost" title={T.verify} onClick={() => openLocationPicker("from")}><MapPin size={13} /></button>
+                    <button className="mt-btn ghost" title={T.copyPrevDest} disabled={!prevRowForCard || !prevRowForCard.to} onClick={copyPrevDestinationToFrom}><Copy size={13} /></button>
                   </div>
                   {fromVerifiedCard && <div className="mt-verified-row"><CircleCheck size={12} /> {T.verified} — <a href={cardDraft.fromVerifiedUrl} target="_blank" rel="noreferrer">{T.openMap}</a></div>}
                   <div className="mt-field" style={{ marginTop: 6 }}>
