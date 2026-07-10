@@ -16,7 +16,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "5.2.0";
+const APP_VERSION = "5.3.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -95,6 +95,7 @@ const T_DICT = {
     addDayModalTitle: "הוספת יום חדש", addDayDate: "תאריך", confirmAdd: "הוסף",
     verify: "אמת מול מפות", verified: "מאומת", openMap: "פתח במפה", pickFromMap: "בחר מהמפה",
     fromAlias: "כינוי למוצא (יוצג בעמודה במקום הטקסט המלא)", toAlias: "כינוי ליעד (יוצג בעמודה במקום הטקסט המלא)",
+    flightAliasPlaceholder: "לדוגמה: תל אביב (TLV)",
     locHint: "טיפ: אם החיפוש לא מוצא תוצאה בעברית, נסה לחפש בשם המקומי/אנגלי (למשל \"Fiumicino Airport\" ולא \"פיומיצ׳ינו\").",
     tabSearch: "חיפוש טקסט", tabMap: "בחירה במפה", mapPickHint: "לחץ במקום הרצוי על המפה כדי לסמן אותו",
     mapResolving: "מזהה כתובת...", mapNoName: "לא נמצאה כתובת מדויקת לנקודה זו — ניתן עדיין לבחור לפי הקואורדינטות",
@@ -132,6 +133,7 @@ const T_DICT = {
     addDayModalTitle: "Add a new day", addDayDate: "Date", confirmAdd: "Add",
     verify: "Verify with Maps", verified: "Verified", openMap: "Open in Maps", pickFromMap: "Pick from map",
     fromAlias: "Origin nickname (shown in the table instead of the full text)", toAlias: "Destination nickname (shown in the table instead of the full text)",
+    flightAliasPlaceholder: "e.g. Tel Aviv (TLV)",
     locHint: "Tip: if the search finds nothing in Hebrew, try the local/English name instead (e.g. \"Fiumicino Airport\").",
     tabSearch: "Text search", tabMap: "Pick on map", mapPickHint: "Click anywhere on the map to mark it",
     mapResolving: "Resolving address...", mapNoName: "No exact address found for this point — you can still pick it by coordinates",
@@ -301,7 +303,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
         </div>
       );
       case "from": return (
-        <span className="mt-loc-cell">
+        <span className={"mt-loc-cell" + (fromVerified ? " has-badge" : "")}>
           {row.fromAlias ? (
             <span className="mt-alias-display" title={row.from}>{row.fromAlias}</span>
           ) : (
@@ -311,7 +313,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
         </span>
       );
       case "to": return (
-        <span className="mt-loc-cell">
+        <span className={"mt-loc-cell" + (toVerified ? " has-badge" : "")}>
           {row.toAlias ? (
             <span className="mt-alias-display" title={row.to}>{row.toAlias}</span>
           ) : (
@@ -874,6 +876,8 @@ export default function MyTripApp() {
         .mt-type-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .mt-loc-cell { display:flex; align-items:center; gap:3px; }
         .mt-loc-cell .mt-editable { flex:1; }
+        .mt-loc-cell.has-badge { justify-content:flex-start; }
+        .mt-loc-cell.has-badge .mt-editable, .mt-loc-cell.has-badge .mt-alias-display { flex:0 1 auto; width:auto; max-width:100%; }
         .mt-alias-display { flex:1; font-size:12.8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:3px 5px; }
         .mt-loc-badge { color:#3E8E5A; display:flex; flex-shrink:0; }
         .mt-editable { border:1px solid transparent; border-radius:6px; padding:3px 5px; font-size:12.8px; width:100%; background:transparent; font-family:inherit; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -1166,7 +1170,7 @@ export default function MyTripApp() {
                   <div className="mt-field" style={{ marginTop: 6 }}>
                     <label>{T.fromAlias}</label>
                     <div className="mt-field-inline">
-                      <div><input value={cardDraft.fromAlias || ""} onChange={(e) => setCardDraft({ ...cardDraft, fromAlias: e.target.value })} /></div>
+                      <div><input value={cardDraft.fromAlias || ""} placeholder={showFlightHint ? T.flightAliasPlaceholder : ""} onChange={(e) => setCardDraft({ ...cardDraft, fromAlias: e.target.value })} /></div>
                       <button className="mt-btn ghost" title={T.pickFromMap} onClick={() => openLocationPicker("fromAlias")}><MapPin size={13} /></button>
                     </div>
                   </div>
@@ -1181,7 +1185,7 @@ export default function MyTripApp() {
                   <div className="mt-field" style={{ marginTop: 6 }}>
                     <label>{T.toAlias}</label>
                     <div className="mt-field-inline">
-                      <div><input value={cardDraft.toAlias || ""} onChange={(e) => setCardDraft({ ...cardDraft, toAlias: e.target.value })} /></div>
+                      <div><input value={cardDraft.toAlias || ""} placeholder={showFlightHint ? T.flightAliasPlaceholder : ""} onChange={(e) => setCardDraft({ ...cardDraft, toAlias: e.target.value })} /></div>
                       <button className="mt-btn ghost" title={T.pickFromMap} onClick={() => openLocationPicker("toAlias")}><MapPin size={13} /></button>
                     </div>
                   </div>
