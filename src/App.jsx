@@ -16,7 +16,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "5.4.0";
+const APP_VERSION = "5.5.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -211,9 +211,8 @@ function rowFrameIssue(draft, frames, T) {
 }
 function rowStartPoint(row) { return (row.from && row.from.trim()) || ""; }
 function rowEndPoint(row) { return (row.to && row.to.trim()) || ""; }
-function segmentRouteUrl(prevRow, row) {
-  if (!prevRow) return null;
-  const origin = rowEndPoint(prevRow), dest = rowStartPoint(row);
+function rowOwnRouteUrl(row) {
+  const origin = rowStartPoint(row), dest = rowEndPoint(row);
   if (!origin || !dest || origin === dest) return null;
   return "https://www.google.com/maps/dir/" + encodeURIComponent(origin) + "/" + encodeURIComponent(dest);
 }
@@ -255,7 +254,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
   const tm = typeMeta(row.typeId, types, T);
   const Icon = ICONS[tm.icon] || Tag;
   const dur = computeDuration(row.startTime, row.endTime, row.overnight);
-  const routeUrl = depth === 0 ? segmentRouteUrl(prevRow, row) : null;
+  const routeUrl = rowOwnRouteUrl(row);
   const fromVerified = row.fromVerifiedUrl && row.fromVerifiedText === row.from;
   const toVerified = row.toVerifiedUrl && row.toVerifiedText === row.to;
   const isFlightType = row.typeId === "flight" || row.typeId === "domestic-flight";
