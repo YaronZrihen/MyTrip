@@ -16,7 +16,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "5.7.0";
+const APP_VERSION = "5.8.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -183,6 +183,37 @@ function getTypeHint(typeId, field, lang) {
   return (t && t[field]) || "";
 }
 
+// Real default VALUES (not just placeholder hints) applied automatically when a record's
+// type is set, filling only fields that are still empty so existing user input is never overwritten.
+const TYPE_DEFAULT_VALUES = {
+  flight: { from: "Ben Gurion Airport", to: "Aeroporto di Roma - Fiumicino Leonardo da Vinci", fromAlias: { he: "תל אביב (TLV)", en: "Tel Aviv (TLV)" }, toAlias: { he: "רומא (FCO)", en: "Rome (FCO)" } },
+  "domestic-flight": { from: "Ben Gurion Airport", to: "Eilat Ramon Airport", fromAlias: { he: "תל אביב (TLV)", en: "Tel Aviv (TLV)" }, toAlias: { he: "אילת (ETM)", en: "Eilat (ETM)" } },
+  hotel: { notes: { he: "3 שעות מנוחה במלון", en: "3 hours resting at the hotel" } },
+  "day-tour": { to: "Fontana di Trevi" },
+  "self-tour": { to: "Fontana di Trevi" },
+  "guided-tour": { to: "Fontana di Trevi" },
+};
+function computeTypeDefaults(newTypeId, existing, prevRow, lang) {
+  const patch = {};
+  if ((newTypeId === "taxi" || newTypeId === "hotel") && prevRow && !existing.from) {
+    patch.from = prevRow.to || "";
+    patch.fromAlias = prevRow.toAlias || "";
+    patch.fromVerifiedUrl = prevRow.toVerifiedUrl || "";
+    patch.fromVerifiedText = prevRow.toVerifiedUrl ? (prevRow.toVerifiedText || prevRow.to) : "";
+    patch.fromLat = prevRow.toLat != null ? prevRow.toLat : null;
+    patch.fromLon = prevRow.toLon != null ? prevRow.toLon : null;
+  }
+  const s = TYPE_DEFAULT_VALUES[newTypeId];
+  if (s) {
+    Object.keys(s).forEach((k) => {
+      if (existing[k]) return;
+      const val = s[k];
+      patch[k] = typeof val === "object" ? (val[lang] || val.he) : val;
+    });
+  }
+  return patch;
+}
+
 function uid() { return Math.random().toString(36).slice(2, 10); }
 function heDay(dateStr, lang) { if (!dateStr) return "—"; const d = new Date(dateStr + "T00:00:00"); if (isNaN(d)) return "—"; return lang === "he" ? HE_DAYS[d.getDay()] : EN_DAYS[d.getDay()]; }
 function fmtDate(dateStr, lang) { if (!dateStr) return "—"; const d = new Date(dateStr + "T00:00:00"); if (isNaN(d)) return dateStr; const dd = String(d.getDate()).padStart(2, "0"); const mm = String(d.getMonth() + 1).padStart(2, "0"); return `${dd}/${mm}/${d.getFullYear()}`; }
@@ -341,7 +372,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
               <div className="mt-floating-backdrop" onClick={() => setTypeMenuOpen(null)} />
               <div className="mt-type-menu" style={{ top: typeMenuPos.top, left: typeMenuPos.left }}>
                 {types.map((t) => { const TI = ICONS[t.icon] || Tag; return (
-                  <button key={t.id} className="opt" onClick={() => { updateRow(row.id, { typeId: t.id }); setTypeMenuOpen(null); }}>
+                  <button key={t.id} className="opt" onClick={() => { const patch = computeTypeDefaults(t.id, row, prevRow, lang); updateRow(row.id, { typeId: t.id, ...patch }); setTypeMenuOpen(null); }}>
                     <span className="mt-type-icon" style={{ background: t.color, width: 20, height: 20 }}><TI size={11} /></span>{t.name}
                   </button>
                 ); })}
@@ -1263,7 +1294,7 @@ export default function MyTripApp() {
               <div className="mt-field-row">
                 <div className="mt-field">
                   <label>{T.type}</label>
-                  <select value={cardDraft.typeId} onChange={(e) => setCardDraft({ ...cardDraft, typeId: e.target.value })}>
+                  <select value={cardDraft.typeId} onChange={(e) => { const newType = e.target.value; const patch = computeTypeDefaults(newType, cardDraft, prevRowForCard, lang); setCardDraft({ ...cardDraft, typeId: newType, ...patch }); }}>
                     <option value="unset">{T.selectType}</option>
                     {types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
