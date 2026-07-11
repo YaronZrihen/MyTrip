@@ -7,7 +7,7 @@ import {
   Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music, ChevronDown, ChevronRight,
   Plus, X, Settings2, Pencil, Trash2, Link2, Globe, LogIn, User,
   Smartphone, Monitor, AlertTriangle, GripVertical, Check, FolderPlus, Sparkles,
-  Route, Waypoints, Download, MapPin, Search, CircleCheck, Clock, ArrowDownUp, Copy, StickyNote
+  Route, Waypoints, Download, MapPin, Search, CircleCheck, Clock, ArrowDownUp, Copy, StickyNote, TrainFront
 } from "lucide-react";
 
 /* ---------------------------------------------------------------------- */
@@ -16,7 +16,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "5.8.0";
+const APP_VERSION = "5.9.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -27,7 +27,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 const DEFAULT_MAP_CENTER = [41.9, 12.49]; // Rome — reasonable default for this itinerary
-const ICONS = { Plane, PlaneTakeoff, Car, BedDouble, Footprints, Users, Sun, Ship, KeySquare, Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music };
+const ICONS = { Plane, PlaneTakeoff, Car, BedDouble, Footprints, Users, Sun, Ship, KeySquare, Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music, TrainFront };
 const HE_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 const EN_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const FRAME_COLORS = ["#256D64", "#3E7CB1", "#8B6F47", "#7A5C9E", "#C1443A", "#5B8C5A"];
@@ -40,6 +40,7 @@ const DEFAULT_TYPES = [
   { id: "flight", name: "טיסה", icon: "Plane", color: "#256D64" },
   { id: "domestic-flight", name: "טיסת פנים", icon: "PlaneTakeoff", color: "#3E7CB1" },
   { id: "taxi", name: "מונית", icon: "Car", color: "#8B6F47" },
+  { id: "train", name: "רכבת", icon: "TrainFront", color: "#3E7CB1" },
   { id: "hotel", name: "מלון", icon: "BedDouble", color: "#D98E3F" },
   { id: "self-tour", name: "טיול עצמאי", icon: "Footprints", color: "#5B8C5A" },
   { id: "guided-tour", name: "טיול מודרך", icon: "Users", color: "#5B8C5A" },
@@ -183,37 +184,6 @@ function getTypeHint(typeId, field, lang) {
   return (t && t[field]) || "";
 }
 
-// Real default VALUES (not just placeholder hints) applied automatically when a record's
-// type is set, filling only fields that are still empty so existing user input is never overwritten.
-const TYPE_DEFAULT_VALUES = {
-  flight: { from: "Ben Gurion Airport", to: "Aeroporto di Roma - Fiumicino Leonardo da Vinci", fromAlias: { he: "תל אביב (TLV)", en: "Tel Aviv (TLV)" }, toAlias: { he: "רומא (FCO)", en: "Rome (FCO)" } },
-  "domestic-flight": { from: "Ben Gurion Airport", to: "Eilat Ramon Airport", fromAlias: { he: "תל אביב (TLV)", en: "Tel Aviv (TLV)" }, toAlias: { he: "אילת (ETM)", en: "Eilat (ETM)" } },
-  hotel: { notes: { he: "3 שעות מנוחה במלון", en: "3 hours resting at the hotel" } },
-  "day-tour": { to: "Fontana di Trevi" },
-  "self-tour": { to: "Fontana di Trevi" },
-  "guided-tour": { to: "Fontana di Trevi" },
-};
-function computeTypeDefaults(newTypeId, existing, prevRow, lang) {
-  const patch = {};
-  if ((newTypeId === "taxi" || newTypeId === "hotel") && prevRow && !existing.from) {
-    patch.from = prevRow.to || "";
-    patch.fromAlias = prevRow.toAlias || "";
-    patch.fromVerifiedUrl = prevRow.toVerifiedUrl || "";
-    patch.fromVerifiedText = prevRow.toVerifiedUrl ? (prevRow.toVerifiedText || prevRow.to) : "";
-    patch.fromLat = prevRow.toLat != null ? prevRow.toLat : null;
-    patch.fromLon = prevRow.toLon != null ? prevRow.toLon : null;
-  }
-  const s = TYPE_DEFAULT_VALUES[newTypeId];
-  if (s) {
-    Object.keys(s).forEach((k) => {
-      if (existing[k]) return;
-      const val = s[k];
-      patch[k] = typeof val === "object" ? (val[lang] || val.he) : val;
-    });
-  }
-  return patch;
-}
-
 function uid() { return Math.random().toString(36).slice(2, 10); }
 function heDay(dateStr, lang) { if (!dateStr) return "—"; const d = new Date(dateStr + "T00:00:00"); if (isNaN(d)) return "—"; return lang === "he" ? HE_DAYS[d.getDay()] : EN_DAYS[d.getDay()]; }
 function fmtDate(dateStr, lang) { if (!dateStr) return "—"; const d = new Date(dateStr + "T00:00:00"); if (isNaN(d)) return dateStr; const dd = String(d.getDate()).padStart(2, "0"); const mm = String(d.getMonth() + 1).padStart(2, "0"); return `${dd}/${mm}/${d.getFullYear()}`; }
@@ -325,14 +295,16 @@ function isChronological(rowsList) {
 }
 function initialRows() {
   const base = [
-    { date: "2026-09-10", typeId: "flight", from: "תל אביב (TLV)", to: "רומא (FCO)", startTime: "07:40", endTime: "10:35", destination: "פיומיצ׳ינו", link: "https://www.google.com/flights", costAmount: 1450, costCurrency: "₪", flightNumber: "LY386" },
-    { date: "2026-09-10", typeId: "taxi", from: "שדה תעופה", to: "מלון רומא", startTime: "11:15", endTime: "12:00", destination: "רומא — טרסטבר", costAmount: 45, costCurrency: "€" },
-    { date: "2026-09-10", typeId: "hotel", from: "", to: "", startTime: "15:00", endTime: "", destination: "Hotel Trastevere", link: "https://www.booking.com", costAmount: 620, costCurrency: "€" },
-    { date: "2026-09-11", typeId: "guided-tour", from: "", to: "", startTime: "09:00", endTime: "13:00", destination: "הקולוסיאום ופורום רומאנום", link: "https://maps.google.com", costAmount: 280, costCurrency: "€" },
-    { date: "2026-09-11", typeId: "self-tour", from: "", to: "", startTime: "16:00", endTime: "19:30", destination: "טרסטבר — שיטוט וקניות", costAmount: 0, costCurrency: "€" },
-    { date: "2026-09-14", typeId: "flight", from: "רומא (FCO)", to: "תל אביב (TLV)", startTime: "18:20", endTime: "21:50", destination: "נתב״ג", costAmount: 1390, costCurrency: "₪", flightNumber: "LY387" },
+    { date: "2026-09-10", typeId: "flight", from: "Ben Gurion Airport", to: "Aeroporto di Roma - Fiumicino Leonardo da Vinci", fromAlias: "תל אביב (TLV)", toAlias: "רומא (FCO)", startTime: "07:40", endTime: "10:35", link: "https://www.google.com/flights", costAmount: 1450, costCurrency: "₪", flightNumber: "LY386" },
+    { date: "2026-09-10", typeId: "taxi", from: "Aeroporto di Roma - Fiumicino Leonardo da Vinci", to: "Hilton Garden Inn Rome Airport", startTime: "11:15", endTime: "12:00", costAmount: 45, costCurrency: "€" },
+    { date: "2026-09-10", typeId: "hotel", from: "Hilton Garden Inn Rome Airport", to: "Hilton Garden Inn Rome Airport", startTime: "12:00", endTime: "15:00", notes: "מנוחה במלון", link: "https://www.booking.com", costAmount: 620, costCurrency: "€" },
+    { date: "2026-09-10", typeId: "train", from: "Hilton Garden Inn Rome Airport", to: "Fontana di Trevi", startTime: "15:30", endTime: "16:10", costAmount: 8, costCurrency: "€" },
+    { date: "2026-09-10", typeId: "day-tour", from: "Fontana di Trevi", to: "Fontana di Trevi", startTime: "16:15", endTime: "19:00", costAmount: 0, costCurrency: "€" },
+    { date: "2026-09-11", typeId: "guided-tour", from: "", to: "", startTime: "09:00", endTime: "13:00", link: "https://maps.google.com", costAmount: 280, costCurrency: "€" },
+    { date: "2026-09-11", typeId: "self-tour", from: "", to: "", startTime: "16:00", endTime: "19:30", costAmount: 0, costCurrency: "€" },
+    { date: "2026-09-14", typeId: "flight", from: "Aeroporto di Roma - Fiumicino Leonardo da Vinci", to: "Ben Gurion Airport", fromAlias: "רומא (FCO)", toAlias: "תל אביב (TLV)", startTime: "18:20", endTime: "21:50", costAmount: 1390, costCurrency: "₪", flightNumber: "LY387" },
   ];
-  return base.map((r) => ({ id: uid(), parentId: null, frameId: null, overnight: false, notes: "", mapLink: "", fromVerifiedUrl: "", fromVerifiedText: "", toVerifiedUrl: "", toVerifiedText: "", custom: {}, ...r }));
+  return base.map((r) => ({ id: uid(), parentId: null, frameId: null, overnight: false, notes: "", mapLink: "", fromVerifiedUrl: "", fromVerifiedText: "", toVerifiedUrl: "", toVerifiedText: "", fromAlias: "", toAlias: "", fromLat: null, fromLon: null, toLat: null, toLon: null, routeDistanceKm: null, routeDurationMin: null, custom: {}, ...r }));
 }
 
 /* ================================================================= */
@@ -372,7 +344,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
               <div className="mt-floating-backdrop" onClick={() => setTypeMenuOpen(null)} />
               <div className="mt-type-menu" style={{ top: typeMenuPos.top, left: typeMenuPos.left }}>
                 {types.map((t) => { const TI = ICONS[t.icon] || Tag; return (
-                  <button key={t.id} className="opt" onClick={() => { const patch = computeTypeDefaults(t.id, row, prevRow, lang); updateRow(row.id, { typeId: t.id, ...patch }); setTypeMenuOpen(null); }}>
+                  <button key={t.id} className="opt" onClick={() => { updateRow(row.id, { typeId: t.id }); setTypeMenuOpen(null); }}>
                     <span className="mt-type-icon" style={{ background: t.color, width: 20, height: 20 }}><TI size={11} /></span>{t.name}
                   </button>
                 ); })}
@@ -1294,7 +1266,7 @@ export default function MyTripApp() {
               <div className="mt-field-row">
                 <div className="mt-field">
                   <label>{T.type}</label>
-                  <select value={cardDraft.typeId} onChange={(e) => { const newType = e.target.value; const patch = computeTypeDefaults(newType, cardDraft, prevRowForCard, lang); setCardDraft({ ...cardDraft, typeId: newType, ...patch }); }}>
+                  <select value={cardDraft.typeId} onChange={(e) => setCardDraft({ ...cardDraft, typeId: e.target.value })}>
                     <option value="unset">{T.selectType}</option>
                     {types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
