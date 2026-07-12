@@ -16,7 +16,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "6.0.1";
+const APP_VERSION = "6.1.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -977,7 +977,7 @@ export default function MyTripApp() {
         .mt-frame-actions button:hover { background:var(--teal-tint); color:var(--teal-dark); }
         .mt-frame-body { padding:2px 12px 12px 12px; }
         .mt-group { margin-top:14px; }
-        .mt-group-header { display:flex; align-items:center; gap:9px; padding:7px 4px; cursor:pointer; user-select:none; flex-wrap:wrap; }
+        .mt-group-header { display:flex; align-items:center; gap:7px; padding:6px 4px; cursor:pointer; user-select:none; flex-wrap:wrap; }
         .mt-group-date { font-weight:700; font-size:13.5px; }
         .mt-group-day { background:var(--teal-tint); color:var(--teal-dark); font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; }
         .mt-group-actions { margin-inline-start:auto; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
@@ -987,11 +987,11 @@ export default function MyTripApp() {
         .mt-chrono-warning { display:flex; align-items:center; gap:7px; background:#FBEAE8; color:var(--danger); font-size:11.5px; padding:6px 10px; border-radius:8px; margin:0 4px 8px; }
         .mt-table-wrap { width:100%; overflow-x:auto; border-radius:10px; }
         table.mt-table { width:100%; table-layout:auto; border-collapse:separate; border-spacing:0; background:var(--surface); border-radius:10px; overflow:hidden; border:1px solid var(--border); }
-        .mt-table thead th { text-align:start; font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); font-weight:600; padding:7px 8px; background:#FAFCFB; border-bottom:1px solid var(--border); white-space:nowrap; }
-        .mt-table tbody td { padding:5px 8px; font-size:12.8px; border-bottom:1px solid var(--border); vertical-align:middle; position:relative; white-space:nowrap; }
+        .mt-table thead th { text-align:start; font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); font-weight:600; padding:6px 6px; background:#FAFCFB; border-bottom:1px solid var(--border); white-space:nowrap; }
+        .mt-table tbody td { padding:4px 6px; font-size:12.8px; border-bottom:1px solid var(--border); vertical-align:middle; position:relative; white-space:nowrap; }
         .mt-table tbody tr:last-child td { border-bottom:none; }
         .mt-table tbody tr:hover { background:#FBFDFC; }
-        .mt-table th.handle, .mt-table td.handle { width:44px; min-width:44px; max-width:44px; white-space:nowrap; }
+        .mt-table th.handle, .mt-table td.handle { width:30px; min-width:30px; max-width:30px; white-space:nowrap; }
         .mt-table th.icon, .mt-table td.icon, .mt-table th.route, .mt-table td.route { width:1%; white-space:nowrap; text-align:center; }
         .mt-table th.link, .mt-table td.link, .mt-table th.actions, .mt-table td.actions, .mt-table th.notes, .mt-table td.notes { width:1%; white-space:nowrap; text-align:center; }
         .mt-table th.duration, .mt-table td.duration { width:1%; white-space:nowrap; }
@@ -1000,7 +1000,7 @@ export default function MyTripApp() {
         .mt-table th.day, .mt-table td.day { min-width:52px; width:1%; }
         .mt-table th.cost, .mt-table td.cost { width:1%; white-space:nowrap; }
         .mt-table th.type, .mt-table td.type { min-width:118px; overflow:visible; }
-        .mt-table th.from, .mt-table td.from, .mt-table th.to, .mt-table td.to { min-width:104px; }
+        .mt-table th.from, .mt-table td.from, .mt-table th.to, .mt-table td.to { min-width:88px; max-width:150px; }
         .mt-table th.destination, .mt-table td.destination { min-width:140px; width:auto; }
         .mt-table td.destination, .mt-table td.from, .mt-table td.to { overflow:hidden; text-overflow:ellipsis; }
         .mt-handle-wrap { display:flex; align-items:center; gap:3px; }
@@ -1011,17 +1011,18 @@ export default function MyTripApp() {
         .mt-type-btn { border:none; background:none; padding:0; display:flex; align-items:center; gap:5px; font-size:12.8px; font-weight:500; color:var(--ink); max-width:100%; }
         .mt-type-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .mt-loc-cell { display:flex; align-items:center; gap:3px; }
-        .mt-loc-cell .mt-editable { flex:1; }
+        .mt-loc-cell .mt-editable { flex:1; max-width:18ch; }
         .mt-loc-cell.has-badge { justify-content:flex-start; }
         .mt-loc-cell.has-badge .mt-editable, .mt-loc-cell.has-badge .mt-alias-display { flex:0 1 auto; width:auto; max-width:100%; }
-        .mt-alias-display { flex:1; font-size:12.8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:3px 5px; }
+        .mt-alias-display { flex:1; font-size:12.8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:3px 5px; max-width:18ch; cursor:default; }
         .mt-loc-badge { color:#3E8E5A; display:flex; flex-shrink:0; }
         .mt-editable { border:1px solid transparent; border-radius:6px; padding:3px 5px; font-size:12.8px; width:100%; background:transparent; font-family:inherit; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .mt-editable:hover { border-color:var(--border); }
         .mt-editable:focus { outline:none; border-color:var(--teal); background:#fff; }
         .mt-editable.mt-time:focus, .mt-editable[type=number]:focus { outline:none; border-color:var(--teal); background:#fff; }
         .mt-editable.mt-time { min-width:76px; }
-        .mt-editable[type=number] { min-width:44px; }
+        .mt-editable[type=number] { min-width:38px; -moz-appearance:textfield; }
+        .mt-editable[type=number]::-webkit-outer-spin-button, .mt-editable[type=number]::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
         .mt-cost { display:flex; align-items:center; gap:3px; font-weight:600; color:var(--amber); }
         .mt-link-icon { color:var(--teal); display:flex; align-items:center; justify-content:center; border:none; background:none; padding:2px; }
         .mt-link-icon.empty { color:var(--border); }
