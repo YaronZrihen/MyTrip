@@ -16,7 +16,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "6.0.0";
+const APP_VERSION = "6.0.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -889,7 +889,11 @@ export default function MyTripApp() {
     const nodes = [
       ...cf.map((f) => ({ type: "frame", key: "f-" + f.id, sort: f.startDate || "", frame: f })),
       ...dg.map((g) => ({ type: "day", key: "d-" + g.date, sort: g.date, group: g })),
-    ].sort((a, b) => a.sort.localeCompare(b.sort));
+    ].sort((a, b) => {
+      if (a.sort !== b.sort) return a.sort.localeCompare(b.sort);
+      if (a.type !== b.type) return a.type === "day" ? -1 : 1; // same date: existing day records render before a same-dated frame
+      return 0;
+    });
 
     if (nodes.length === 0) {
       return (
