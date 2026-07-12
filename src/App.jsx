@@ -17,7 +17,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "7.1.0";
+const APP_VERSION = "7.2.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -508,7 +508,6 @@ function DayGroup({ g, fid, depth, ctx }) {
         <span className="mt-group-date">{fmtDate(g.date, lang)}</span>
         <span className="mt-group-day">{heDay(g.date, lang)}</span>
         <div className="mt-group-actions" onClick={(e) => e.stopPropagation()}>
-          <button className="mt-group-add" onClick={() => addRow(g.date, null, fid)}><Plus size={13} /> {T.addRow}</button>
           <button className="mt-group-add" onClick={() => openAddDayModal(fid)}><Plus size={13} /> {T.addDay}</button>
           {dayRoute ? (
             <a className="mt-group-add" href={dayRoute} target="_blank" rel="noreferrer"><Waypoints size={13} /> {T.dayRoute}</a>
@@ -544,6 +543,7 @@ function DayGroup({ g, fid, depth, ctx }) {
               </div>
             );
           })}
+          <button className="mt-group-add mt-group-add-bottom" onClick={() => addRow(g.date, null, fid)}><Plus size={13} /> {T.addRow}</button>
         </div>
       ) : (
         <div className="mt-table-wrap">
@@ -578,6 +578,7 @@ function DayGroup({ g, fid, depth, ctx }) {
               ))}
             </tbody>
           </table>
+          <button className="mt-group-add mt-group-add-bottom" onClick={() => addRow(g.date, null, fid)}><Plus size={13} /> {T.addRow}</button>
         </div>
       ))}
     </div>
@@ -1104,6 +1105,7 @@ export default function MyTripApp() {
         .mt-group-add { font-size:12px; color:var(--teal); display:flex; align-items:center; gap:3px; background:none; border:none; font-weight:600; text-decoration:none; }
         .mt-group-add:hover { text-decoration:underline; }
         .mt-group-add.disabled { color:var(--border); cursor:default; }
+        .mt-group-add-bottom { display:flex; margin-top:6px; padding:6px 4px; }
         .mt-chrono-warning { display:flex; align-items:center; gap:7px; background:#FBEAE8; color:var(--danger); font-size:11.5px; padding:6px 10px; border-radius:8px; margin:0 4px 8px; }
         .mt-table-wrap { width:100%; overflow-x:auto; border-radius:10px; }
         table.mt-table { width:100%; table-layout:fixed; border-collapse:separate; border-spacing:0; background:var(--surface); border-radius:10px; overflow:hidden; border:1px solid var(--border); }
@@ -1120,7 +1122,7 @@ export default function MyTripApp() {
         .mt-table th.duration, .mt-table td.duration { white-space:nowrap; }
         .mt-table th.type, .mt-table td.type { overflow:visible; }
         .mt-table td.from, .mt-table td.to { overflow:hidden; text-overflow:ellipsis; }
-        .mt-handle-wrap { display:flex; align-items:center; gap:6px; }
+        .mt-handle-wrap { display:flex; align-items:center; gap:2px; }
         .mt-type-wrap { position:relative; }
         .mt-type-chip { display:flex; align-items:center; gap:6px; }
         .mt-type-icon { width:22px; height:22px; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
