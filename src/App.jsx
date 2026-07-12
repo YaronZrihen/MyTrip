@@ -7,7 +7,7 @@ import {
   Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music, ChevronDown, ChevronRight,
   Plus, X, Settings2, Pencil, Trash2, Link2, Globe, LogIn, User,
   Smartphone, Monitor, AlertTriangle, GripVertical, Check, FolderPlus, Sparkles,
-  Route, Waypoints, Download, MapPin, Search, CircleCheck, Clock, ArrowDownUp, Copy, StickyNote, TrainFront
+  Route, Waypoints, Download, Upload, MapPin, Search, CircleCheck, Clock, ArrowDownUp, Copy, StickyNote, TrainFront
 } from "lucide-react";
 
 /* ---------------------------------------------------------------------- */
@@ -16,7 +16,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "6.3.0";
+const APP_VERSION = "6.4.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -72,6 +72,7 @@ const T_DICT = {
   he: {
     appName: "MyTrip", addRow: "הוסף רשומה", addDay: "הוסף יום", newFrame: "מסגרת חדשה",
     columns: "עמודות", addColumn: "הוסף עמודה", addType: "הוסף תיאור", resetColumnWidths: "איפוס רוחב עמודות (גרור את קצה כותרת העמודה לשינוי ידני)",
+    exportFile: "שמור לקובץ", importFile: "ייבוא מקובץ", importSuccess: "הייבוא הצליח", importError: "הקובץ אינו תקין",
     login: "התחברות עם Google", logout: "יציאה",
     desktop: "מחשב", mobile: "סלולר", lang: "English", editRecord: "כרטיס רשומה",
     save: "שמירה", cancel: "ביטול", delete: "מחיקה", addSub: "הוסף תת-רשומה",
@@ -112,6 +113,7 @@ const T_DICT = {
   en: {
     appName: "MyTrip", addRow: "Add record", addDay: "Add day", newFrame: "New frame",
     columns: "Columns", addColumn: "Add column", addType: "Add description", resetColumnWidths: "Reset column widths (drag a header's edge to resize manually)",
+    exportFile: "Save to file", importFile: "Import from file", importSuccess: "Import successful", importError: "This file isn't valid",
     login: "Sign in with Google", logout: "Sign out",
     desktop: "Desktop", mobile: "Mobile", lang: "עברית", editRecord: "Record card",
     save: "Save", cancel: "Cancel", delete: "Delete", addSub: "Add sub-record",
@@ -190,6 +192,14 @@ function computeDuration(start, end, overnight) {
   if (mins < 0) return null;
   const h = Math.floor(mins / 60), m = mins % 60;
   return `${h}:${String(m).padStart(2, "0")}`;
+}
+function detectTextAlign(text) {
+  if (!text) return undefined;
+  for (const ch of text) {
+    if (/[\u0590-\u05FF]/.test(ch)) return "right";
+    if (/[A-Za-z]/.test(ch)) return "left";
+  }
+  return undefined;
 }
 function typeMeta(typeId, types, T) {
   if (!typeId || typeId === "unset") return { id: "unset", name: (T && T.selectType) || "בחר...", icon: "Tag", color: "#C1443A" };
@@ -385,9 +395,9 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
       case "from": return (
         <span className={"mt-loc-cell" + (fromVerified ? " has-badge" : "")}>
           {row.fromAlias ? (
-            <span className="mt-alias-display" dir="auto" title={row.from}>{row.fromAlias}</span>
+            <span className="mt-alias-display" dir="auto" style={{ textAlign: detectTextAlign(row.fromAlias) }} title={row.from} onClick={() => openCard(row)}>{row.fromAlias}</span>
           ) : (
-            <input className="mt-editable" dir="auto" title={row.from} placeholder={getTypeHint(row.typeId, "from", lang)} value={row.from} onChange={(e) => updateRow(row.id, { from: e.target.value })} />
+            <input className="mt-editable" dir="auto" style={{ textAlign: detectTextAlign(row.from) }} title={row.from} placeholder={getTypeHint(row.typeId, "from", lang)} value={row.from} onChange={(e) => updateRow(row.id, { from: e.target.value })} />
           )}
           {fromVerified && <a className="mt-loc-badge" href={row.fromVerifiedUrl} target="_blank" rel="noreferrer" title={T.openMap}><MapPin size={11} /></a>}
         </span>
@@ -395,9 +405,9 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
       case "to": return (
         <span className={"mt-loc-cell" + (toVerified ? " has-badge" : "")}>
           {row.toAlias ? (
-            <span className="mt-alias-display" dir="auto" title={row.to}>{row.toAlias}</span>
+            <span className="mt-alias-display" dir="auto" style={{ textAlign: detectTextAlign(row.toAlias) }} title={row.to} onClick={() => openCard(row)}>{row.toAlias}</span>
           ) : (
-            <input className="mt-editable" dir="auto" title={row.to} placeholder={getTypeHint(row.typeId, "to", lang)} value={row.to} onChange={(e) => updateRow(row.id, { to: e.target.value })} />
+            <input className="mt-editable" dir="auto" style={{ textAlign: detectTextAlign(row.to) }} title={row.to} placeholder={getTypeHint(row.typeId, "to", lang)} value={row.to} onChange={(e) => updateRow(row.id, { to: e.target.value })} />
           )}
           {toVerified && <a className="mt-loc-badge" href={row.toVerifiedUrl} target="_blank" rel="noreferrer" title={T.openMap}><MapPin size={11} /></a>}
         </span>
@@ -585,6 +595,8 @@ export default function MyTripApp() {
   const [types, setTypes] = useState(DEFAULT_TYPES);
   const [columns, setColumns] = useState(DEFAULT_COLUMNS);
   const [columnWidths, setColumnWidths] = useState({});
+  const [importMsg, setImportMsg] = useState(null);
+  const importInputRef = useRef(null);
   const [lang, setLang] = useState("he");
   const [viewMode, setViewMode] = useState("auto");
   const [narrowScreen, setNarrowScreen] = useState(false);
@@ -654,6 +666,37 @@ export default function MyTripApp() {
     window.addEventListener("mouseup", onUp);
   }
   function resetColumnWidths() { setColumnWidths({}); }
+
+  function exportToFile() {
+    const payload = { version: APP_VERSION, exportedAt: new Date().toISOString(), rows, frames, types, columns, columnWidths, displayCurrency };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `mytrip-export-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+  function importFromFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        if (!data || !Array.isArray(data.rows)) throw new Error("bad-format");
+        setRows(data.rows);
+        setFrames(Array.isArray(data.frames) ? data.frames : []);
+        if (Array.isArray(data.types) && data.types.length) setTypes(data.types);
+        if (Array.isArray(data.columns) && data.columns.length) setColumns(data.columns);
+        if (data.columnWidths) setColumnWidths(data.columnWidths);
+        if (data.displayCurrency) setDisplayCurrency(data.displayCurrency);
+        setImportMsg({ ok: true });
+      } catch (e) {
+        setImportMsg({ ok: false });
+      }
+    };
+    reader.readAsText(file);
+  }
   const visibleColumns = columns.filter((c) => c.visible);
 
   /* ---------- bound data helpers ---------- */
@@ -1023,8 +1066,8 @@ export default function MyTripApp() {
         .mt-table-wrap { width:100%; overflow-x:auto; border-radius:10px; }
         table.mt-table { width:100%; table-layout:fixed; border-collapse:separate; border-spacing:0; background:var(--surface); border-radius:10px; overflow:hidden; border:1px solid var(--border); }
         .mt-table thead th { text-align:start; font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); font-weight:600; padding:6px 6px; background:#FAFCFB; border-bottom:1px solid var(--border); white-space:nowrap; position:relative; overflow:hidden; text-overflow:ellipsis; }
-        .mt-col-resizer { position:absolute; top:0; bottom:0; inset-inline-end:-3px; width:6px; cursor:col-resize; user-select:none; z-index:5; }
-        .mt-col-resizer:hover, .mt-col-resizer:active { background:var(--teal); opacity:.35; }
+        .mt-col-resizer { position:absolute; top:0; bottom:0; inset-inline-end:-3px; width:6px; cursor:col-resize; user-select:none; z-index:5; background:rgba(37,109,100,.18); }
+        .mt-col-resizer:hover, .mt-col-resizer:active { background:var(--teal); opacity:.6; }
         .mt-table tbody td { padding:4px 6px; font-size:12.8px; border-bottom:1px solid var(--border); vertical-align:middle; position:relative; white-space:nowrap; }
         .mt-table tbody tr:last-child td { border-bottom:none; }
         .mt-table tbody tr:hover { background:#FBFDFC; }
@@ -1156,6 +1199,11 @@ export default function MyTripApp() {
         <div className="mt-toolbar-group">
           <button className="mt-icon-btn" ref={addTypeBtnRef} onClick={openAddTypeMenu}><Plus /> {T.addType}</button>
           <button className="mt-icon-btn" ref={columnsBtnRef} onClick={openColumnsMenu}><Settings2 /> {T.columns}</button>
+          <button className="mt-icon-btn" onClick={exportToFile}><Download /> {T.exportFile}</button>
+          <button className="mt-icon-btn" onClick={() => importInputRef.current && importInputRef.current.click()}><Upload /> {T.importFile}</button>
+          <input ref={importInputRef} type="file" accept="application/json,.json" style={{ display: "none" }}
+            onChange={(e) => { importFromFile(e.target.files && e.target.files[0]); e.target.value = ""; }} />
+          {importMsg && <span className="mt-hint" style={{ color: importMsg.ok ? "#3E8E5A" : "var(--danger)" }}>{importMsg.ok ? T.importSuccess : T.importError}</span>}
         </div>
       </div>
 
