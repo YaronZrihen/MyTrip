@@ -7,7 +7,8 @@ import {
   Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music, ChevronDown, ChevronRight,
   Plus, X, Settings2, Pencil, Trash2, Link2, Globe, LogIn, User,
   Smartphone, Monitor, AlertTriangle, GripVertical, Check, FolderPlus, Sparkles,
-  Route, Waypoints, Download, Upload, MapPin, Search, CircleCheck, Clock, ArrowDownUp, Copy, StickyNote, TrainFront
+  Route, Waypoints, Download, Upload, MapPin, Search, CircleCheck, Clock, ArrowDownUp, Copy, StickyNote, TrainFront,
+  Bus, Motorbike, Bike, Scooter, Sailboat, ShipWheel, Anchor, Kayak, Helicopter, Caravan
 } from "lucide-react";
 
 /* ---------------------------------------------------------------------- */
@@ -16,7 +17,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "6.6.0";
+const APP_VERSION = "7.0.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -27,7 +28,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 const DEFAULT_MAP_CENTER = [41.9, 12.49]; // Rome — reasonable default for this itinerary
-const ICONS = { Plane, PlaneTakeoff, Car, BedDouble, Footprints, Users, Sun, Ship, KeySquare, Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music, TrainFront };
+const ICONS = { Plane, PlaneTakeoff, Car, BedDouble, Footprints, Users, Sun, Ship, KeySquare, Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music, TrainFront, Bus, Motorbike, Bike, Scooter, Sailboat, ShipWheel, Anchor, Kayak, Helicopter, Caravan };
 const HE_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 const EN_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const FRAME_COLORS = ["#256D64", "#3E7CB1", "#8B6F47", "#7A5C9E", "#C1443A", "#5B8C5A"];
@@ -37,17 +38,42 @@ const FALLBACK_RATES = { ILS: 1, USD: 0.27, EUR: 0.25, GBP: 0.21 };
 const FLIGHT_LOOKUP_ENABLED = false; // needs a real flight-data provider (e.g. AeroDataBox) + API key + server proxy
 
 const DEFAULT_TYPES = [
-  { id: "flight", name: "טיסה", icon: "Plane", color: "#256D64" },
-  { id: "domestic-flight", name: "טיסת פנים", icon: "PlaneTakeoff", color: "#3E7CB1" },
-  { id: "taxi", name: "מונית", icon: "Car", color: "#8B6F47" },
-  { id: "train", name: "רכבת", icon: "TrainFront", color: "#3E7CB1" },
-  { id: "hotel", name: "מלון", icon: "BedDouble", color: "#D98E3F" },
-  { id: "self-tour", name: "טיול עצמאי", icon: "Footprints", color: "#5B8C5A" },
-  { id: "guided-tour", name: "טיול מודרך", icon: "Users", color: "#5B8C5A" },
-  { id: "day-tour", name: "טיול יומי", icon: "Sun", color: "#D9A23D" },
-  { id: "ferry", name: "מעבורת", icon: "Ship", color: "#3E7CB1" },
-  { id: "car-rental", name: "השכרת רכב", icon: "KeySquare", color: "#8B6F47" },
+  { id: "train", name: "רכבת", icon: "TrainFront", color: "#3E7CB1", category: "public-transport" },
+  { id: "high-speed-train", name: "רכבת מהירה", icon: "TrainFront", color: "#2F5F8A", category: "public-transport" },
+  { id: "bus", name: "אוטובוס", icon: "Bus", color: "#3E7CB1", category: "public-transport" },
+  { id: "taxi", name: "מונית", icon: "Car", color: "#8B6F47", category: "public-transport" },
+
+  { id: "car-rental", name: "השכרת רכב", icon: "KeySquare", color: "#8B6F47", category: "road-transport" },
+  { id: "caravan", name: "קראוון", icon: "Caravan", color: "#8B6F47", category: "road-transport" },
+  { id: "motorcycle", name: "אופנוע", icon: "Motorbike", color: "#8B6F47", category: "road-transport" },
+  { id: "bicycle", name: "אופניים", icon: "Bike", color: "#5B8C5A", category: "road-transport" },
+  { id: "scooter", name: "קורקינט", icon: "Scooter", color: "#5B8C5A", category: "road-transport" },
+
+  { id: "ferry", name: "מעבורת", icon: "Ship", color: "#3E7CB1", category: "sea-transport" },
+  { id: "yacht", name: "יאכטה", icon: "Sailboat", color: "#2F7A8C", category: "sea-transport" },
+  { id: "ship", name: "אוניה", icon: "ShipWheel", color: "#2F7A8C", category: "sea-transport" },
+  { id: "cruise", name: "שייט", icon: "Anchor", color: "#2F7A8C", category: "sea-transport" },
+  { id: "canoe", name: "קאנו", icon: "Kayak", color: "#2F7A8C", category: "sea-transport" },
+
+  { id: "flight", name: "טיסה בינלאומית", icon: "Plane", color: "#256D64", category: "air-transport" },
+  { id: "domestic-flight", name: "טיסת פנים", icon: "PlaneTakeoff", color: "#3E7CB1", category: "air-transport" },
+  { id: "helicopter", name: "מסוק", icon: "Helicopter", color: "#256D64", category: "air-transport" },
+
+  { id: "hotel", name: "מלון", icon: "BedDouble", color: "#D98E3F", category: "stay-activities" },
+  { id: "self-tour", name: "טיול עצמאי", icon: "Footprints", color: "#5B8C5A", category: "stay-activities" },
+  { id: "guided-tour", name: "טיול מודרך", icon: "Users", color: "#5B8C5A", category: "stay-activities" },
+  { id: "day-tour", name: "טיול יומי", icon: "Sun", color: "#D9A23D", category: "stay-activities" },
 ];
+const CATEGORY_ORDER = ["public-transport", "road-transport", "sea-transport", "air-transport", "stay-activities", "other"];
+const CATEGORY_LABELS = {
+  he: { "public-transport": "תחבורה ציבורית", "road-transport": "תחבורה כביש", "sea-transport": "תחבורה ימית", "air-transport": "תחבורה אווירית", "stay-activities": "לינה ופעילויות", other: "אחר" },
+  en: { "public-transport": "Public Transport", "road-transport": "Road Transport", "sea-transport": "Sea Transport", "air-transport": "Air Transport", "stay-activities": "Stay & Activities", other: "Other" },
+};
+function groupTypesByCategory(types) {
+  const map = {};
+  types.forEach((t) => { const cat = t.category || "other"; if (!map[cat]) map[cat] = []; map[cat].push(t); });
+  return CATEGORY_ORDER.filter((c) => map[c] && map[c].length).map((c) => ({ category: c, items: map[c] }));
+}
 const ICON_PALETTE = ["Tag", "Star", "Flag", "Camera", "Utensils", "ShoppingBag", "Music"];
 const CUSTOM_COLOR_ROTATION = ["#7A5C9E", "#C1443A", "#3E7CB1", "#5B8C5A", "#8B6F47", "#D98E3F"];
 const TZ_HINT_TYPES = ["flight", "domestic-flight", "ferry"];
@@ -154,31 +180,7 @@ const T_DICT = {
 };
 
 /* ---------- pure helpers ---------- */
-const TYPE_HINTS = {
-  he: {
-    flight: { from: "לדוגמה: Ben Gurion Airport", to: "לדוגמה: Fiumicino Leonardo da Vinci", fromAlias: "לדוגמה: תל אביב (TLV)", toAlias: "לדוגמה: רומא (FCO)" },
-    "domestic-flight": { from: "לדוגמה: Ben Gurion Airport", to: "לדוגמה: Eilat Ramon Airport", fromAlias: "לדוגמה: תל אביב (TLV)", toAlias: "לדוגמה: אילת (ETM)" },
-    taxi: { from: "הדבק את היעד מהרשומה הקודמת", to: "לדוגמה: Hilton Garden Inn Rome Airport" },
-    hotel: { from: "הדבק את היעד מהרשומה הקודמת", notes: "לדוגמה: 3 שעות מנוחה במלון" },
-    "self-tour": { to: "לדוגמה: Fontana di Trevi (מזרקת טרווי)" },
-    "guided-tour": { to: "לדוגמה: Fontana di Trevi (מזרקת טרווי)" },
-    "day-tour": { to: "לדוגמה: Fontana di Trevi (מזרקת טרווי)" },
-  },
-  en: {
-    flight: { from: "e.g. Ben Gurion Airport", to: "e.g. Fiumicino Leonardo da Vinci", fromAlias: "e.g. Tel Aviv (TLV)", toAlias: "e.g. Rome (FCO)" },
-    "domestic-flight": { from: "e.g. Ben Gurion Airport", to: "e.g. Eilat Ramon Airport", fromAlias: "e.g. Tel Aviv (TLV)", toAlias: "e.g. Eilat (ETM)" },
-    taxi: { from: "Paste the destination from the previous record", to: "e.g. Hilton Garden Inn Rome Airport" },
-    hotel: { from: "Paste the destination from the previous record", notes: "e.g. 3 hours resting at the hotel" },
-    "self-tour": { to: "e.g. Fontana di Trevi (Trevi Fountain)" },
-    "guided-tour": { to: "e.g. Fontana di Trevi (Trevi Fountain)" },
-    "day-tour": { to: "e.g. Fontana di Trevi (Trevi Fountain)" },
-  },
-};
-function getTypeHint(typeId, field, lang) {
-  const langHints = TYPE_HINTS[lang] || TYPE_HINTS.he;
-  const t = langHints[typeId];
-  return (t && t[field]) || "";
-}
+function getTypeHint() { return ""; }
 
 function uid() { return Math.random().toString(36).slice(2, 10); }
 function heDay(dateStr, lang) { if (!dateStr) return "—"; const d = new Date(dateStr + "T00:00:00"); if (isNaN(d)) return "—"; return lang === "he" ? HE_DAYS[d.getDay()] : EN_DAYS[d.getDay()]; }
@@ -254,8 +256,9 @@ function rowFrameIssue(draft, frames, T) {
 function rowStartPoint(row) { return (row.from && row.from.trim()) || ""; }
 function rowEndPoint(row) { return (row.to && row.to.trim()) || ""; }
 const TRAVEL_MODE_MAP = {
-  taxi: "driving", "car-rental": "driving",
-  train: "transit", ferry: "transit",
+  taxi: "driving", "car-rental": "driving", caravan: "driving", motorcycle: "driving",
+  bicycle: "bicycling", scooter: "bicycling",
+  train: "transit", "high-speed-train": "transit", bus: "transit",
   "self-tour": "walking", "guided-tour": "walking", "day-tour": "walking",
 };
 function rowOwnRouteUrl(row) {
@@ -381,11 +384,16 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
             <>
               <div className="mt-floating-backdrop" onClick={() => setTypeMenuOpen(null)} />
               <div className="mt-type-menu" style={{ top: typeMenuPos.top ?? undefined, bottom: typeMenuPos.bottom ?? undefined, left: typeMenuPos.left }}>
-                {types.map((t) => { const TI = ICONS[t.icon] || Tag; return (
-                  <button key={t.id} className="opt" onClick={() => { updateRow(row.id, { typeId: t.id }); setTypeMenuOpen(null); }}>
-                    <span className="mt-type-icon" style={{ background: t.color, width: 20, height: 20 }}><TI size={11} /></span>{t.name}
-                  </button>
-                ); })}
+                {groupTypesByCategory(types).map((grp) => (
+                  <React.Fragment key={grp.category}>
+                    <div className="mt-type-cat-label">{CATEGORY_LABELS[lang][grp.category] || grp.category}</div>
+                    {grp.items.map((t) => { const TI = ICONS[t.icon] || Tag; return (
+                      <button key={t.id} className="opt" onClick={() => { updateRow(row.id, { typeId: t.id }); setTypeMenuOpen(null); }}>
+                        <span className="mt-type-icon" style={{ background: t.color, width: 20, height: 20 }}><TI size={11} /></span>{t.name}
+                      </button>
+                    ); })}
+                  </React.Fragment>
+                ))}
                 <div className="divider" />
                 <div className="mt-type-new-form">
                   <input type="text" placeholder={T.typeName} value={newTypeDraft.name} onChange={(e) => setNewTypeDraft({ ...newTypeDraft, name: e.target.value })} />
@@ -1128,6 +1136,7 @@ export default function MyTripApp() {
         .mt-fx-select { border:1px solid var(--border); border-radius:8px; padding:5px 8px; font-size:12.5px; background:#fff; color:var(--ink); }
         .mt-fx-note { font-size:10.5px; color:var(--muted); font-style:italic; }
         .mt-type-menu { position:fixed; z-index:200; background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 12px 32px rgba(20,40,35,.18); padding:6px; min-width:190px; max-height:70vh; overflow-y:auto; color:var(--ink); }
+        .mt-type-cat-label { font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-weight:700; padding:8px 8px 3px; }
         .mt-type-menu button.opt { width:100%; display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:7px; background:none; border:none; font-size:12.5px; text-align:start; color:var(--ink); }
         .mt-type-menu button.opt:hover { background:var(--bg); }
         .mt-type-menu .divider { height:1px; background:var(--border); margin:6px 2px; }
@@ -1376,7 +1385,11 @@ export default function MyTripApp() {
                   <label>{T.type}</label>
                   <select value={cardDraft.typeId} onChange={(e) => setCardDraft({ ...cardDraft, typeId: e.target.value })}>
                     <option value="unset">{T.selectType}</option>
-                    {types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    {groupTypesByCategory(types).map((grp) => (
+                      <optgroup key={grp.category} label={CATEGORY_LABELS[lang][grp.category] || grp.category}>
+                        {grp.items.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      </optgroup>
+                    ))}
                   </select>
                 </div>
                 <div className="mt-field"><label>תאריך</label><DateField value={cardDraft.date} onChange={(e) => setCardDraft({ ...cardDraft, date: e.target.value })} /></div>
