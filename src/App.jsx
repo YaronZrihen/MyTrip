@@ -16,7 +16,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "6.4.0";
+const APP_VERSION = "6.5.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1066,8 +1066,9 @@ export default function MyTripApp() {
         .mt-table-wrap { width:100%; overflow-x:auto; border-radius:10px; }
         table.mt-table { width:100%; table-layout:fixed; border-collapse:separate; border-spacing:0; background:var(--surface); border-radius:10px; overflow:hidden; border:1px solid var(--border); }
         .mt-table thead th { text-align:start; font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); font-weight:600; padding:6px 6px; background:#FAFCFB; border-bottom:1px solid var(--border); white-space:nowrap; position:relative; overflow:hidden; text-overflow:ellipsis; }
-        .mt-col-resizer { position:absolute; top:0; bottom:0; inset-inline-end:-3px; width:6px; cursor:col-resize; user-select:none; z-index:5; background:rgba(37,109,100,.18); }
-        .mt-col-resizer:hover, .mt-col-resizer:active { background:var(--teal); opacity:.6; }
+        .mt-table th.from, .mt-table th.to { padding-inline-start:10px; }
+        .mt-col-resizer { position:absolute; top:2px; bottom:2px; inset-inline-end:-2px; width:3px; cursor:col-resize; user-select:none; z-index:5; background:rgba(37,109,100,.10); border-radius:2px; }
+        .mt-col-resizer:hover, .mt-col-resizer:active { background:var(--teal); opacity:.5; }
         .mt-table tbody td { padding:4px 6px; font-size:12.8px; border-bottom:1px solid var(--border); vertical-align:middle; position:relative; white-space:nowrap; }
         .mt-table tbody tr:last-child td { border-bottom:none; }
         .mt-table tbody tr:hover { background:#FBFDFC; }
@@ -1391,10 +1392,7 @@ export default function MyTripApp() {
                   {fromVerifiedCard && <div className="mt-verified-row"><CircleCheck size={12} /> {T.verified} — <a href={cardDraft.fromVerifiedUrl} target="_blank" rel="noreferrer">{T.openMap}</a></div>}
                   <div className="mt-field" style={{ marginTop: 6 }}>
                     <label>{T.fromAlias}</label>
-                    <div className="mt-field-inline">
-                      <div><input dir="auto" value={cardDraft.fromAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "fromAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, fromAlias: e.target.value })} /></div>
-                      <button className="mt-btn ghost mt-btn-icon" title={T.pickFromMap} onClick={() => openLocationPicker("fromAlias")}><MapPin size={13} /></button>
-                    </div>
+                    <input dir="auto" value={cardDraft.fromAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "fromAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, fromAlias: e.target.value })} />
                     <div className="mt-hint">{T.aliasHint}</div>
                   </div>
                 </div>
@@ -1407,10 +1405,7 @@ export default function MyTripApp() {
                   {toVerifiedCard && <div className="mt-verified-row"><CircleCheck size={12} /> {T.verified} — <a href={cardDraft.toVerifiedUrl} target="_blank" rel="noreferrer">{T.openMap}</a></div>}
                   <div className="mt-field" style={{ marginTop: 6 }}>
                     <label>{T.toAlias}</label>
-                    <div className="mt-field-inline">
-                      <div><input dir="auto" value={cardDraft.toAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "toAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, toAlias: e.target.value })} /></div>
-                      <button className="mt-btn ghost mt-btn-icon" title={T.pickFromMap} onClick={() => openLocationPicker("toAlias")}><MapPin size={13} /></button>
-                    </div>
+                    <input dir="auto" value={cardDraft.toAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "toAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, toAlias: e.target.value })} />
                     <div className="mt-hint">{T.aliasHint}</div>
                   </div>
                 </div>
