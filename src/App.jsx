@@ -16,7 +16,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "6.1.0";
+const APP_VERSION = "6.2.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -270,6 +270,14 @@ function fetchDrivingRoute(a, b) {
       return { distanceKm: route.distance / 1000, durationMin: route.duration / 60 };
     });
 }
+const COL_WIDTHS = {
+  date: 78, day: 48, icon: 30, type: 112, from: 138, to: 138,
+  startTime: 58, duration: 44, endTime: 58, route: 30, link: 30, cost: 84, notes: 30,
+};
+function colFixedWidth(key) {
+  if (COL_WIDTHS[key] != null) return COL_WIDTHS[key];
+  return 110; // fallback for custom columns
+}
 function dayRouteUrl(rowsInDay) {
   const points = [];
   rowsInDay.forEach((r) => { const a = rowStartPoint(r), b = rowEndPoint(r); if (a) points.push(a); if (b && b !== a) points.push(b); });
@@ -500,6 +508,11 @@ function DayGroup({ g, fid, depth, ctx }) {
       ) : (
         <div className="mt-table-wrap">
           <table className="mt-table">
+            <colgroup>
+              <col style={{ width: 26 }} />
+              {visibleColumns.map((c) => <col key={c.key} style={{ width: colFixedWidth(c.key) }} />)}
+              <col style={{ width: 64 }} />
+            </colgroup>
             <thead>
               <tr>
                 <th className="handle"></th>
@@ -986,23 +999,17 @@ export default function MyTripApp() {
         .mt-group-add.disabled { color:var(--border); cursor:default; }
         .mt-chrono-warning { display:flex; align-items:center; gap:7px; background:#FBEAE8; color:var(--danger); font-size:11.5px; padding:6px 10px; border-radius:8px; margin:0 4px 8px; }
         .mt-table-wrap { width:100%; overflow-x:auto; border-radius:10px; }
-        table.mt-table { width:100%; table-layout:auto; border-collapse:separate; border-spacing:0; background:var(--surface); border-radius:10px; overflow:hidden; border:1px solid var(--border); }
+        table.mt-table { width:auto; table-layout:fixed; border-collapse:separate; border-spacing:0; background:var(--surface); border-radius:10px; overflow:hidden; border:1px solid var(--border); }
         .mt-table thead th { text-align:start; font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); font-weight:600; padding:6px 6px; background:#FAFCFB; border-bottom:1px solid var(--border); white-space:nowrap; }
         .mt-table tbody td { padding:4px 6px; font-size:12.8px; border-bottom:1px solid var(--border); vertical-align:middle; position:relative; white-space:nowrap; }
         .mt-table tbody tr:last-child td { border-bottom:none; }
         .mt-table tbody tr:hover { background:#FBFDFC; }
-        .mt-table th.handle, .mt-table td.handle { width:30px; min-width:30px; max-width:30px; white-space:nowrap; }
-        .mt-table th.icon, .mt-table td.icon, .mt-table th.route, .mt-table td.route { width:1%; white-space:nowrap; text-align:center; }
-        .mt-table th.link, .mt-table td.link, .mt-table th.actions, .mt-table td.actions, .mt-table th.notes, .mt-table td.notes { width:1%; white-space:nowrap; text-align:center; }
-        .mt-table th.duration, .mt-table td.duration { width:1%; white-space:nowrap; }
-        .mt-table th.startTime, .mt-table td.startTime, .mt-table th.endTime, .mt-table td.endTime { min-width:86px; width:1%; }
-        .mt-table th.date, .mt-table td.date { min-width:80px; width:1%; }
-        .mt-table th.day, .mt-table td.day { min-width:52px; width:1%; }
-        .mt-table th.cost, .mt-table td.cost { width:1%; white-space:nowrap; }
-        .mt-table th.type, .mt-table td.type { min-width:118px; overflow:visible; }
-        .mt-table th.from, .mt-table td.from, .mt-table th.to, .mt-table td.to { min-width:88px; max-width:150px; }
-        .mt-table th.destination, .mt-table td.destination { min-width:140px; width:auto; }
-        .mt-table td.destination, .mt-table td.from, .mt-table td.to { overflow:hidden; text-overflow:ellipsis; }
+        .mt-table th.handle, .mt-table td.handle { white-space:nowrap; }
+        .mt-table th.icon, .mt-table td.icon, .mt-table th.route, .mt-table td.route { white-space:nowrap; text-align:center; }
+        .mt-table th.link, .mt-table td.link, .mt-table th.actions, .mt-table td.actions, .mt-table th.notes, .mt-table td.notes { white-space:nowrap; text-align:center; }
+        .mt-table th.duration, .mt-table td.duration { white-space:nowrap; }
+        .mt-table th.type, .mt-table td.type { overflow:visible; }
+        .mt-table td.from, .mt-table td.to { overflow:hidden; text-overflow:ellipsis; }
         .mt-handle-wrap { display:flex; align-items:center; gap:3px; }
         .mt-type-wrap { position:relative; }
         .mt-type-chip { display:flex; align-items:center; gap:6px; }
@@ -1021,9 +1028,9 @@ export default function MyTripApp() {
         .mt-editable:focus { outline:none; border-color:var(--teal); background:#fff; }
         .mt-editable.mt-time:focus, .mt-editable[type=number]:focus { outline:none; border-color:var(--teal); background:#fff; }
         .mt-editable.mt-time { min-width:76px; }
-        .mt-editable[type=number] { min-width:38px; -moz-appearance:textfield; }
+        .mt-editable[type=number] { min-width:38px; padding-inline-start:1px; -moz-appearance:textfield; }
         .mt-editable[type=number]::-webkit-outer-spin-button, .mt-editable[type=number]::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
-        .mt-cost { display:flex; align-items:center; gap:3px; font-weight:600; color:var(--amber); }
+        .mt-cost { display:flex; align-items:center; gap:0; font-weight:600; color:var(--amber); }
         .mt-link-icon { color:var(--teal); display:flex; align-items:center; justify-content:center; border:none; background:none; padding:2px; }
         .mt-link-icon.empty { color:var(--border); }
         .mt-link-icon.has-note { color:var(--amber); }
