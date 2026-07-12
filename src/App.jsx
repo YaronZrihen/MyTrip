@@ -16,7 +16,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "6.2.0";
+const APP_VERSION = "6.3.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -71,7 +71,7 @@ const DEFAULT_COLUMNS = [
 const T_DICT = {
   he: {
     appName: "MyTrip", addRow: "הוסף רשומה", addDay: "הוסף יום", newFrame: "מסגרת חדשה",
-    columns: "עמודות", addColumn: "הוסף עמודה", addType: "הוסף תיאור",
+    columns: "עמודות", addColumn: "הוסף עמודה", addType: "הוסף תיאור", resetColumnWidths: "איפוס רוחב עמודות (גרור את קצה כותרת העמודה לשינוי ידני)",
     login: "התחברות עם Google", logout: "יציאה",
     desktop: "מחשב", mobile: "סלולר", lang: "English", editRecord: "כרטיס רשומה",
     save: "שמירה", cancel: "ביטול", delete: "מחיקה", addSub: "הוסף תת-רשומה",
@@ -111,7 +111,7 @@ const T_DICT = {
   },
   en: {
     appName: "MyTrip", addRow: "Add record", addDay: "Add day", newFrame: "New frame",
-    columns: "Columns", addColumn: "Add column", addType: "Add description",
+    columns: "Columns", addColumn: "Add column", addType: "Add description", resetColumnWidths: "Reset column widths (drag a header's edge to resize manually)",
     login: "Sign in with Google", logout: "Sign out",
     desktop: "Desktop", mobile: "Mobile", lang: "עברית", editRecord: "Record card",
     save: "Save", cancel: "Cancel", delete: "Delete", addSub: "Add sub-record",
@@ -271,6 +271,7 @@ function fetchDrivingRoute(a, b) {
     });
 }
 const COL_WIDTHS = {
+  handle: 26, actions: 64,
   date: 78, day: 48, icon: 30, type: 112, from: 138, to: 138,
   startTime: 58, duration: 44, endTime: 58, route: 30, link: 30, cost: 84, notes: 30,
 };
@@ -453,7 +454,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
 
 function DayGroup({ g, fid, depth, ctx }) {
   const { T, lang, effectiveMobile, collapsedGroups, setCollapsedGroups, collapsedParents, setCollapsedParents,
-    addRow, openCard, types, visibleColumns, openAddDayModal, rows, sortDayByTime } = ctx;
+    addRow, openCard, types, visibleColumns, openAddDayModal, rows, sortDayByTime, getColWidth, startResize } = ctx;
   const gk = (fid || "root") + "__" + g.date;
   const collapsed = !!collapsedGroups[gk];
   const childrenOf = (pid) => childrenOfPure(rows, pid);
@@ -509,14 +510,19 @@ function DayGroup({ g, fid, depth, ctx }) {
         <div className="mt-table-wrap">
           <table className="mt-table">
             <colgroup>
-              <col style={{ width: 26 }} />
-              {visibleColumns.map((c) => <col key={c.key} style={{ width: colFixedWidth(c.key) }} />)}
-              <col style={{ width: 64 }} />
+              <col style={{ width: getColWidth("handle") }} />
+              {visibleColumns.map((c) => <col key={c.key} style={{ width: getColWidth(c.key) }} />)}
+              <col style={{ width: getColWidth("actions") }} />
             </colgroup>
             <thead>
               <tr>
                 <th className="handle"></th>
-                {visibleColumns.map((c) => <th key={c.key} className={c.key} title={lang === "he" ? c.label_he : c.label_en}>{lang === "he" ? c.label_he : c.label_en}</th>)}
+                {visibleColumns.map((c) => (
+                  <th key={c.key} className={c.key} title={lang === "he" ? c.label_he : c.label_en}>
+                    {lang === "he" ? c.label_he : c.label_en}
+                    <span className="mt-col-resizer" onMouseDown={(e) => startResize(e, c.key)} />
+                  </th>
+                ))}
                 <th className="actions"></th>
               </tr>
             </thead>
@@ -578,6 +584,7 @@ export default function MyTripApp() {
   const [frames, setFrames] = useState([]);
   const [types, setTypes] = useState(DEFAULT_TYPES);
   const [columns, setColumns] = useState(DEFAULT_COLUMNS);
+  const [columnWidths, setColumnWidths] = useState({});
   const [lang, setLang] = useState("he");
   const [viewMode, setViewMode] = useState("auto");
   const [narrowScreen, setNarrowScreen] = useState(false);
@@ -632,6 +639,21 @@ export default function MyTripApp() {
   }
 
   const effectiveMobile = viewMode === "mobile" || (viewMode === "auto" && narrowScreen);
+  function getColWidth(key) { return columnWidths[key] != null ? columnWidths[key] : colFixedWidth(key); }
+  function startResize(e, key) {
+    e.preventDefault(); e.stopPropagation();
+    const startX = e.clientX;
+    const startWidth = getColWidth(key);
+    function onMove(ev) {
+      const delta = ev.clientX - startX;
+      const signed = dir === "rtl" ? -delta : delta;
+      setColumnWidths((prev) => ({ ...prev, [key]: Math.max(24, startWidth + signed) }));
+    }
+    function onUp() { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }
+  function resetColumnWidths() { setColumnWidths({}); }
   const visibleColumns = columns.filter((c) => c.visible);
 
   /* ---------- bound data helpers ---------- */
@@ -894,7 +916,7 @@ export default function MyTripApp() {
     typeMenuOpen, setTypeMenuOpen, newTypeDraft, setNewTypeDraft, addCustomType,
     collapsedParents, setCollapsedParents, collapsedGroups, setCollapsedGroups,
     toggleFrameCollapse, openFrameModal, deleteFrame, nextDateInContext, frameTotals,
-    openAddDayModal, sortDayByTime,
+    openAddDayModal, sortDayByTime, getColWidth, startResize,
   };
 
   function renderContext(fid, depth) {
@@ -999,8 +1021,10 @@ export default function MyTripApp() {
         .mt-group-add.disabled { color:var(--border); cursor:default; }
         .mt-chrono-warning { display:flex; align-items:center; gap:7px; background:#FBEAE8; color:var(--danger); font-size:11.5px; padding:6px 10px; border-radius:8px; margin:0 4px 8px; }
         .mt-table-wrap { width:100%; overflow-x:auto; border-radius:10px; }
-        table.mt-table { width:auto; table-layout:fixed; border-collapse:separate; border-spacing:0; background:var(--surface); border-radius:10px; overflow:hidden; border:1px solid var(--border); }
-        .mt-table thead th { text-align:start; font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); font-weight:600; padding:6px 6px; background:#FAFCFB; border-bottom:1px solid var(--border); white-space:nowrap; }
+        table.mt-table { width:100%; table-layout:fixed; border-collapse:separate; border-spacing:0; background:var(--surface); border-radius:10px; overflow:hidden; border:1px solid var(--border); }
+        .mt-table thead th { text-align:start; font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); font-weight:600; padding:6px 6px; background:#FAFCFB; border-bottom:1px solid var(--border); white-space:nowrap; position:relative; overflow:hidden; text-overflow:ellipsis; }
+        .mt-col-resizer { position:absolute; top:0; bottom:0; inset-inline-end:-3px; width:6px; cursor:col-resize; user-select:none; z-index:5; }
+        .mt-col-resizer:hover, .mt-col-resizer:active { background:var(--teal); opacity:.35; }
         .mt-table tbody td { padding:4px 6px; font-size:12.8px; border-bottom:1px solid var(--border); vertical-align:middle; position:relative; white-space:nowrap; }
         .mt-table tbody tr:last-child td { border-bottom:none; }
         .mt-table tbody tr:hover { background:#FBFDFC; }
@@ -1150,6 +1174,8 @@ export default function MyTripApp() {
             <div className="divider" />
             <input type="text" placeholder={T.addColumn} value={newColName} onChange={(e) => setNewColName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addCustomColumn()} />
             <button className="mt-btn primary" style={{ width: "100%" }} onClick={addCustomColumn}><Plus size={13} /> {T.addColumn}</button>
+            <div className="divider" />
+            <button className="mt-btn ghost" style={{ width: "100%" }} onClick={resetColumnWidths}><ArrowDownUp size={13} /> {T.resetColumnWidths}</button>
           </div>
         </>
       )}
