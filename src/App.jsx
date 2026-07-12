@@ -16,7 +16,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "5.9.0";
+const APP_VERSION = "6.0.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -85,7 +85,7 @@ const T_DICT = {
     frameModalNew: "מסגרת טיול חדשה", frameModalEdit: "עריכת מסגרת", frameName: "שם המסגרת",
     frameStart: "תאריך התחלה", frameEnd: "תאריך סיום", parentFrame: "שייכת למסגרת",
     addSubFrame: "הוסף מסגרת-משנה", suggestPrefix: "זוהו", suggestMid: "טיסות ללא מסגרת:",
-    fillDatesAfterExisting: "מלא תאריכים אחרי הרשומות הקיימות",
+    fillDatesAbove: "הוסף מסגרת מעל התאריך הקיים", fillDatesBelow: "הוסף מסגרת מתחת לתאריך הקיים",
     suggestBtn: "צור מסגרת טיול אוטומטית", suggestDismiss: "התעלם",
     fxApprox: "לפי שער מקורב (אין חיבור לאינטרנט)", fxLive: "לפי שער עדכני",
     frameRangeInvalid: "תאריך ההתחלה חייב להיות לפני תאריך הסיום",
@@ -97,12 +97,9 @@ const T_DICT = {
     chronoWarning: "סדר הרשומות ביום זה אינו כרונולוגי לפי שעה", sortByTime: "מיין לפי שעה",
     addDayModalTitle: "הוספת יום חדש", addDayDate: "תאריך", confirmAdd: "הוסף",
     verify: "אמת מול מפות", verified: "מאומת", openMap: "פתח במפה", pickFromMap: "בחר מהמפה",
-    fromAlias: "כינוי למוצא (יוצג בעמודה במקום הטקסט המלא)", toAlias: "כינוי ליעד (יוצג בעמודה במקום הטקסט המלא)",
+    fromAlias: "כינוי למוצא", toAlias: "כינוי ליעד", aliasHint: "יוצג בעמודה במקום הטקסט המלא",
     flightAliasPlaceholder: "לדוגמה: תל אביב (TLV)", copyPrevDest: "העתק יעד משורה קודמת",
-    calcTravelTime: "חשב זמן ומרחק נסיעה (ברכב)", routeCalculating: "מחשב...",
-    routeCalcError: "לא ניתן לחשב מסלול נסיעה כרגע", routeCalcGeocodeError: "לא ניתן לזהות את המיקומים (מוצא/יעד)",
-    routeResult: "מרחק: {km} ק\"מ · זמן נסיעה משוער: {min} דק' (הזמן \"עד שעה\" עודכן בהתאם, אם הוזנה שעת התחלה)",
-    km: "ק\"מ", min: "דק'",
+    km: "ק\"מ", min: "דק'", calculatingDistance: "מחשב מרחק...",
     locHint: "טיפ: אם החיפוש לא מוצא תוצאה בעברית, נסה לחפש בשם המקומי/אנגלי (למשל \"Fiumicino Airport\" ולא \"פיומיצ׳ינו\").",
     tabSearch: "חיפוש טקסט", tabMap: "בחירה במפה", mapPickHint: "לחץ במקום הרצוי על המפה כדי לסמן אותו",
     mapResolving: "מזהה כתובת...", mapNoName: "לא נמצאה כתובת מדויקת לנקודה זו — ניתן עדיין לבחור לפי הקואורדינטות",
@@ -128,7 +125,7 @@ const T_DICT = {
     frameModalNew: "New trip frame", frameModalEdit: "Edit frame", frameName: "Frame name",
     frameStart: "Start date", frameEnd: "End date", parentFrame: "Belongs to frame",
     addSubFrame: "Add sub-frame", suggestPrefix: "Found", suggestMid: "flights without a frame:",
-    fillDatesAfterExisting: "Fill dates after existing records",
+    fillDatesAbove: "Add frame above the existing date", fillDatesBelow: "Add frame below the existing date",
     suggestBtn: "Auto-create a trip frame", suggestDismiss: "Dismiss",
     fxApprox: "Approximate rate (no internet connection)", fxLive: "Live rate",
     frameRangeInvalid: "Start date must be before the end date",
@@ -140,12 +137,9 @@ const T_DICT = {
     chronoWarning: "Records on this day are not in chronological time order", sortByTime: "Sort by time",
     addDayModalTitle: "Add a new day", addDayDate: "Date", confirmAdd: "Add",
     verify: "Verify with Maps", verified: "Verified", openMap: "Open in Maps", pickFromMap: "Pick from map",
-    fromAlias: "Origin nickname (shown in the table instead of the full text)", toAlias: "Destination nickname (shown in the table instead of the full text)",
+    fromAlias: "Origin nickname", toAlias: "Destination nickname", aliasHint: "Shown in the table instead of the full text",
     flightAliasPlaceholder: "e.g. Tel Aviv (TLV)", copyPrevDest: "Copy previous row's destination",
-    calcTravelTime: "Calculate driving time & distance", routeCalculating: "Calculating...",
-    routeCalcError: "Couldn't calculate a driving route right now", routeCalcGeocodeError: "Couldn't resolve the locations (origin/destination)",
-    routeResult: "Distance: {km} km · Estimated driving time: {min} min (the \"Until\" time was updated accordingly, if a start time was set)",
-    km: "km", min: "min",
+    km: "km", min: "min", calculatingDistance: "Calculating distance...",
     locHint: "Tip: if the search finds nothing in Hebrew, try the local/English name instead (e.g. \"Fiumicino Airport\").",
     tabSearch: "Text search", tabMap: "Pick on map", mapPickHint: "Click anywhere on the map to mark it",
     mapResolving: "Resolving address...", mapNoName: "No exact address found for this point — you can still pick it by coordinates",
@@ -249,10 +243,18 @@ function rowFrameIssue(draft, frames, T) {
 }
 function rowStartPoint(row) { return (row.from && row.from.trim()) || ""; }
 function rowEndPoint(row) { return (row.to && row.to.trim()) || ""; }
+const TRAVEL_MODE_MAP = {
+  taxi: "driving", "car-rental": "driving",
+  train: "transit", ferry: "transit",
+  "self-tour": "walking", "guided-tour": "walking", "day-tour": "walking",
+};
 function rowOwnRouteUrl(row) {
   const origin = rowStartPoint(row), dest = rowEndPoint(row);
   if (!origin || !dest || origin === dest) return null;
-  return "https://www.google.com/maps/dir/" + encodeURIComponent(origin) + "/" + encodeURIComponent(dest);
+  const mode = TRAVEL_MODE_MAP[row.typeId];
+  let url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}`;
+  if (mode) url += `&travelmode=${mode}`;
+  return url;
 }
 function geocodeText(text) {
   return fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=he,en&q=${encodeURIComponent(text)}`, { headers: { Accept: "application/json" } })
@@ -267,15 +269,6 @@ function fetchDrivingRoute(a, b) {
       if (!route) return null;
       return { distanceKm: route.distance / 1000, durationMin: route.duration / 60 };
     });
-}
-function addMinutesToTime(hhmm, minutesToAdd) {
-  if (!hhmm) return { time: "", overflow: false };
-  const [h, m] = hhmm.split(":").map(Number);
-  let total = h * 60 + m + Math.round(minutesToAdd);
-  let overflow = false;
-  if (total >= 24 * 60) { total -= 24 * 60; overflow = true; }
-  const nh = Math.floor(total / 60), nm = total % 60;
-  return { time: `${String(nh).padStart(2, "0")}:${String(nm).padStart(2, "0")}`, overflow };
 }
 function dayRouteUrl(rowsInDay) {
   const points = [];
@@ -322,6 +315,23 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
   const toVerified = row.toVerifiedUrl && row.toVerifiedText === row.to;
   const typeBtnRef = useRef(null);
   const [typeMenuPos, setTypeMenuPos] = useState({ top: 0, left: 0 });
+  const [distLoading, setDistLoading] = useState(false);
+
+  function handleRouteHover() {
+    if (row.routeDistanceKm != null || distLoading) return;
+    const origin = rowStartPoint(row), dest = rowEndPoint(row);
+    if (!origin || !dest) return;
+    setDistLoading(true);
+    const originP = (row.fromLat != null && row.fromLon != null) ? Promise.resolve({ lat: row.fromLat, lon: row.fromLon }) : geocodeText(origin);
+    const destP = (row.toLat != null && row.toLon != null) ? Promise.resolve({ lat: row.toLat, lon: row.toLon }) : geocodeText(dest);
+    Promise.all([originP, destP]).then(([a, b]) => {
+      if (!a || !b) { setDistLoading(false); return; }
+      return fetchDrivingRoute(a, b).then((info) => {
+        setDistLoading(false);
+        if (info) updateRow(row.id, { routeDistanceKm: info.distanceKm, routeDurationMin: info.durationMin, fromLat: a.lat, fromLon: a.lon, toLat: b.lat, toLon: b.lon });
+      });
+    }).catch(() => setDistLoading(false));
+  }
 
   function toggleTypeMenu() {
     if (typeMenuOpen === row.id) { setTypeMenuOpen(null); return; }
@@ -366,9 +376,9 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
       case "from": return (
         <span className={"mt-loc-cell" + (fromVerified ? " has-badge" : "")}>
           {row.fromAlias ? (
-            <span className="mt-alias-display" title={row.from}>{row.fromAlias}</span>
+            <span className="mt-alias-display" dir="auto" title={row.from}>{row.fromAlias}</span>
           ) : (
-            <input className="mt-editable" title={row.from} placeholder={getTypeHint(row.typeId, "from", lang)} value={row.from} onChange={(e) => updateRow(row.id, { from: e.target.value })} />
+            <input className="mt-editable" dir="auto" title={row.from} placeholder={getTypeHint(row.typeId, "from", lang)} value={row.from} onChange={(e) => updateRow(row.id, { from: e.target.value })} />
           )}
           {fromVerified && <a className="mt-loc-badge" href={row.fromVerifiedUrl} target="_blank" rel="noreferrer" title={T.openMap}><MapPin size={11} /></a>}
         </span>
@@ -376,9 +386,9 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
       case "to": return (
         <span className={"mt-loc-cell" + (toVerified ? " has-badge" : "")}>
           {row.toAlias ? (
-            <span className="mt-alias-display" title={row.to}>{row.toAlias}</span>
+            <span className="mt-alias-display" dir="auto" title={row.to}>{row.toAlias}</span>
           ) : (
-            <input className="mt-editable" title={row.to} placeholder={getTypeHint(row.typeId, "to", lang)} value={row.to} onChange={(e) => updateRow(row.id, { to: e.target.value })} />
+            <input className="mt-editable" dir="auto" title={row.to} placeholder={getTypeHint(row.typeId, "to", lang)} value={row.to} onChange={(e) => updateRow(row.id, { to: e.target.value })} />
           )}
           {toVerified && <a className="mt-loc-badge" href={row.toVerifiedUrl} target="_blank" rel="noreferrer" title={T.openMap}><MapPin size={11} /></a>}
         </span>
@@ -387,7 +397,10 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
       case "duration": return <span title={dur === null ? "" : dur} style={{ color: dur === null ? "var(--danger)" : "var(--muted)", fontSize: 12 }}>{dur === null ? "!" : dur}</span>;
       case "endTime": return <input className="mt-editable mt-time" type="time" value={row.endTime} onChange={(e) => updateRow(row.id, { endTime: e.target.value })} />;
       case "route": return routeUrl ? (
-        <a className="mt-link-icon" href={routeUrl} target="_blank" rel="noreferrer" title={row.routeDistanceKm != null ? `${T.routeTooltip} — ${row.routeDistanceKm.toFixed(1)} ${T.km} (~${Math.round(row.routeDurationMin)} ${T.min})` : T.routeTooltip}><Route size={14} /></a>
+        <a className="mt-link-icon" href={routeUrl} target="_blank" rel="noreferrer" onMouseEnter={handleRouteHover}
+          title={distLoading ? T.calculatingDistance : (row.routeDistanceKm != null ? `${T.routeTooltip} — ${row.routeDistanceKm.toFixed(1)} ${T.km} (~${Math.round(row.routeDurationMin)} ${T.min})` : T.routeTooltip)}>
+          <Route size={14} />
+        </a>
       ) : <span className="mt-link-icon empty" title={T.noRoute}><Route size={14} /></span>;
       case "link": return row.link ? (
         <a className="mt-link-icon" href={row.link} target="_blank" rel="noreferrer" title={row.link}><Link2 size={14} /></a>
@@ -569,7 +582,6 @@ export default function MyTripApp() {
   const [cardRowId, setCardRowId] = useState(null);
   const [cardDraft, setCardDraft] = useState(null);
   const [flightLookupMsg, setFlightLookupMsg] = useState("");
-  const [routeCalcMsg, setRouteCalcMsg] = useState(null);
   const [frameDraft, setFrameDraft] = useState(null);
   const [addDayCtx, setAddDayCtx] = useState(null); // { fid, date }
   const [locPicker, setLocPicker] = useState(null); // { field, query, results, loading }
@@ -627,11 +639,27 @@ export default function MyTripApp() {
   function nextDateInContext(fid) {
     const frame = fid ? frames.find((f) => f.id === fid) : null;
     const groups = dayGroupsAt(fid);
+    const kids = childFrames(fid);
+    let maxDate = groups.length ? groups[groups.length - 1].date : null;
+    kids.forEach((k) => { if (k.endDate && (!maxDate || k.endDate > maxDate)) maxDate = k.endDate; });
     let base;
-    if (groups.length) { const d = new Date(groups[groups.length - 1].date + "T00:00:00"); d.setDate(d.getDate() + 1); base = d.toISOString().slice(0, 10); }
+    if (maxDate) { const d = new Date(maxDate + "T00:00:00"); d.setDate(d.getDate() + 1); base = d.toISOString().slice(0, 10); }
     else if (frame) base = frame.startDate;
     else base = new Date().toISOString().slice(0, 10);
     if (frame) { if (base > frame.endDate) base = frame.endDate; if (base < frame.startDate) base = frame.startDate; }
+    return base;
+  }
+  function prevDateInContext(fid) {
+    const frame = fid ? frames.find((f) => f.id === fid) : null;
+    const groups = dayGroupsAt(fid);
+    const kids = childFrames(fid);
+    let minDate = groups.length ? groups[0].date : null;
+    kids.forEach((k) => { if (k.startDate && (!minDate || k.startDate < minDate)) minDate = k.startDate; });
+    let base;
+    if (minDate) { const d = new Date(minDate + "T00:00:00"); d.setDate(d.getDate() - 1); base = d.toISOString().slice(0, 10); }
+    else if (frame) base = frame.startDate;
+    else base = new Date().toISOString().slice(0, 10);
+    if (frame) { if (base < frame.startDate) base = frame.startDate; if (base > frame.endDate) base = frame.endDate; }
     return base;
   }
 
@@ -784,8 +812,8 @@ export default function MyTripApp() {
   }
 
   /* ---------- record card ---------- */
-  function openCard(row) { setCardRowId(row.id); setCardDraft({ ...row }); setFlightLookupMsg(""); setRouteCalcMsg(null); }
-  function closeCard() { setCardRowId(null); setCardDraft(null); setFlightLookupMsg(""); setLocPicker(null); setRouteCalcMsg(null); }
+  function openCard(row) { setCardRowId(row.id); setCardDraft({ ...row }); setFlightLookupMsg(""); }
+  function closeCard() { setCardRowId(null); setCardDraft(null); setFlightLookupMsg(""); setLocPicker(null); }
   function findPrevRowInDay(rowId) {
     const row = rows.find((r) => r.id === rowId);
     if (!row || row.parentId) return null;
@@ -816,37 +844,20 @@ export default function MyTripApp() {
     // Placeholder for a real provider call, e.g.:
     // fetch(`/api/flight-lookup?flight=${cardDraft.flightNumber}`).then(...)
   }
-  function calculateTravelTime() {
-    if (!cardDraft || !cardDraft.from || !cardDraft.to) return;
-    setRouteCalcMsg({ loading: true, error: null });
-    const originP = (cardDraft.fromLat != null && cardDraft.fromLon != null) ? Promise.resolve({ lat: cardDraft.fromLat, lon: cardDraft.fromLon }) : geocodeText(cardDraft.from);
-    const destP = (cardDraft.toLat != null && cardDraft.toLon != null) ? Promise.resolve({ lat: cardDraft.toLat, lon: cardDraft.toLon }) : geocodeText(cardDraft.to);
-    Promise.all([originP, destP]).then(([a, b]) => {
-      if (!a || !b) { setRouteCalcMsg({ loading: false, error: T.routeCalcGeocodeError }); return; }
-      return fetchDrivingRoute(a, b).then((info) => {
-        if (!info) { setRouteCalcMsg({ loading: false, error: T.routeCalcError }); return; }
-        setCardDraft((d) => {
-          const next = { ...d, routeDistanceKm: info.distanceKm, routeDurationMin: info.durationMin, fromLat: a.lat, fromLon: a.lon, toLat: b.lat, toLon: b.lon };
-          if (d.startTime) {
-            const { time, overflow } = addMinutesToTime(d.startTime, info.durationMin);
-            next.endTime = time;
-            if (overflow) next.overnight = true;
-          }
-          return next;
-        });
-        setRouteCalcMsg({ loading: false, error: null });
-      });
-    }).catch(() => setRouteCalcMsg({ loading: false, error: T.routeCalcError }));
-  }
 
   /* ---------- frame modal ---------- */
   function openFrameModal(frame, presetParentId) {
     setFrameDraft(frame ? { ...frame } : { id: null, name: "", startDate: "", endDate: "", parentFrameId: presetParentId || null, collapsed: false });
   }
   function closeFrameModal() { setFrameDraft(null); }
-  function fillFrameDatesAfterExisting() {
+  function fillFrameDatesBelow() {
     if (!frameDraft) return;
     const suggestedStart = nextDateInContext(frameDraft.parentFrameId || null);
+    setFrameDraft((d) => ({ ...d, startDate: suggestedStart, endDate: suggestedStart }));
+  }
+  function fillFrameDatesAbove() {
+    if (!frameDraft) return;
+    const suggestedStart = prevDateInContext(frameDraft.parentFrameId || null);
     setFrameDraft((d) => ({ ...d, startDate: suggestedStart, endDate: suggestedStart }));
   }
   const frameIssue = frameDraft ? frameDateIssue(frameDraft, rows, frames, T) : null;
@@ -983,7 +994,7 @@ export default function MyTripApp() {
         .mt-table th.startTime, .mt-table td.startTime, .mt-table th.endTime, .mt-table td.endTime { min-width:86px; width:1%; }
         .mt-table th.date, .mt-table td.date { min-width:80px; width:1%; }
         .mt-table th.day, .mt-table td.day { min-width:52px; width:1%; }
-        .mt-table th.cost, .mt-table td.cost { min-width:96px; }
+        .mt-table th.cost, .mt-table td.cost { width:1%; white-space:nowrap; }
         .mt-table th.type, .mt-table td.type { min-width:118px; overflow:visible; }
         .mt-table th.from, .mt-table td.from, .mt-table th.to, .mt-table td.to { min-width:104px; }
         .mt-table th.destination, .mt-table td.destination { min-width:140px; width:auto; }
@@ -1006,7 +1017,7 @@ export default function MyTripApp() {
         .mt-editable:focus { outline:none; border-color:var(--teal); background:#fff; }
         .mt-editable.mt-time:focus, .mt-editable[type=number]:focus { outline:none; border-color:var(--teal); background:#fff; }
         .mt-editable.mt-time { min-width:76px; }
-        .mt-editable[type=number] { min-width:64px; }
+        .mt-editable[type=number] { min-width:44px; }
         .mt-cost { display:flex; align-items:center; gap:3px; font-weight:600; color:var(--amber); }
         .mt-link-icon { color:var(--teal); display:flex; align-items:center; justify-content:center; border:none; background:none; padding:2px; }
         .mt-link-icon.empty { color:var(--border); }
@@ -1049,7 +1060,7 @@ export default function MyTripApp() {
         .mt-field input:focus, .mt-field select:focus { outline:none; border-color:var(--teal); }
         .mt-field-row { display:flex; gap:9px; }
         .mt-field-row > div { flex:1; }
-        .mt-field-inline { display:flex; gap:8px; align-items:flex-end; }
+        .mt-field-inline { display:flex; gap:5px; align-items:flex-end; }
         .mt-field-inline > div:first-child { flex:1; }
         .mt-checkbox-row { display:flex; align-items:center; gap:7px; font-size:12.5px; }
         .mt-error { display:flex; gap:6px; align-items:flex-start; background:#FBEAE8; color:var(--danger); font-size:11.5px; padding:7px 9px; border-radius:8px; }
@@ -1058,6 +1069,7 @@ export default function MyTripApp() {
         .mt-verified-row { display:flex; align-items:center; gap:5px; font-size:11px; color:#3E8E5A; margin-top:3px; }
         .mt-modal-footer { display:flex; justify-content:flex-end; gap:7px; padding:13px 18px; border-top:1px solid var(--border); position:sticky; bottom:0; background:var(--surface); flex-wrap:wrap; }
         .mt-btn { border-radius:8px; padding:7px 14px; font-size:12.5px; font-weight:600; border:1px solid var(--border); background:#fff; display:inline-flex; align-items:center; gap:5px; }
+        .mt-btn-icon { padding:7px 8px; flex-shrink:0; }
         .mt-btn.primary { background:var(--teal); color:#fff; border-color:var(--teal); }
         .mt-btn.primary:disabled { opacity:.5; cursor:not-allowed; }
         .mt-btn:disabled { opacity:.4; cursor:not-allowed; }
@@ -1286,32 +1298,34 @@ export default function MyTripApp() {
                 <div className="mt-field">
                   <label>{T.from}</label>
                   <div className="mt-field-inline">
-                    <div><input value={cardDraft.from} placeholder={getTypeHint(cardDraft.typeId, "from", lang)} onChange={(e) => setCardDraft({ ...cardDraft, from: e.target.value })} /></div>
-                    <button className="mt-btn ghost" title={T.verify} onClick={() => openLocationPicker("from")}><MapPin size={13} /></button>
-                    <button className="mt-btn ghost" title={T.copyPrevDest} disabled={!prevRowForCard || !prevRowForCard.to} onClick={copyPrevDestinationToFrom}><Copy size={13} /></button>
+                    <div><input dir="auto" value={cardDraft.from} placeholder={getTypeHint(cardDraft.typeId, "from", lang)} onChange={(e) => setCardDraft({ ...cardDraft, from: e.target.value })} /></div>
+                    <button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openLocationPicker("from")}><MapPin size={13} /></button>
+                    <button className="mt-btn ghost mt-btn-icon" title={T.copyPrevDest} disabled={!prevRowForCard || !prevRowForCard.to} onClick={copyPrevDestinationToFrom}><Copy size={13} /></button>
                   </div>
                   {fromVerifiedCard && <div className="mt-verified-row"><CircleCheck size={12} /> {T.verified} — <a href={cardDraft.fromVerifiedUrl} target="_blank" rel="noreferrer">{T.openMap}</a></div>}
                   <div className="mt-field" style={{ marginTop: 6 }}>
                     <label>{T.fromAlias}</label>
                     <div className="mt-field-inline">
-                      <div><input value={cardDraft.fromAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "fromAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, fromAlias: e.target.value })} /></div>
-                      <button className="mt-btn ghost" title={T.pickFromMap} onClick={() => openLocationPicker("fromAlias")}><MapPin size={13} /></button>
+                      <div><input dir="auto" value={cardDraft.fromAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "fromAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, fromAlias: e.target.value })} /></div>
+                      <button className="mt-btn ghost mt-btn-icon" title={T.pickFromMap} onClick={() => openLocationPicker("fromAlias")}><MapPin size={13} /></button>
                     </div>
+                    <div className="mt-hint">{T.aliasHint}</div>
                   </div>
                 </div>
                 <div className="mt-field">
                   <label>{T.to}</label>
                   <div className="mt-field-inline">
-                    <div><input value={cardDraft.to} placeholder={getTypeHint(cardDraft.typeId, "to", lang)} onChange={(e) => setCardDraft({ ...cardDraft, to: e.target.value })} /></div>
-                    <button className="mt-btn ghost" title={T.verify} onClick={() => openLocationPicker("to")}><MapPin size={13} /></button>
+                    <div><input dir="auto" value={cardDraft.to} placeholder={getTypeHint(cardDraft.typeId, "to", lang)} onChange={(e) => setCardDraft({ ...cardDraft, to: e.target.value })} /></div>
+                    <button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openLocationPicker("to")}><MapPin size={13} /></button>
                   </div>
                   {toVerifiedCard && <div className="mt-verified-row"><CircleCheck size={12} /> {T.verified} — <a href={cardDraft.toVerifiedUrl} target="_blank" rel="noreferrer">{T.openMap}</a></div>}
                   <div className="mt-field" style={{ marginTop: 6 }}>
                     <label>{T.toAlias}</label>
                     <div className="mt-field-inline">
-                      <div><input value={cardDraft.toAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "toAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, toAlias: e.target.value })} /></div>
-                      <button className="mt-btn ghost" title={T.pickFromMap} onClick={() => openLocationPicker("toAlias")}><MapPin size={13} /></button>
+                      <div><input dir="auto" value={cardDraft.toAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "toAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, toAlias: e.target.value })} /></div>
+                      <button className="mt-btn ghost mt-btn-icon" title={T.pickFromMap} onClick={() => openLocationPicker("toAlias")}><MapPin size={13} /></button>
                     </div>
+                    <div className="mt-hint">{T.aliasHint}</div>
                   </div>
                 </div>
               </div>
@@ -1322,15 +1336,6 @@ export default function MyTripApp() {
               </div>
               <label className="mt-checkbox-row"><input type="checkbox" checked={!!cardDraft.overnight} onChange={(e) => setCardDraft({ ...cardDraft, overnight: e.target.checked })} />{T.overnight}</label>
               {cardHasTimeError && <div className="mt-error"><AlertTriangle /> {T.timeError}</div>}
-              <div>
-                <button className="mt-btn ghost" disabled={!cardDraft.from || !cardDraft.to || (routeCalcMsg && routeCalcMsg.loading)} onClick={calculateTravelTime}>
-                  <Route size={13} /> {routeCalcMsg && routeCalcMsg.loading ? T.routeCalculating : T.calcTravelTime}
-                </button>
-                {routeCalcMsg && routeCalcMsg.error && <div className="mt-hint" style={{ color: "var(--danger)" }}>{routeCalcMsg.error}</div>}
-                {cardDraft.routeDistanceKm != null && !(routeCalcMsg && routeCalcMsg.loading) && (
-                  <div className="mt-hint">{T.routeResult.replace("{km}", cardDraft.routeDistanceKm.toFixed(1)).replace("{min}", Math.round(cardDraft.routeDurationMin))}</div>
-                )}
-              </div>
               {showTzHint && <div className="mt-hint">{T.tzNote}</div>}
 
               {showFlightHint && (
@@ -1391,7 +1396,10 @@ export default function MyTripApp() {
                 <div className="mt-field"><label>{T.frameStart}</label><DateField value={frameDraft.startDate} onChange={(e) => setFrameDraft({ ...frameDraft, startDate: e.target.value })} /></div>
                 <div className="mt-field"><label>{T.frameEnd}</label><DateField value={frameDraft.endDate} onChange={(e) => setFrameDraft({ ...frameDraft, endDate: e.target.value })} /></div>
               </div>
-              <button className="mt-btn ghost" style={{ width: "100%" }} onClick={fillFrameDatesAfterExisting}><ArrowDownUp size={13} /> {T.fillDatesAfterExisting}</button>
+              <div className="mt-field-row">
+                <button className="mt-btn ghost" style={{ width: "100%" }} onClick={fillFrameDatesAbove}><ArrowDownUp size={13} /> {T.fillDatesAbove}</button>
+                <button className="mt-btn ghost" style={{ width: "100%" }} onClick={fillFrameDatesBelow}><ArrowDownUp size={13} /> {T.fillDatesBelow}</button>
+              </div>
               <div className="mt-field">
                 <label>{T.parentFrame}</label>
                 <select value={frameDraft.parentFrameId || ""} onChange={(e) => setFrameDraft({ ...frameDraft, parentFrameId: e.target.value || null })}>
