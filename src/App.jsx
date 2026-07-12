@@ -16,7 +16,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "6.5.0";
+const APP_VERSION = "6.6.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -354,7 +354,16 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
 
   function toggleTypeMenu() {
     if (typeMenuOpen === row.id) { setTypeMenuOpen(null); return; }
-    if (typeBtnRef.current) { const r = typeBtnRef.current.getBoundingClientRect(); setTypeMenuPos({ top: r.bottom + 4, left: r.left }); }
+    if (typeBtnRef.current) {
+      const r = typeBtnRef.current.getBoundingClientRect();
+      const estMenuHeight = 300;
+      const spaceBelow = window.innerHeight - r.bottom;
+      if (spaceBelow < estMenuHeight && r.top > spaceBelow) {
+        setTypeMenuPos({ bottom: window.innerHeight - r.top + 4, top: null, left: r.left });
+      } else {
+        setTypeMenuPos({ top: r.bottom + 4, bottom: null, left: r.left });
+      }
+    }
     setTypeMenuOpen(row.id);
   }
 
@@ -371,7 +380,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
           {typeMenuOpen === row.id && (
             <>
               <div className="mt-floating-backdrop" onClick={() => setTypeMenuOpen(null)} />
-              <div className="mt-type-menu" style={{ top: typeMenuPos.top, left: typeMenuPos.left }}>
+              <div className="mt-type-menu" style={{ top: typeMenuPos.top ?? undefined, bottom: typeMenuPos.bottom ?? undefined, left: typeMenuPos.left }}>
                 {types.map((t) => { const TI = ICONS[t.icon] || Tag; return (
                   <button key={t.id} className="opt" onClick={() => { updateRow(row.id, { typeId: t.id }); setTypeMenuOpen(null); }}>
                     <span className="mt-type-icon" style={{ background: t.color, width: 20, height: 20 }}><TI size={11} /></span>{t.name}
@@ -395,7 +404,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
       case "from": return (
         <span className={"mt-loc-cell" + (fromVerified ? " has-badge" : "")}>
           {row.fromAlias ? (
-            <span className="mt-alias-display" dir="auto" style={{ textAlign: detectTextAlign(row.fromAlias) }} title={row.from} onClick={() => openCard(row)}>{row.fromAlias}</span>
+            <input className="mt-editable" dir="auto" style={{ textAlign: detectTextAlign(row.fromAlias) }} title={row.from} value={row.fromAlias} onChange={(e) => updateRow(row.id, { fromAlias: e.target.value })} />
           ) : (
             <input className="mt-editable" dir="auto" style={{ textAlign: detectTextAlign(row.from) }} title={row.from} placeholder={getTypeHint(row.typeId, "from", lang)} value={row.from} onChange={(e) => updateRow(row.id, { from: e.target.value })} />
           )}
@@ -405,7 +414,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
       case "to": return (
         <span className={"mt-loc-cell" + (toVerified ? " has-badge" : "")}>
           {row.toAlias ? (
-            <span className="mt-alias-display" dir="auto" style={{ textAlign: detectTextAlign(row.toAlias) }} title={row.to} onClick={() => openCard(row)}>{row.toAlias}</span>
+            <input className="mt-editable" dir="auto" style={{ textAlign: detectTextAlign(row.toAlias) }} title={row.to} value={row.toAlias} onChange={(e) => updateRow(row.id, { toAlias: e.target.value })} />
           ) : (
             <input className="mt-editable" dir="auto" style={{ textAlign: detectTextAlign(row.to) }} title={row.to} placeholder={getTypeHint(row.typeId, "to", lang)} value={row.to} onChange={(e) => updateRow(row.id, { to: e.target.value })} />
           )}
