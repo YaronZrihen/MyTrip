@@ -8,7 +8,7 @@ import {
   Plus, X, Settings2, Pencil, Trash2, Link2, Globe, LogIn, User,
   Smartphone, Monitor, AlertTriangle, GripVertical, Check, FolderPlus, Sparkles,
   Route, Waypoints, Download, Upload, MapPin, Search, CircleCheck, Clock, ArrowDownUp, Copy, StickyNote, TrainFront,
-  Bus, Motorbike, Bike, Scooter, Sailboat, ShipWheel, Anchor, Kayak, Helicopter, Caravan
+  Bus, Motorbike, Bike, Scooter, Sailboat, ShipWheel, Anchor, Kayak, Helicopter, Caravan, Building2, Landmark, Home
 } from "lucide-react";
 
 /* ---------------------------------------------------------------------- */
@@ -17,7 +17,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "7.0.0";
+const APP_VERSION = "7.1.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -28,7 +28,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 const DEFAULT_MAP_CENTER = [41.9, 12.49]; // Rome — reasonable default for this itinerary
-const ICONS = { Plane, PlaneTakeoff, Car, BedDouble, Footprints, Users, Sun, Ship, KeySquare, Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music, TrainFront, Bus, Motorbike, Bike, Scooter, Sailboat, ShipWheel, Anchor, Kayak, Helicopter, Caravan };
+const ICONS = { Plane, PlaneTakeoff, Car, BedDouble, Footprints, Users, Sun, Ship, KeySquare, Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music, TrainFront, Bus, Motorbike, Bike, Scooter, Sailboat, ShipWheel, Anchor, Kayak, Helicopter, Caravan, Building2, Landmark, Home };
 const HE_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 const EN_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const FRAME_COLORS = ["#256D64", "#3E7CB1", "#8B6F47", "#7A5C9E", "#C1443A", "#5B8C5A"];
@@ -59,15 +59,19 @@ const DEFAULT_TYPES = [
   { id: "domestic-flight", name: "טיסת פנים", icon: "PlaneTakeoff", color: "#3E7CB1", category: "air-transport" },
   { id: "helicopter", name: "מסוק", icon: "Helicopter", color: "#256D64", category: "air-transport" },
 
-  { id: "hotel", name: "מלון", icon: "BedDouble", color: "#D98E3F", category: "stay-activities" },
-  { id: "self-tour", name: "טיול עצמאי", icon: "Footprints", color: "#5B8C5A", category: "stay-activities" },
-  { id: "guided-tour", name: "טיול מודרך", icon: "Users", color: "#5B8C5A", category: "stay-activities" },
-  { id: "day-tour", name: "טיול יומי", icon: "Sun", color: "#D9A23D", category: "stay-activities" },
+  { id: "hotel", name: "מלון", icon: "BedDouble", color: "#D98E3F", category: "accommodation" },
+  { id: "hostel", name: "אכסנייה", icon: "Building2", color: "#D98E3F", category: "accommodation" },
+  { id: "apartment", name: "דירה", icon: "Home", color: "#D98E3F", category: "accommodation" },
+
+  { id: "self-tour", name: "טיול עצמאי", icon: "Footprints", color: "#5B8C5A", category: "activities" },
+  { id: "guided-tour", name: "טיול מודרך", icon: "Users", color: "#5B8C5A", category: "activities" },
+  { id: "day-tour", name: "טיול יומי", icon: "Sun", color: "#D9A23D", category: "activities" },
+  { id: "attraction", name: "אטרקציה", icon: "Landmark", color: "#5B8C5A", category: "activities" },
 ];
-const CATEGORY_ORDER = ["public-transport", "road-transport", "sea-transport", "air-transport", "stay-activities", "other"];
+const CATEGORY_ORDER = ["public-transport", "road-transport", "sea-transport", "air-transport", "accommodation", "activities", "other"];
 const CATEGORY_LABELS = {
-  he: { "public-transport": "תחבורה ציבורית", "road-transport": "תחבורה כביש", "sea-transport": "תחבורה ימית", "air-transport": "תחבורה אווירית", "stay-activities": "לינה ופעילויות", other: "אחר" },
-  en: { "public-transport": "Public Transport", "road-transport": "Road Transport", "sea-transport": "Sea Transport", "air-transport": "Air Transport", "stay-activities": "Stay & Activities", other: "Other" },
+  he: { "public-transport": "תחבורה ציבורית", "road-transport": "תחבורה כביש", "sea-transport": "תחבורה ימית", "air-transport": "תחבורה אווירית", accommodation: "לינה", activities: "פעילויות", other: "אחר" },
+  en: { "public-transport": "Public Transport", "road-transport": "Road Transport", "sea-transport": "Sea Transport", "air-transport": "Air Transport", accommodation: "Accommodation", activities: "Activities", other: "Other" },
 };
 function groupTypesByCategory(types) {
   const map = {};
@@ -355,20 +359,28 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
     }).catch(() => setDistLoading(false));
   }
 
+  function computeTypeMenuPos() {
+    if (!typeBtnRef.current) return;
+    const r = typeBtnRef.current.getBoundingClientRect();
+    const estMenuHeight = 300;
+    const spaceBelow = window.innerHeight - r.bottom;
+    if (spaceBelow < estMenuHeight && r.top > spaceBelow) {
+      setTypeMenuPos({ bottom: window.innerHeight - r.top + 4, top: null, left: r.left });
+    } else {
+      setTypeMenuPos({ top: r.bottom + 4, bottom: null, left: r.left });
+    }
+  }
   function toggleTypeMenu() {
     if (typeMenuOpen === row.id) { setTypeMenuOpen(null); return; }
-    if (typeBtnRef.current) {
-      const r = typeBtnRef.current.getBoundingClientRect();
-      const estMenuHeight = 300;
-      const spaceBelow = window.innerHeight - r.bottom;
-      if (spaceBelow < estMenuHeight && r.top > spaceBelow) {
-        setTypeMenuPos({ bottom: window.innerHeight - r.top + 4, top: null, left: r.left });
-      } else {
-        setTypeMenuPos({ top: r.bottom + 4, bottom: null, left: r.left });
-      }
-    }
+    computeTypeMenuPos();
     setTypeMenuOpen(row.id);
   }
+  useEffect(() => {
+    if (typeMenuOpen !== row.id) return;
+    window.addEventListener("scroll", computeTypeMenuPos, true);
+    window.addEventListener("resize", computeTypeMenuPos);
+    return () => { window.removeEventListener("scroll", computeTypeMenuPos, true); window.removeEventListener("resize", computeTypeMenuPos); };
+  }, [typeMenuOpen === row.id]);
 
   function renderCell(col) {
     switch (col.key) {
@@ -573,8 +585,9 @@ function DayGroup({ g, fid, depth, ctx }) {
 }
 
 function FrameBlock({ frame, depth, ctx, renderContext }) {
-  const { T, lang, toggleFrameCollapse, openFrameModal, deleteFrame, openAddDayModal, frameTotals } = ctx;
+  const { T, lang, toggleFrameCollapse, openFrameModal, deleteFrame, openAddDayModal, addRow, lastDateInContext, frameTotals, displayCurrency, convertAmount } = ctx;
   const totals = frameTotals(frame.id);
+  const convertedTotal = Object.entries(totals).reduce((sum, [cur, amt]) => sum + convertAmount(amt, cur, displayCurrency), 0);
   const color = FRAME_COLORS[depth % FRAME_COLORS.length];
   return (
     <div className="mt-frame-block" style={{ "--frame-color": color }}>
@@ -582,9 +595,9 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
         <span className="chev">{frame.collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}</span>
         <span className="mt-frame-name">{frame.name}</span>
         <span className="mt-frame-range">{fmtDate(frame.startDate, lang)} – {fmtDate(frame.endDate, lang)}</span>
-        {Object.entries(totals).map(([cur, amt]) => (
-          <span className="mt-chip small" key={cur}>{cur} {amt.toLocaleString()}</span>
-        ))}
+        {convertedTotal > 0 && (
+          <span className="mt-chip small">{displayCurrency} {convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+        )}
         <span className="mt-frame-actions" onClick={(e) => e.stopPropagation()}>
           <button onClick={() => openAddDayModal(frame.id)} title={T.addDay}><Plus size={14} /></button>
           <button onClick={() => openFrameModal(null, frame.id)} title={T.addSubFrame}><FolderPlus size={14} /></button>
@@ -592,7 +605,12 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
           <button onClick={() => deleteFrame(frame.id)} title={T.delete}><Trash2 size={13} /></button>
         </span>
       </div>
-      {!frame.collapsed && <div className="mt-frame-body">{renderContext(frame.id, depth + 1)}</div>}
+      {!frame.collapsed && (
+        <div className="mt-frame-body">
+          {renderContext(frame.id, depth + 1)}
+          <button className="mt-group-add mt-frame-add-row" onClick={() => addRow(lastDateInContext(frame.id), null, frame.id)}><Plus size={13} /> {T.addRow}</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -730,6 +748,12 @@ export default function MyTripApp() {
     }
     walk(childFrames(null), 0);
     return result;
+  }
+  function lastDateInContext(fid) {
+    const groups = dayGroupsAt(fid);
+    if (groups.length) return groups[groups.length - 1].date;
+    const frame = fid ? frames.find((f) => f.id === fid) : null;
+    return frame ? frame.startDate : new Date().toISOString().slice(0, 10);
   }
   function nextDateInContext(fid) {
     const frame = fid ? frames.find((f) => f.id === fid) : null;
@@ -975,8 +999,8 @@ export default function MyTripApp() {
     updateRow, deleteRow, openCard, addRow, dragId, setDragId, onDropRow,
     typeMenuOpen, setTypeMenuOpen, newTypeDraft, setNewTypeDraft, addCustomType,
     collapsedParents, setCollapsedParents, collapsedGroups, setCollapsedGroups,
-    toggleFrameCollapse, openFrameModal, deleteFrame, nextDateInContext, frameTotals,
-    openAddDayModal, sortDayByTime, getColWidth, startResize,
+    toggleFrameCollapse, openFrameModal, deleteFrame, nextDateInContext, lastDateInContext, frameTotals,
+    openAddDayModal, sortDayByTime, getColWidth, startResize, displayCurrency, convertAmount,
   };
 
   function renderContext(fid, depth) {
@@ -1071,6 +1095,7 @@ export default function MyTripApp() {
         .mt-frame-actions button { border:none; background:none; color:var(--muted); padding:4px; border-radius:5px; display:flex; }
         .mt-frame-actions button:hover { background:var(--teal-tint); color:var(--teal-dark); }
         .mt-frame-body { padding:2px 12px 12px 12px; }
+        .mt-frame-add-row { margin-top:10px; padding:6px 4px; }
         .mt-group { margin-top:14px; }
         .mt-group-header { display:flex; align-items:center; gap:7px; padding:6px 4px; cursor:pointer; user-select:none; flex-wrap:wrap; }
         .mt-group-date { font-weight:700; font-size:13.5px; }
@@ -1095,7 +1120,7 @@ export default function MyTripApp() {
         .mt-table th.duration, .mt-table td.duration { white-space:nowrap; }
         .mt-table th.type, .mt-table td.type { overflow:visible; }
         .mt-table td.from, .mt-table td.to { overflow:hidden; text-overflow:ellipsis; }
-        .mt-handle-wrap { display:flex; align-items:center; gap:3px; }
+        .mt-handle-wrap { display:flex; align-items:center; gap:6px; }
         .mt-type-wrap { position:relative; }
         .mt-type-chip { display:flex; align-items:center; gap:6px; }
         .mt-type-icon { width:22px; height:22px; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
@@ -1452,7 +1477,7 @@ export default function MyTripApp() {
                 </div>
               )}
               <div className="mt-field"><label>{T.link}</label><input value={cardDraft.link} placeholder="https://..." onChange={(e) => setCardDraft({ ...cardDraft, link: e.target.value })} /></div>
-              {["hotel", "self-tour", "guided-tour", "day-tour", "ferry", "car-rental"].includes(cardDraft.typeId) && (
+              {["hotel", "hostel", "apartment", "self-tour", "guided-tour", "day-tour", "attraction", "ferry", "car-rental", "yacht", "cruise"].includes(cardDraft.typeId) && (
                 <div className="mt-field"><label>{T.maplink}</label><input value={cardDraft.mapLink || ""} placeholder="https://maps.google.com/..." onChange={(e) => setCardDraft({ ...cardDraft, mapLink: e.target.value })} /></div>
               )}
               <div className="mt-field-row">
