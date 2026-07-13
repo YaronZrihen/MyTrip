@@ -17,7 +17,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "7.2.0";
+const APP_VERSION = "7.3.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -704,7 +704,7 @@ export default function MyTripApp() {
   function resetColumnWidths() { setColumnWidths({}); }
 
   function exportToFile() {
-    const payload = { version: APP_VERSION, exportedAt: new Date().toISOString(), rows, frames, types, columns, columnWidths, displayCurrency };
+    const payload = { version: APP_VERSION, exportedAt: new Date().toISOString(), rows, frames, displayCurrency };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -722,9 +722,6 @@ export default function MyTripApp() {
         if (!data || !Array.isArray(data.rows)) throw new Error("bad-format");
         setRows(data.rows);
         setFrames(Array.isArray(data.frames) ? data.frames : []);
-        if (Array.isArray(data.types) && data.types.length) setTypes(data.types);
-        if (Array.isArray(data.columns) && data.columns.length) setColumns(data.columns);
-        if (data.columnWidths) setColumnWidths(data.columnWidths);
         if (data.displayCurrency) setDisplayCurrency(data.displayCurrency);
         setImportMsg({ ok: true });
       } catch (e) {
