@@ -9,7 +9,7 @@ import {
   Smartphone, Monitor, AlertTriangle, GripVertical, Check, FolderPlus, Sparkles,
   Route, Waypoints, Download, Upload, MapPin, Search, CircleCheck, Clock, ArrowDownUp, Copy, StickyNote, TrainFront,
   Bus, Motorbike, Bike, Scooter, Sailboat, ShipWheel, Anchor, Kayak, Helicopter, Caravan, Building2, Landmark, Home,
-  CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2
+  CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2, MoreVertical
 } from "lucide-react";
 
 /* ---------------------------------------------------------------------- */
@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "8.0.0";
+const APP_VERSION = "8.1.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -111,12 +111,12 @@ const T_DICT = {
     destination: "שם היעד", link: "קישור להזמנה", maplink: "קישור למיקום / מסלול",
     flightNo: "מספר טיסה", cost: "עלות", currency: "מטבע", notes: "הערות", frame: "מסגרת",
     noFrame: "ללא מסגרת (רמה עליונה)", selectType: "בחר...",
-    newType: "תיאור חדש", typeName: "שם תיאור", add: "הוספה",
+    newType: "תיאור חדש", typeName: "שם תיאור", add: "הוספה", searchTypes: "חיפוש תיאור...",
     totalPerCurrency: "סה״כ טיול", timeError: "שעת סיום לפני שעת ההתחלה — סמן \"חוצה חצות\" אם מדובר בלילה",
     noRows: "אין עדיין רשומות כאן", dragHint: "גרירה לשינוי סדר", mockNote: "*הדמיית התחברות בלבד בפרוטוטייפ",
     frameModalNew: "מסגרת טיול חדשה", frameModalEdit: "עריכת מסגרת", frameName: "שם המסגרת",
     frameStart: "תאריך התחלה", frameEnd: "תאריך סיום", parentFrame: "שייכת למסגרת",
-    addSubFrame: "הוסף מסגרת-משנה", suggestPrefix: "זוהו", suggestMid: "טיסות ללא מסגרת:",
+    addSubFrame: "הוסף מסגרת-משנה", suggestPrefix: "זוהו", suggestMid: "טיסות ללא מסגרת:", moreOptions: "עוד אפשרויות",
     fillDatesAbove: "הוסף מסגרת מעל התאריך הקיים", fillDatesBelow: "הוסף מסגרת מתחת לתאריך הקיים",
     suggestBtn: "צור מסגרת טיול אוטומטית", suggestDismiss: "התעלם",
     fxApprox: "לפי שער מקורב (אין חיבור לאינטרנט)", fxLive: "לפי שער עדכני",
@@ -164,12 +164,12 @@ const T_DICT = {
     destination: "Venue", link: "Booking link", maplink: "Map / route link",
     flightNo: "Flight number", cost: "Cost", currency: "Currency", notes: "Notes", frame: "Frame",
     noFrame: "No frame (top level)", selectType: "Select...",
-    newType: "New description", typeName: "Description name", add: "Add",
+    newType: "New description", typeName: "Description name", add: "Add", searchTypes: "Search description...",
     totalPerCurrency: "Trip total", timeError: "End time is before start time — check \"crosses midnight\" for overnight legs",
     noRows: "No records here yet", dragHint: "Drag to reorder", mockNote: "*Sign-in is a prototype mock only",
     frameModalNew: "New trip frame", frameModalEdit: "Edit frame", frameName: "Frame name",
     frameStart: "Start date", frameEnd: "End date", parentFrame: "Belongs to frame",
-    addSubFrame: "Add sub-frame", suggestPrefix: "Found", suggestMid: "flights without a frame:",
+    addSubFrame: "Add sub-frame", suggestPrefix: "Found", suggestMid: "flights without a frame:", moreOptions: "More options",
     fillDatesAbove: "Add frame above the existing date", fillDatesBelow: "Add frame below the existing date",
     suggestBtn: "Auto-create a trip frame", suggestDismiss: "Dismiss",
     fxApprox: "Approximate rate (no internet connection)", fxLive: "Live rate",
@@ -391,6 +391,8 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
   const toVerified = row.toVerifiedUrl && row.toVerifiedText === row.to;
   const typeBtnRef = useRef(null);
   const [typeMenuPos, setTypeMenuPos] = useState({ top: 0, left: 0 });
+  const [typeSearch, setTypeSearch] = useState("");
+  const [showAddTypeForm, setShowAddTypeForm] = useState(false);
   const [distLoading, setDistLoading] = useState(false);
 
   function handleRouteHover() {
@@ -423,6 +425,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
   function toggleTypeMenu() {
     if (typeMenuOpen === row.id) { setTypeMenuOpen(null); return; }
     computeTypeMenuPos();
+    setTypeSearch(""); setShowAddTypeForm(false);
     setTypeMenuOpen(row.id);
   }
   useEffect(() => {
@@ -446,26 +449,42 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
             <>
               <div className="mt-floating-backdrop" onClick={() => setTypeMenuOpen(null)} />
               <div className="mt-type-menu" style={{ top: typeMenuPos.top ?? undefined, bottom: typeMenuPos.bottom ?? undefined, left: typeMenuPos.left }}>
-                {groupTypesByCategory(types).map((grp) => (
-                  <React.Fragment key={grp.category}>
-                    <div className="mt-type-cat-label">{CATEGORY_LABELS[lang][grp.category] || grp.category}</div>
-                    {grp.items.map((t) => { const TI = ICONS[t.icon] || Tag; return (
-                      <button key={t.id} className="opt" onClick={() => { updateRow(row.id, { typeId: t.id }); setTypeMenuOpen(null); }}>
-                        <span className="mt-type-icon" style={{ background: t.color, width: 20, height: 20 }}><TI size={11} /></span>{t.name}
-                      </button>
-                    ); })}
-                  </React.Fragment>
-                ))}
-                <div className="divider" />
-                <div className="mt-type-new-form">
-                  <input type="text" placeholder={T.typeName} value={newTypeDraft.name} onChange={(e) => setNewTypeDraft({ ...newTypeDraft, name: e.target.value })} />
-                  <div className="mt-icon-pick-row">
-                    {ICON_PALETTE.map((ic) => { const PI = ICONS[ic]; return (
-                      <button key={ic} className={"mt-icon-pick" + (newTypeDraft.icon === ic ? " sel" : "")} onClick={() => setNewTypeDraft({ ...newTypeDraft, icon: ic })}><PI /></button>
-                    ); })}
-                  </div>
-                  <button className="mt-btn primary" style={{ width: "100%" }} onClick={() => addCustomType(row.id)}><Plus size={12} /> {T.add}</button>
+                <div className="mt-type-search-wrap">
+                  <Search size={13} />
+                  <input autoFocus className="mt-type-search" placeholder={T.searchTypes} value={typeSearch} onChange={(e) => setTypeSearch(e.target.value)} />
+                  {typeSearch && <button className="mt-type-search-clear" onClick={() => setTypeSearch("")}><X size={12} /></button>}
                 </div>
+                <div className="mt-type-list">
+                  {groupTypesByCategory(types)
+                    .map((grp) => ({ ...grp, items: grp.items.filter((t) => t.name.toLowerCase().includes(typeSearch.toLowerCase())) }))
+                    .filter((grp) => grp.items.length)
+                    .map((grp) => (
+                      <React.Fragment key={grp.category}>
+                        <div className="mt-type-cat-label">{CATEGORY_LABELS[lang][grp.category] || grp.category}</div>
+                        {grp.items.map((t) => { const TI = ICONS[t.icon] || Tag; const selected = t.id === row.typeId; return (
+                          <button key={t.id} className={"opt" + (selected ? " selected" : "")} onClick={() => { updateRow(row.id, { typeId: t.id }); setTypeMenuOpen(null); }}>
+                            <span className="mt-type-icon" style={{ background: t.color, width: 20, height: 20 }}><TI size={11} /></span>
+                            <span style={{ flex: 1 }}>{t.name}</span>
+                            {selected && <Check size={13} />}
+                          </button>
+                        ); })}
+                      </React.Fragment>
+                    ))}
+                </div>
+                <div className="divider" />
+                {showAddTypeForm ? (
+                  <div className="mt-type-new-form">
+                    <input type="text" autoFocus placeholder={T.typeName} value={newTypeDraft.name} onChange={(e) => setNewTypeDraft({ ...newTypeDraft, name: e.target.value })} />
+                    <div className="mt-icon-pick-row">
+                      {ICON_PALETTE.map((ic) => { const PI = ICONS[ic]; return (
+                        <button key={ic} className={"mt-icon-pick" + (newTypeDraft.icon === ic ? " sel" : "")} onClick={() => setNewTypeDraft({ ...newTypeDraft, icon: ic })}><PI /></button>
+                      ); })}
+                    </div>
+                    <button className="mt-btn primary" style={{ width: "100%" }} onClick={() => addCustomType(row.id)}><Plus size={12} /> {T.add}</button>
+                  </div>
+                ) : (
+                  <button className="mt-type-add-toggle" onClick={() => setShowAddTypeForm(true)}><Plus size={13} /> {T.newType}</button>
+                )}
               </div>
             </>
           )}
@@ -648,10 +667,18 @@ function DayGroup({ g, fid, depth, ctx }) {
 }
 
 function FrameBlock({ frame, depth, ctx, renderContext }) {
-  const { T, lang, toggleFrameCollapse, openFrameModal, deleteFrame, openAddDayModal, addRow, lastDateInContext, frameTotals, displayCurrency, convertAmount } = ctx;
+  const { T, lang, toggleFrameCollapse, openFrameModal, deleteFrame, openAddDayModal, addRow, lastDateInContext, frameTotals, displayCurrency, convertAmount, frameMenuOpenId, setFrameMenuOpenId, frameMenuPos, setFrameMenuPos } = ctx;
   const totals = frameTotals(frame.id);
   const convertedTotal = Object.entries(totals).reduce((sum, [cur, amt]) => sum + convertAmount(amt, cur, displayCurrency), 0);
   const color = FRAME_COLORS[depth % FRAME_COLORS.length];
+  const menuBtnRef = useRef(null);
+  const isMenuOpen = frameMenuOpenId === frame.id;
+  function toggleMenu(e) {
+    e.stopPropagation();
+    if (isMenuOpen) { setFrameMenuOpenId(null); return; }
+    if (menuBtnRef.current) { const r = menuBtnRef.current.getBoundingClientRect(); setFrameMenuPos({ top: r.bottom + 4, left: r.left }); }
+    setFrameMenuOpenId(frame.id);
+  }
   return (
     <div className="mt-frame-block" style={{ "--frame-color": color }}>
       <div className="mt-frame-header" onClick={() => toggleFrameCollapse(frame.id)}>
@@ -662,12 +689,21 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
           <span className="mt-chip small">{displayCurrency} {convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
         )}
         <span className="mt-frame-actions" onClick={(e) => e.stopPropagation()}>
-          <button onClick={() => openAddDayModal(frame.id)} title={T.addDay}><Plus size={14} /></button>
-          <button onClick={() => openFrameModal(null, frame.id)} title={T.addSubFrame}><FolderPlus size={14} /></button>
-          <button onClick={() => openFrameModal(frame)} title={T.editRecord}><Pencil size={13} /></button>
-          <button onClick={() => deleteFrame(frame.id)} title={T.delete}><Trash2 size={13} /></button>
+          <button ref={menuBtnRef} onClick={toggleMenu} title={T.moreOptions}><MoreVertical size={16} /></button>
         </span>
       </div>
+      {isMenuOpen && (
+        <>
+          <div className="mt-floating-backdrop" onClick={() => setFrameMenuOpenId(null)} />
+          <div className="mt-floating-menu mt-kebab-menu" style={{ top: frameMenuPos.top, left: frameMenuPos.left }}>
+            <button className="mt-share-opt" onClick={() => { openAddDayModal(frame.id); setFrameMenuOpenId(null); }}><Plus size={14} /> {T.addDay}</button>
+            <button className="mt-share-opt" onClick={() => { openFrameModal(null, frame.id); setFrameMenuOpenId(null); }}><FolderPlus size={14} /> {T.addSubFrame}</button>
+            <button className="mt-share-opt" onClick={() => { openFrameModal(frame); setFrameMenuOpenId(null); }}><Pencil size={14} /> {T.editRecord}</button>
+            <div className="divider" />
+            <button className="mt-share-opt" style={{ color: "var(--danger)" }} onClick={() => { deleteFrame(frame.id); setFrameMenuOpenId(null); }}><Trash2 size={14} /> {T.delete}</button>
+          </div>
+        </>
+      )}
       {!frame.collapsed && (
         <div className="mt-frame-body">
           {renderContext(frame.id, depth + 1)}
@@ -721,6 +757,8 @@ export default function MyTripApp() {
   const [aiMessages, setAiMessages] = useState([]);
   const [aiInput, setAiInput] = useState("");
   const [demoNotice, setDemoNotice] = useState(null);
+  const [frameMenuOpenId, setFrameMenuOpenId] = useState(null);
+  const [frameMenuPos, setFrameMenuPos] = useState({ top: 0, left: 0 });
   const [frameDraft, setFrameDraft] = useState(null);
   const [addDayCtx, setAddDayCtx] = useState(null); // { fid, date }
   const [locPicker, setLocPicker] = useState(null); // { field, query, results, loading }
@@ -1169,6 +1207,7 @@ export default function MyTripApp() {
     collapsedParents, setCollapsedParents, collapsedGroups, setCollapsedGroups,
     toggleFrameCollapse, openFrameModal, deleteFrame, nextDateInContext, lastDateInContext, frameTotals,
     openAddDayModal, sortDayByTime, getColWidth, startResize, displayCurrency, convertAmount,
+    frameMenuOpenId, setFrameMenuOpenId, frameMenuPos, setFrameMenuPos,
   };
 
   function renderContext(fid, depth) {
@@ -1269,6 +1308,7 @@ export default function MyTripApp() {
         .mt-frame-name { font-weight:700; font-size:14px; font-family:'Frank Ruhl Libre',serif; }
         .mt-frame-range { font-size:11.5px; color:var(--muted); background:var(--bg); padding:2px 8px; border-radius:20px; }
         .mt-frame-actions { display:flex; gap:2px; margin-inline-start:auto; }
+        .mt-kebab-menu { min-width:180px; }
         .mt-frame-actions button { border:none; background:none; color:var(--muted); padding:4px; border-radius:5px; display:flex; }
         .mt-frame-actions button:hover { background:var(--teal-tint); color:var(--teal-dark); }
         .mt-frame-body { padding:2px 12px 12px 12px; }
@@ -1338,9 +1378,18 @@ export default function MyTripApp() {
         .mt-chip-total { font-size:15px; padding:6px 14px; }
         .mt-fx-select { border:1px solid var(--border); border-radius:8px; padding:5px 8px; font-size:12.5px; background:#fff; color:var(--ink); }
         .mt-fx-note { font-size:10.5px; color:var(--muted); font-style:italic; }
-        .mt-type-menu { position:fixed; z-index:200; background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 12px 32px rgba(20,40,35,.18); padding:6px; min-width:190px; max-height:70vh; overflow-y:auto; color:var(--ink); }
+        .mt-type-menu { position:fixed; z-index:200; background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 12px 32px rgba(20,40,35,.18); padding:8px; min-width:210px; max-height:min(360px, 70vh); display:flex; flex-direction:column; color:var(--ink); }
+        .mt-type-search-wrap { display:flex; align-items:center; gap:6px; border:1px solid var(--border); border-radius:8px; padding:6px 8px; margin-bottom:6px; background:#fff; flex-shrink:0; }
+        .mt-type-search-wrap svg { color:var(--muted); flex-shrink:0; }
+        .mt-type-search { border:none; outline:none; flex:1; font-size:12.5px; background:transparent; color:var(--ink); min-width:0; }
+        .mt-type-search-clear { border:none; background:none; color:var(--muted); display:flex; padding:2px; }
+        .mt-type-list { overflow-y:auto; flex:1; min-height:0; }
+        .mt-type-add-toggle { width:100%; display:flex; align-items:center; justify-content:center; gap:6px; padding:8px; border-radius:7px; background:none; border:none; font-size:12px; color:var(--teal); font-weight:600; flex-shrink:0; }
+        .mt-type-add-toggle:hover { background:var(--bg); }
         .mt-type-cat-label { font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-weight:700; padding:8px 8px 3px; }
-        .mt-type-menu button.opt { width:100%; display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:7px; background:none; border:none; font-size:12.5px; text-align:start; color:var(--ink); }
+        .mt-type-menu button.opt { width:100%; display:flex; align-items:center; gap:8px; padding:7px 8px; border-radius:7px; background:none; border:none; font-size:12.5px; text-align:start; color:var(--ink); }
+        .mt-type-menu button.opt.selected { background:var(--teal-tint); font-weight:600; color:var(--teal-dark); }
+        .mt-type-menu button.opt.selected svg:last-child { color:var(--teal); }
         .mt-type-menu button.opt:hover { background:var(--bg); }
         .mt-type-menu .divider { height:1px; background:var(--border); margin:6px 2px; }
         .mt-type-new-form { padding:6px 4px; }
