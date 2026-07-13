@@ -8,7 +8,8 @@ import {
   Plus, X, Settings2, Pencil, Trash2, Link2, Globe, LogIn, User,
   Smartphone, Monitor, AlertTriangle, GripVertical, Check, FolderPlus, Sparkles,
   Route, Waypoints, Download, Upload, MapPin, Search, CircleCheck, Clock, ArrowDownUp, Copy, StickyNote, TrainFront,
-  Bus, Motorbike, Bike, Scooter, Sailboat, ShipWheel, Anchor, Kayak, Helicopter, Caravan, Building2, Landmark, Home
+  Bus, Motorbike, Bike, Scooter, Sailboat, ShipWheel, Anchor, Kayak, Helicopter, Caravan, Building2, Landmark, Home,
+  CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2
 } from "lucide-react";
 
 /* ---------------------------------------------------------------------- */
@@ -17,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "7.4.0";
+const APP_VERSION = "8.0.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -131,6 +132,18 @@ const T_DICT = {
     fromAlias: "כינוי למוצא", toAlias: "כינוי ליעד", aliasHint: "יוצג בעמודה במקום הטקסט המלא",
     flightAliasPlaceholder: "לדוגמה: תל אביב (TLV)", copyPrevDest: "העתק יעד משורה קודמת",
     km: "ק\"מ", min: "דק'", calculatingDistance: "מחשב מרחק...",
+    weatherAtArrival: "מזג אוויר ביעד", weatherLoading: "בודק מזג אוויר...", weatherUnavailable: "תחזית לא זמינה (מעבר ל-16 יום קדימה, או שהמיקום לא זוהה)",
+    exportPdf: "ייצוא PDF (הדפסה)", reminders: "תזכורות", reminderIn: "בעוד כ-{min} דקות",
+    share: "שיתוף", shareExportHtml: "ייצוא כדף שיתוף (HTML)", shareExportHtmlHint: "קובץ עצמאי לצפייה — אפשר לשלוח לכל אחד, גם בלי גישה לאתר",
+    shareWithUser: "שתף עם משתמש במערכת (בקרוב)", shareEditAccess: "שיתוף עריכה עם שותפי טיול (בקרוב)",
+    demoNeedsAccounts: "התכונה הזו דורשת מערכת משתמשים והרשאות (חיבור ל-DB), עדיין לא קיימת בפרוטוטייפ. זו הצגה בלבד של איך זה ייראה.",
+    tryGooglePlaces: "חפש עם Google Places (הדגמה)", demoNeedsGoogleKey: "תוצאות מדויקות ועשירות יותר (כולל עברית טובה בהרבה) אפשריות עם Google Places API — דורש מפתח API וחיוב בענן של גוגל. זו הצגה בלבד; החיפוש הפעיל כרגע משתמש ב-OpenStreetMap החינמי.",
+    uploadFile: "העלה קובץ (כרטיס טיסה, שובר הזמנה...) — הדגמה", demoNeedsStorage: "העלאת קבצים דורשת שירות אחסון (כמו Supabase Storage או S3), עדיין לא מחובר בפרוטוטייפ. זו הצגה בלבד.",
+    aiDemoNotice: "זו הדגמת ממשק בלבד. חיבור אמיתי ל-Claude דורש שרת/פונקציה בצד השרת (לא ניתן לחשוף מפתח API בצד הלקוח).",
+    aiSuggestItinerary: "הצע מסלול יומי אוטומטי", aiInputPlaceholder: "שאל שאלה על הטיול...",
+    aiSuggestDemoText: "דוגמה להצעה (הדגמה): יום 2 — בוקר: ביקור בקולוסיאום (09:00), צהריים: ארוחה בטרסטבר, אחה״צ: מזרקת טרווי ופנתיאון. לחיבור אמיתי נדרש שרת שמפעיל את Claude API.",
+    aiChatDemoText: "זו תגובת הדגמה בלבד. בגרסה מחוברת, השאלה הזו הייתה נשלחת ל-Claude יחד עם נתוני הטיול שלך ומקבלת תשובה מבוססת.",
+    aiAssistant: "עוזר AI (הדגמה)", ok: "הבנתי",
     locHint: "טיפ: אם החיפוש לא מוצא תוצאה בעברית, נסה לחפש בשם המקומי/אנגלי (למשל \"Fiumicino Airport\" ולא \"פיומיצ׳ינו\").",
     tabSearch: "חיפוש טקסט", tabMap: "בחירה במפה", mapPickHint: "לחץ במקום הרצוי על המפה כדי לסמן אותו",
     mapResolving: "מזהה כתובת...", mapNoName: "לא נמצאה כתובת מדויקת לנקודה זו — ניתן עדיין לבחור לפי הקואורדינטות",
@@ -172,6 +185,18 @@ const T_DICT = {
     fromAlias: "Origin nickname", toAlias: "Destination nickname", aliasHint: "Shown in the table instead of the full text",
     flightAliasPlaceholder: "e.g. Tel Aviv (TLV)", copyPrevDest: "Copy previous row's destination",
     km: "km", min: "min", calculatingDistance: "Calculating distance...",
+    weatherAtArrival: "Weather at destination", weatherLoading: "Checking weather...", weatherUnavailable: "Forecast unavailable (beyond 16 days out, or location unresolved)",
+    exportPdf: "Export PDF (print)", reminders: "Reminders", reminderIn: "in about {min} minutes",
+    share: "Share", shareExportHtml: "Export as a share page (HTML)", shareExportHtmlHint: "Standalone file to view — send to anyone, even without site access",
+    shareWithUser: "Share with a system user (coming soon)", shareEditAccess: "Share edit access with trip partners (coming soon)",
+    demoNeedsAccounts: "This feature needs a user/permission system (a database connection) that doesn't exist in the prototype yet. This is just a preview of how it will look.",
+    tryGooglePlaces: "Search with Google Places (preview)", demoNeedsGoogleKey: "Richer, more accurate results (including much better Hebrew support) are possible with the Google Places API — needs an API key and billing on Google Cloud. This is a preview only; the active search currently uses free OpenStreetMap data.",
+    uploadFile: "Upload a file (boarding pass, booking voucher...) — preview", demoNeedsStorage: "File uploads need a storage service (like Supabase Storage or S3), not yet connected in the prototype. This is a preview only.",
+    aiDemoNotice: "This is a UI preview only. A real Claude connection needs a server-side function (an API key can't be exposed client-side).",
+    aiSuggestItinerary: "Suggest an automatic day plan", aiInputPlaceholder: "Ask a question about the trip...",
+    aiSuggestDemoText: "Example suggestion (demo): Day 2 — Morning: visit the Colosseum (9:00), Lunch in Trastevere, Afternoon: Trevi Fountain and the Pantheon. A real connection needs a server running the Claude API.",
+    aiChatDemoText: "This is a demo reply only. In a connected version, this question would be sent to Claude along with your trip data and get a grounded answer.",
+    aiAssistant: "AI Assistant (preview)", ok: "Got it",
     locHint: "Tip: if the search finds nothing in Hebrew, try the local/English name instead (e.g. \"Fiumicino Airport\").",
     tabSearch: "Text search", tabMap: "Pick on map", mapPickHint: "Click anywhere on the map to mark it",
     mapResolving: "Resolving address...", mapNoName: "No exact address found for this point — you can still pick it by coordinates",
@@ -287,6 +312,31 @@ function fetchDrivingRoute(a, b) {
       return { distanceKm: route.distance / 1000, durationMin: route.duration / 60 };
     });
 }
+
+/* Weather — Open-Meteo (free, no API key). Forecast only covers ~16 days ahead. */
+const WMO_ICON_MAP = {
+  0: { icon: "Sun", he: "בהיר", en: "Clear" },
+  1: { icon: "CloudSun", he: "בהיר בעיקרו", en: "Mostly clear" },
+  2: { icon: "CloudSun", he: "מעונן חלקית", en: "Partly cloudy" },
+  3: { icon: "Cloud", he: "מעונן", en: "Overcast" },
+  45: { icon: "CloudFog", he: "ערפל", en: "Fog" }, 48: { icon: "CloudFog", he: "ערפל קפוא", en: "Fog" },
+  51: { icon: "CloudRain", he: "טפטוף קל", en: "Light drizzle" }, 53: { icon: "CloudRain", he: "טפטוף", en: "Drizzle" }, 55: { icon: "CloudRain", he: "טפטוף כבד", en: "Heavy drizzle" },
+  61: { icon: "CloudRain", he: "גשם קל", en: "Light rain" }, 63: { icon: "CloudRain", he: "גשם", en: "Rain" }, 65: { icon: "CloudRain", he: "גשם כבד", en: "Heavy rain" },
+  71: { icon: "CloudSnow", he: "שלג קל", en: "Light snow" }, 73: { icon: "CloudSnow", he: "שלג", en: "Snow" }, 75: { icon: "CloudSnow", he: "שלג כבד", en: "Heavy snow" },
+  80: { icon: "CloudRain", he: "ממטרים", en: "Showers" }, 81: { icon: "CloudRain", he: "ממטרים", en: "Showers" }, 82: { icon: "CloudRain", he: "ממטרים עזים", en: "Violent showers" },
+  95: { icon: "CloudLightning", he: "סופת רעמים", en: "Thunderstorm" }, 96: { icon: "CloudLightning", he: "סופת רעמים", en: "Thunderstorm" }, 99: { icon: "CloudLightning", he: "סופת רעמים", en: "Thunderstorm" },
+};
+function weatherMeta(code) { return WMO_ICON_MAP[code] || { icon: "Cloud", he: "לא ידוע", en: "Unknown" }; }
+const WEATHER_ICONS = { Sun, CloudSun, Cloud, CloudFog, CloudRain, CloudSnow, CloudLightning };
+function fetchWeather(lat, lon, dateStr) {
+  return fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=auto&start_date=${dateStr}&end_date=${dateStr}`)
+    .then((r) => { if (!r.ok) throw new Error("http-" + r.status); return r.json(); })
+    .then((data) => {
+      if (!data || !data.daily || !data.daily.time || !data.daily.time.length) return null;
+      return { code: data.daily.weathercode[0], max: data.daily.temperature_2m_max[0], min: data.daily.temperature_2m_min[0] };
+    });
+}
+
 const COL_WIDTHS = {
   handle: 26, actions: 64,
   date: 78, day: 48, icon: 30, type: 112, from: 138, to: 138,
@@ -662,6 +712,15 @@ export default function MyTripApp() {
   const [cardRowId, setCardRowId] = useState(null);
   const [cardDraft, setCardDraft] = useState(null);
   const [flightLookupMsg, setFlightLookupMsg] = useState("");
+  const [weatherData, setWeatherData] = useState(null);
+  const [weatherExpanded, setWeatherExpanded] = useState(false);
+  const [remindersOn, setRemindersOn] = useState(false);
+  const [firedReminders, setFiredReminders] = useState({});
+  const [shareMenuOpen, setShareMenuOpen] = useState(false);
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const [aiMessages, setAiMessages] = useState([]);
+  const [aiInput, setAiInput] = useState("");
+  const [demoNotice, setDemoNotice] = useState(null);
   const [frameDraft, setFrameDraft] = useState(null);
   const [addDayCtx, setAddDayCtx] = useState(null); // { fid, date }
   const [locPicker, setLocPicker] = useState(null); // { field, query, results, loading }
@@ -671,6 +730,7 @@ export default function MyTripApp() {
   const [fxRates, setFxRates] = useState(null);
   const [fxIsLive, setFxIsLive] = useState(false);
   const columnsBtnRef = useRef(null);
+  const shareBtnRef = useRef(null);
   const addTypeBtnRef = useRef(null);
   const dir = lang === "he" ? "rtl" : "ltr";
   const T = T_DICT[lang];
@@ -715,6 +775,88 @@ export default function MyTripApp() {
   }
   function resetColumnWidths() { setColumnWidths({}); }
 
+  function exportToPDF() { window.print(); }
+  function toggleReminders() {
+    if (!remindersOn) {
+      if (typeof Notification !== "undefined" && Notification.permission !== "granted") {
+        Notification.requestPermission().then((perm) => { if (perm === "granted") setRemindersOn(true); });
+      } else {
+        setRemindersOn(true);
+      }
+    } else {
+      setRemindersOn(false);
+    }
+  }
+  useEffect(() => {
+    if (!remindersOn) return;
+    function check() {
+      const now = new Date();
+      rows.forEach((r) => {
+        if (!r.date || !r.startTime || firedReminders[r.id]) return;
+        const target = new Date(`${r.date}T${r.startTime}:00`);
+        const diffMin = (target - now) / 60000;
+        if (diffMin > 0 && diffMin <= 120) {
+          const tm = typeMeta(r.typeId, types, T);
+          if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+            new Notification(`${tm.name} — ${T.reminderIn.replace("{min}", Math.round(diffMin))}`, { body: r.toAlias || r.to || r.fromAlias || r.from || "" });
+          }
+          setFiredReminders((p) => ({ ...p, [r.id]: true }));
+        }
+      });
+    }
+    check();
+    const id = setInterval(check, 60000);
+    return () => clearInterval(id);
+  }, [remindersOn, rows, firedReminders]);
+
+  function showDemoNotice(msg) { setDemoNotice(msg); setShareMenuOpen(false); }
+  function handleAiSuggest() { setAiMessages((p) => [...p, { role: "assistant", text: T.aiSuggestDemoText }]); }
+  function handleAiSend() {
+    if (!aiInput.trim()) return;
+    setAiMessages((p) => [...p, { role: "user", text: aiInput }, { role: "assistant", text: T.aiChatDemoText }]);
+    setAiInput("");
+  }
+
+  function buildShareHTML() {
+    function esc(s) { return (s || "").toString().replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+    function rowHtml(r, depth) {
+      const tm = typeMeta(r.typeId, types, T);
+      const from = r.fromAlias || r.from || "", to = r.toAlias || r.to || "";
+      return `<div style="padding:7px 0;padding-inline-start:${depth * 16}px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;gap:10px;">
+        <div><strong>${esc(tm.name)}</strong> — ${esc(from)}${from && to ? " → " : ""}${esc(to)}${r.notes ? `<br><span style="color:#888;font-size:12px;">${esc(r.notes)}</span>` : ""}</div>
+        <div style="color:#666;font-size:12px;white-space:nowrap;">${r.startTime || ""}${r.endTime ? " – " + r.endTime : ""}${Number(r.costAmount) > 0 ? ` · ${esc(r.costCurrency)}${r.costAmount}` : ""}</div>
+      </div>`;
+    }
+    function dayHtml(fid) {
+      return dayGroupsAt(fid).map((g) => {
+        const rowsHtml = g.rows.map((r) => rowHtml(r, 0) + childrenOf(r.id).map((c) => rowHtml(c, 1)).join("")).join("");
+        return `<div style="margin-top:14px;"><div style="font-weight:700;margin-bottom:4px;">${fmtDate(g.date, lang)} — ${heDay(g.date, lang)}</div>${rowsHtml}</div>`;
+      }).join("");
+    }
+    function frameHtml(fid) {
+      let out = dayHtml(fid);
+      childFrames(fid).forEach((f) => {
+        out += `<div style="border:1px solid #ddd;border-radius:10px;padding:12px;margin-top:16px;">
+          <div style="font-weight:700;font-size:15px;">${esc(f.name)} <span style="font-weight:400;color:#888;font-size:12px;">(${fmtDate(f.startDate, lang)} – ${fmtDate(f.endDate, lang)})</span></div>
+          ${frameHtml(f.id)}
+        </div>`;
+      });
+      return out;
+    }
+    return `<!DOCTYPE html><html dir="${dir}" lang="${lang}"><head><meta charset="utf-8"><title>MyTrip</title>
+    <style>body{font-family:Arial,Helvetica,sans-serif;max-width:720px;margin:24px auto;padding:0 16px;color:#1E2A28;}
+    h1{font-family:Georgia,serif;}</style></head><body><h1>MyTrip</h1>${frameHtml(null)}</body></html>`;
+  }
+  function exportShareableHTML() {
+    const html = buildShareHTML();
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `mytrip-share-${new Date().toISOString().slice(0, 10)}.html`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setShareMenuOpen(false);
+  }
   function exportToFile() {
     const payload = { version: APP_VERSION, exportedAt: new Date().toISOString(), rows, frames, displayCurrency };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
@@ -941,7 +1083,23 @@ export default function MyTripApp() {
   }
 
   /* ---------- record card ---------- */
-  function openCard(row) { setCardRowId(row.id); setCardDraft({ ...row }); setFlightLookupMsg(""); }
+  function openCard(row) {
+    setCardRowId(row.id); setCardDraft({ ...row }); setFlightLookupMsg(""); setWeatherData(null); setWeatherExpanded(false);
+    if (row.date && row.toLat != null && row.toLon != null) {
+      setWeatherData({ loading: true });
+      fetchWeather(row.toLat, row.toLon, row.date).then((w) => setWeatherData({ loading: false, data: w, error: !w })).catch(() => setWeatherData({ loading: false, error: true }));
+    }
+  }
+  function checkWeatherManually() {
+    if (weatherData && weatherData.data) { setWeatherExpanded((v) => !v); return; }
+    if (!cardDraft || !cardDraft.to || !cardDraft.date) return;
+    setWeatherData({ loading: true });
+    const p = (cardDraft.toLat != null && cardDraft.toLon != null) ? Promise.resolve({ lat: cardDraft.toLat, lon: cardDraft.toLon }) : geocodeText(cardDraft.to);
+    p.then((coords) => {
+      if (!coords) { setWeatherData({ loading: false, error: true }); return; }
+      return fetchWeather(coords.lat, coords.lon, cardDraft.date).then((w) => setWeatherData({ loading: false, data: w, error: !w }));
+    }).catch(() => setWeatherData({ loading: false, error: true }));
+  }
   function closeCard() { setCardRowId(null); setCardDraft(null); setFlightLookupMsg(""); setLocPicker(null); }
   function findPrevRowInDay(rowId) {
     const row = rows.find((r) => r.id === rowId);
@@ -1088,6 +1246,15 @@ export default function MyTripApp() {
         .mt-floating-backdrop { position:fixed; inset:0; z-index:190; background:transparent; }
         .mt-menu-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:7px; }
         .mt-menu-head strong { font-size:12.5px; }
+        .mt-share-opt { width:100%; display:flex; align-items:center; gap:8px; padding:8px; border-radius:7px; background:none; border:none; font-size:12.5px; text-align:start; color:var(--ink); }
+        .mt-share-opt:hover { background:var(--bg); }
+        .mt-share-opt.disabled { color:var(--muted); }
+        .mt-file-demo { width:100%; display:flex; align-items:center; justify-content:center; gap:8px; border:1.5px dashed var(--border); border-radius:10px; padding:12px; background:var(--bg); color:var(--muted); font-size:12px; }
+        .mt-file-demo:hover { border-color:var(--teal); color:var(--teal-dark); }
+        .mt-ai-chat { display:flex; flex-direction:column; gap:6px; max-height:200px; overflow-y:auto; }
+        .mt-ai-msg { font-size:12.5px; padding:8px 10px; border-radius:10px; max-width:85%; line-height:1.4; }
+        .mt-ai-msg.assistant { background:var(--teal-tint); color:var(--teal-dark); align-self:flex-start; }
+        .mt-ai-msg.user { background:var(--bg); align-self:flex-end; }
         .mt-columns-menu { min-width:220px; }
         .mt-columns-menu label { display:flex; align-items:center; gap:7px; padding:4px 4px; font-size:12.5px; border-radius:6px; }
         .mt-columns-menu label:hover { background:var(--bg); }
@@ -1200,6 +1367,13 @@ export default function MyTripApp() {
         .mt-error { display:flex; gap:6px; align-items:flex-start; background:#FBEAE8; color:var(--danger); font-size:11.5px; padding:7px 9px; border-radius:8px; }
         .mt-error svg { width:13px; height:13px; flex-shrink:0; margin-top:1px; }
         .mt-hint { font-size:11px; color:var(--muted); }
+        .mt-weather-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+        .mt-weather-chip { display:flex; align-items:center; gap:6px; border:1px solid var(--border); background:#fff; border-radius:20px; padding:5px 12px; font-size:12px; font-weight:600; color:var(--ink); }
+        .mt-weather-chip:hover { background:var(--teal-tint); border-color:var(--teal); }
+        .mt-weather-chip svg { color:#3E7CB1; }
+        .mt-weather-detail { font-size:12px; color:var(--muted); }
+        .mt-weather-spin { animation:mt-spin 1.2s linear infinite; }
+        @keyframes mt-spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
         .mt-verified-row { display:flex; align-items:center; gap:5px; font-size:11px; color:#3E8E5A; margin-top:3px; }
         .mt-modal-footer { display:flex; justify-content:flex-end; gap:7px; padding:13px 18px; border-top:1px solid var(--border); position:sticky; bottom:0; background:var(--surface); flex-wrap:wrap; }
         .mt-btn { border-radius:8px; padding:7px 14px; font-size:12.5px; font-weight:600; border:1px solid var(--border); background:#fff; display:inline-flex; align-items:center; gap:5px; }
@@ -1244,6 +1418,18 @@ export default function MyTripApp() {
           .mt-card { padding:12px 14px; }
           .mt-icon-btn { padding:8px 10px; }
         }
+
+        @media print {
+          .mt-header, .mt-toolbar, .mt-suggest, .mt-row-actions, .mt-frame-actions, .mt-group-actions,
+          .mt-drag-handle, .mt-col-resizer, .mt-frame-add-row, .mt-group-add-bottom, .mt-fx-select, .mt-fx-note,
+          .mt-columns-backdrop, .mt-floating-menu, .mt-floating-backdrop { display:none !important; }
+          .mytrip-app { background:#fff; }
+          .mt-content { padding:0; }
+          .mt-frame-block { break-inside:avoid; border-color:#ccc; }
+          .mt-group { break-inside:avoid; }
+          table.mt-table { font-size:11px; }
+          .mt-table-wrap { overflow:visible; }
+        }
       `}</style>
 
       <div className="mt-header">
@@ -1261,319 +1447,4 @@ export default function MyTripApp() {
           {!loggedIn ? (
             <button className="mt-icon-btn" onClick={() => setLoggedIn(true)}><LogIn /> {T.login}</button>
           ) : (
-            <button className="mt-icon-btn" onClick={() => setLoggedIn(false)} title={T.mockNote}><span className="mt-avatar"><User size={14} /></span> {T.logout}</button>
-          )}
-        </div>
-      </div>
-
-      <div className="mt-toolbar">
-        <div className="mt-toolbar-group">
-          <button className="mt-icon-btn" onClick={() => openFrameModal(null, null)}><FolderPlus /> {T.newFrame}</button>
-        </div>
-        <div className="mt-toolbar-group">
-          <button className="mt-icon-btn" ref={addTypeBtnRef} onClick={openAddTypeMenu}><Plus /> {T.addType}</button>
-          <button className="mt-icon-btn" ref={columnsBtnRef} onClick={openColumnsMenu}><Settings2 /> {T.columns}</button>
-          <button className="mt-icon-btn" onClick={exportToFile}><Download /> {T.exportFile}</button>
-          <button className="mt-icon-btn" onClick={() => importInputRef.current && importInputRef.current.click()}><Upload /> {T.importFile}</button>
-          <input ref={importInputRef} type="file" accept="application/json,.json" style={{ display: "none" }}
-            onChange={(e) => { importFromFile(e.target.files && e.target.files[0]); e.target.value = ""; }} />
-          {importMsg && <span className="mt-hint" style={{ color: importMsg.ok ? "#3E8E5A" : "var(--danger)" }}>{importMsg.ok ? T.importSuccess : T.importError}</span>}
-        </div>
-      </div>
-
-      {colMenuOpen && (
-        <>
-          <div className="mt-floating-backdrop" onClick={() => setColMenuOpen(false)} />
-          <div className="mt-floating-menu mt-columns-menu" style={{ top: colMenuPos.top, left: colMenuPos.left }}>
-            <div className="mt-menu-head"><strong>{T.columns}</strong><button className="mt-btn ghost" style={{ padding: "2px 6px" }} onClick={() => setColMenuOpen(false)}><X size={14} /></button></div>
-            {columns.map((c) => (
-              <label key={c.key}>
-                <input type="checkbox" checked={c.visible} onChange={() => toggleColumn(c.key)} />
-                {lang === "he" ? c.label_he : c.label_en}
-                {c.custom && <button className="mt-btn ghost" style={{ padding: "2px 6px", marginInlineStart: "auto" }} onClick={(e) => { e.preventDefault(); removeCustomColumn(c.key); }}><X size={12} /></button>}
-              </label>
-            ))}
-            <div className="divider" />
-            <input type="text" placeholder={T.addColumn} value={newColName} onChange={(e) => setNewColName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addCustomColumn()} />
-            <button className="mt-btn primary" style={{ width: "100%" }} onClick={addCustomColumn}><Plus size={13} /> {T.addColumn}</button>
-            <div className="divider" />
-            <button className="mt-btn ghost" style={{ width: "100%" }} onClick={resetColumnWidths}><ArrowDownUp size={13} /> {T.resetColumnWidths}</button>
-          </div>
-        </>
-      )}
-
-      {addTypeOpen && (
-        <>
-          <div className="mt-floating-backdrop" onClick={() => setAddTypeOpen(false)} />
-          <div className="mt-floating-menu" style={{ top: addTypePos.top, left: addTypePos.left, minWidth: 200 }}>
-            <div className="mt-menu-head"><strong>{T.newType}</strong><button className="mt-btn ghost" style={{ padding: "2px 6px" }} onClick={() => setAddTypeOpen(false)}><X size={14} /></button></div>
-            <input type="text" placeholder={T.typeName} value={addTypeDraft.name} onChange={(e) => setAddTypeDraft({ ...addTypeDraft, name: e.target.value })} style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 6, padding: "5px 7px", fontSize: 12.5, marginBottom: 8, color: "var(--ink)", background: "#fff" }} />
-            <div className="mt-icon-pick-row">
-              {ICON_PALETTE.map((ic) => { const PI = ICONS[ic]; return (
-                <button key={ic} className={"mt-icon-pick" + (addTypeDraft.icon === ic ? " sel" : "")} onClick={() => setAddTypeDraft({ ...addTypeDraft, icon: ic })}><PI /></button>
-              ); })}
-            </div>
-            <button className="mt-btn primary" style={{ width: "100%" }} onClick={submitAddType}><Plus size={13} /> {T.add}</button>
-          </div>
-        </>
-      )}
-
-      <div className="mt-content">
-        {showSuggestion && (
-          <div className="mt-suggest">
-            <Sparkles />
-            <span>{T.suggestPrefix} {unassignedFlights.length} {T.suggestMid} {fmtDate(unassignedFlights[0].date, lang)} – {fmtDate(unassignedFlights[unassignedFlights.length - 1].date, lang)}</span>
-            <button className="mt-btn primary" onClick={createFrameFromSuggestion}>{T.suggestBtn}</button>
-            <button className="mt-btn ghost" onClick={() => setDismissedKey(suggestionKey)}>{T.suggestDismiss}</button>
-          </div>
-        )}
-
-        {renderContext(null, 0)}
-
-        <div className="mt-summary">
-          <span className="mt-summary-label">{T.totalPerCurrency}:</span>
-          {Object.keys(grandTotals).length === 0 ? (
-            <span style={{ fontSize: 12.5, color: "var(--muted)" }}>—</span>
-          ) : (
-            <>
-              <span className="mt-chip mt-chip-total">{displayCurrency} {convertedGrandTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-              <select className="mt-fx-select" value={displayCurrency} onChange={(e) => setDisplayCurrency(e.target.value)}>
-                {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-              <span className="mt-fx-note">{fxIsLive ? T.fxLive : T.fxApprox}</span>
-              <span style={{ width: "100%" }} />
-              {Object.entries(grandTotals).map(([cur, amt]) => <span className="mt-chip small" key={cur}>{cur} {amt.toLocaleString()}</span>)}
-            </>
-          )}
-        </div>
-        <div className="mt-note">{loggedIn ? T.mockNote : ""}</div>
-      </div>
-
-      {/* add-day modal */}
-      {addDayCtx && (
-        <div className="mt-modal-backdrop" onClick={closeAddDayModal}>
-          <div className="mt-modal narrow" onClick={(e) => e.stopPropagation()}>
-            <div className="mt-modal-header"><span className="mt-modal-title">{T.addDayModalTitle}</span><button className="mt-btn ghost" onClick={closeAddDayModal}><X size={16} /></button></div>
-            <div className="mt-modal-body">
-              <div className="mt-field"><label>{T.addDayDate}</label><DateField value={addDayCtx.date} onChange={(e) => setAddDayCtx({ ...addDayCtx, date: e.target.value })} /></div>
-              {addDayIssue && <div className="mt-error"><AlertTriangle /> {addDayIssue}</div>}
-            </div>
-            <div className="mt-modal-footer">
-              <button className="mt-btn ghost" onClick={closeAddDayModal}>{T.cancel}</button>
-              <button className="mt-btn primary" disabled={!addDayCtx.date || !!addDayIssue} onClick={confirmAddDay}><Check size={13} /> {T.confirmAdd}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* location picker modal (must stack above the record-card modal it's opened from) */}
-      {locPicker && (
-        <div className="mt-modal-backdrop" style={{ zIndex: 150 }} onClick={() => setLocPicker(null)}>
-          <div className="mt-modal narrow" style={{ zIndex: 151 }} onClick={(e) => e.stopPropagation()}>
-            <div className="mt-modal-header"><span className="mt-modal-title">{T.locPickerTitle}</span><button className="mt-btn ghost" onClick={() => setLocPicker(null)}><X size={16} /></button></div>
-            <div className="mt-loc-tabs">
-              <button className={"mt-loc-tab" + (locPicker.mode === "search" ? " active" : "")} onClick={() => setLocPickerMode("search")}>{T.tabSearch}</button>
-              <button className={"mt-loc-tab" + (locPicker.mode === "map" ? " active" : "")} onClick={() => setLocPickerMode("map")}>{T.tabMap}</button>
-            </div>
-            {locPicker.mode === "search" ? (
-              <div className="mt-modal-body">
-                <div className="mt-field-inline">
-                  <div><input value={locPicker.query} onChange={(e) => setLocPicker({ ...locPicker, query: e.target.value })} onKeyDown={(e) => e.key === "Enter" && runLocationSearch()} /></div>
-                  <button className="mt-btn primary" onClick={() => runLocationSearch()}><Search size={13} /> {T.locSearch}</button>
-                </div>
-                <div className="mt-hint">{T.locHint}</div>
-                {locPicker.loading && <div className="mt-hint">{T.locSearching}</div>}
-                {!locPicker.loading && locPicker.error && (
-                  <div className="mt-error">
-                    <AlertTriangle />
-                    <span>{T.locError} <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locPicker.query)}`} target="_blank" rel="noreferrer">{T.openInGoogleSearch}</a></span>
-                  </div>
-                )}
-                {!locPicker.loading && !locPicker.error && locPicker.results.length === 0 && <div className="mt-hint">{T.locNoResults}</div>}
-                <div className="mt-loc-results">
-                  {locPicker.results.map((r, i) => (
-                    <button key={i} className="mt-loc-result" onClick={() => pickLocation(r)}>{r.display_name}</button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="mt-modal-body">
-                <div className="mt-hint">{T.mapPickHint}</div>
-                <div className="mt-map-wrap">
-                  <MapContainer center={locPicker.mapCenter} zoom={locPicker.mapMarker ? 13 : 5} style={{ height: 260, width: "100%", borderRadius: 10 }} scrollWheelZoom={true}>
-                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' />
-                    <MapClickCapture onPick={handleMapPick} />
-                    {locPicker.mapMarker && <Marker position={[locPicker.mapMarker.lat, locPicker.mapMarker.lng]} />}
-                  </MapContainer>
-                </div>
-                {locPicker.mapMarker && (
-                  <div className="mt-map-result">
-                    {locPicker.mapMarker.loading ? (
-                      <div className="mt-hint">{T.mapResolving}</div>
-                    ) : locPicker.mapMarker.label ? (
-                      <>
-                        <div className="mt-loc-result static">{locPicker.mapMarker.label}</div>
-                        <button className="mt-btn primary" style={{ width: "100%", marginTop: 6 }} onClick={confirmMapPick}><Check size={13} /> {T.confirmLocation}</button>
-                      </>
-                    ) : (
-                      <>
-                        <div className="mt-hint">{T.mapNoName}</div>
-                        <button className="mt-btn primary" style={{ width: "100%", marginTop: 6 }} onClick={confirmMapPick}><Check size={13} /> {T.confirmLocation}</button>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* record card modal */}
-      {cardDraft && (
-        <div className="mt-modal-backdrop" onClick={closeCard}>
-          <div className="mt-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="mt-modal-header"><span className="mt-modal-title">{T.editRecord}</span><button className="mt-btn ghost" onClick={closeCard}><X size={16} /></button></div>
-            <div className="mt-modal-body">
-              <div className="mt-field-row">
-                <div className="mt-field">
-                  <label>{T.type}</label>
-                  <select value={cardDraft.typeId} onChange={(e) => setCardDraft({ ...cardDraft, typeId: e.target.value })}>
-                    <option value="unset">{T.selectType}</option>
-                    {groupTypesByCategory(types).map((grp) => (
-                      <optgroup key={grp.category} label={CATEGORY_LABELS[lang][grp.category] || grp.category}>
-                        {grp.items.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                      </optgroup>
-                    ))}
-                  </select>
-                </div>
-                <div className="mt-field"><label>תאריך</label><DateField value={cardDraft.date} onChange={(e) => setCardDraft({ ...cardDraft, date: e.target.value })} /></div>
-              </div>
-              <div className="mt-field">
-                <label>{T.frame}</label>
-                <select value={cardDraft.frameId || ""} onChange={(e) => setCardDraft({ ...cardDraft, frameId: e.target.value || null })}>
-                  <option value="">{T.noFrame}</option>
-                  {frameOptionsList(null).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
-                </select>
-              </div>
-              {cardFrameIssue && <div className="mt-error"><AlertTriangle /> {cardFrameIssue}</div>}
-
-              <div className="mt-field-row">
-                <div className="mt-field">
-                  <label>{T.from}</label>
-                  <div className="mt-field-inline">
-                    <div><input dir="auto" value={cardDraft.from} placeholder={getTypeHint(cardDraft.typeId, "from", lang)} onChange={(e) => setCardDraft({ ...cardDraft, from: e.target.value })} /></div>
-                    <button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openLocationPicker("from")}><MapPin size={13} /></button>
-                    <button className="mt-btn ghost mt-btn-icon" title={T.copyPrevDest} disabled={!prevRowForCard || !prevRowForCard.to} onClick={copyPrevDestinationToFrom}><Copy size={13} /></button>
-                  </div>
-                  {fromVerifiedCard && <div className="mt-verified-row"><CircleCheck size={12} /> {T.verified} — <a href={cardDraft.fromVerifiedUrl} target="_blank" rel="noreferrer">{T.openMap}</a></div>}
-                  <div className="mt-field" style={{ marginTop: 6 }}>
-                    <label>{T.fromAlias}</label>
-                    <input dir="auto" value={cardDraft.fromAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "fromAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, fromAlias: e.target.value })} />
-                    <div className="mt-hint">{T.aliasHint}</div>
-                  </div>
-                </div>
-                <div className="mt-field">
-                  <label>{T.to}</label>
-                  <div className="mt-field-inline">
-                    <div><input dir="auto" value={cardDraft.to} placeholder={getTypeHint(cardDraft.typeId, "to", lang)} onChange={(e) => setCardDraft({ ...cardDraft, to: e.target.value })} /></div>
-                    <button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openLocationPicker("to")}><MapPin size={13} /></button>
-                  </div>
-                  {toVerifiedCard && <div className="mt-verified-row"><CircleCheck size={12} /> {T.verified} — <a href={cardDraft.toVerifiedUrl} target="_blank" rel="noreferrer">{T.openMap}</a></div>}
-                  <div className="mt-field" style={{ marginTop: 6 }}>
-                    <label>{T.toAlias}</label>
-                    <input dir="auto" value={cardDraft.toAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "toAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, toAlias: e.target.value })} />
-                    <div className="mt-hint">{T.aliasHint}</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-field-row">
-                <div className="mt-field"><label>{T.start}</label><input type="time" value={cardDraft.startTime} onChange={(e) => setCardDraft({ ...cardDraft, startTime: e.target.value })} /></div>
-                <div className="mt-field"><label>{T.end}</label><input type="time" value={cardDraft.endTime} onChange={(e) => setCardDraft({ ...cardDraft, endTime: e.target.value })} /></div>
-              </div>
-              <label className="mt-checkbox-row"><input type="checkbox" checked={!!cardDraft.overnight} onChange={(e) => setCardDraft({ ...cardDraft, overnight: e.target.checked })} />{T.overnight}</label>
-              {cardHasTimeError && <div className="mt-error"><AlertTriangle /> {T.timeError}</div>}
-              {showTzHint && <div className="mt-hint">{T.tzNote}</div>}
-
-              {showFlightHint && (
-                <div className="mt-field">
-                  <label>{T.flightNo}</label>
-                  <div className="mt-field-inline">
-                    <input value={cardDraft.flightNumber || ""} onChange={(e) => setCardDraft({ ...cardDraft, flightNumber: e.target.value })} />
-                    <button className="mt-btn ghost" onClick={fetchFlightData}><Download size={13} /> {T.fetchFlightData}</button>
-                  </div>
-                  {flightLookupMsg && <div className="mt-hint" style={{ marginTop: 4 }}>{flightLookupMsg}</div>}
-                </div>
-              )}
-              <div className="mt-field"><label>{T.link}</label><input value={cardDraft.link} placeholder="https://..." onChange={(e) => setCardDraft({ ...cardDraft, link: e.target.value })} /></div>
-              {["hotel", "hostel", "apartment", "self-tour", "guided-tour", "day-tour", "attraction", "ferry", "car-rental", "yacht", "cruise"].includes(cardDraft.typeId) && (
-                <div className="mt-field"><label>{T.maplink}</label><input value={cardDraft.mapLink || ""} placeholder="https://maps.google.com/..." onChange={(e) => setCardDraft({ ...cardDraft, mapLink: e.target.value })} /></div>
-              )}
-              <div className="mt-field-row">
-                <div className="mt-field"><label>{T.cost}</label><input type="number" value={cardDraft.costAmount} onChange={(e) => setCardDraft({ ...cardDraft, costAmount: e.target.value })} /></div>
-                <div className="mt-field"><label>{T.currency}</label>
-                  <select value={cardDraft.costCurrency} onChange={(e) => setCardDraft({ ...cardDraft, costCurrency: e.target.value })}>
-                    {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div className="mt-field"><label>{T.notes}</label><input value={cardDraft.notes || ""} placeholder={getTypeHint(cardDraft.typeId, "notes", lang)} onChange={(e) => setCardDraft({ ...cardDraft, notes: e.target.value })} /></div>
-              {columns.filter((c) => c.custom).map((c) => (
-                <div className="mt-field" key={c.key}>
-                  <label>{lang === "he" ? c.label_he : c.label_en}</label>
-                  <input value={(cardDraft.custom && cardDraft.custom[c.key]) || ""} onChange={(e) => setCardDraft({ ...cardDraft, custom: { ...cardDraft.custom, [c.key]: e.target.value } })} />
-                </div>
-              ))}
-            </div>
-            <div className="mt-modal-footer">
-              {!cardDraft.parentId && (
-                <button className="mt-btn ghost" style={{ marginInlineEnd: "auto" }} onClick={() => { addRow(cardDraft.date, cardRowId, cardDraft.frameId); closeCard(); }}>
-                  <Plus size={13} /> {T.addSub}
-                </button>
-              )}
-              <button className="mt-btn danger" onClick={() => { deleteRow(cardRowId); closeCard(); }}><Trash2 size={13} /> {T.delete}</button>
-              <button className="mt-btn ghost" onClick={closeCard}>{T.cancel}</button>
-              <button className="mt-btn primary" disabled={!cardDraft.date || cardHasTimeError || !!cardFrameIssue} onClick={saveCard}><Check size={13} /> {T.save}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* frame modal */}
-      {frameDraft && (
-        <div className="mt-modal-backdrop" onClick={closeFrameModal}>
-          <div className="mt-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="mt-modal-header">
-              <span className="mt-modal-title">{frameDraft.id ? T.frameModalEdit : T.frameModalNew}</span>
-              <button className="mt-btn ghost" onClick={closeFrameModal}><X size={16} /></button>
-            </div>
-            <div className="mt-modal-body">
-              <div className="mt-field"><label>{T.frameName}</label><input value={frameDraft.name} onChange={(e) => setFrameDraft({ ...frameDraft, name: e.target.value })} /></div>
-              <div className="mt-field-row">
-                <div className="mt-field"><label>{T.frameStart}</label><DateField value={frameDraft.startDate} onChange={(e) => setFrameDraft({ ...frameDraft, startDate: e.target.value })} /></div>
-                <div className="mt-field"><label>{T.frameEnd}</label><DateField value={frameDraft.endDate} onChange={(e) => setFrameDraft({ ...frameDraft, endDate: e.target.value })} /></div>
-              </div>
-              <div className="mt-field-row">
-                <button className="mt-btn ghost" style={{ width: "100%" }} onClick={fillFrameDatesAbove}><ArrowDownUp size={13} /> {T.fillDatesAbove}</button>
-                <button className="mt-btn ghost" style={{ width: "100%" }} onClick={fillFrameDatesBelow}><ArrowDownUp size={13} /> {T.fillDatesBelow}</button>
-              </div>
-              <div className="mt-field">
-                <label>{T.parentFrame}</label>
-                <select value={frameDraft.parentFrameId || ""} onChange={(e) => setFrameDraft({ ...frameDraft, parentFrameId: e.target.value || null })}>
-                  <option value="">{T.noFrame}</option>
-                  {frameOptionsList(frameDraft.id).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
-                </select>
-              </div>
-              {frameIssue && <div className="mt-error"><AlertTriangle /> {frameIssue}</div>}
-            </div>
-            <div className="mt-modal-footer">
-              <button className="mt-btn ghost" onClick={closeFrameModal}>{T.cancel}</button>
-              <button className="mt-btn primary" disabled={!frameDraft.name.trim() || !frameDraft.startDate || !frameDraft.endDate || !!frameIssue} onClick={saveFrame}><Check size={13} /> {T.save}</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+            <button className="mt-icon-btn" onClick={() => setLoggedIn(false)} title={T.mockNote
