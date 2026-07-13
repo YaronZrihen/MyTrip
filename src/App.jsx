@@ -17,7 +17,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "7.3.0";
+const APP_VERSION = "7.4.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -526,6 +526,8 @@ function DayGroup({ g, fid, depth, ctx }) {
         <div className="mt-cards">
           {allRowsHere.map((r) => {
             const tm = typeMeta(r.typeId, types, T); const Icon = ICONS[tm.icon] || Tag;
+            const routeUrl = rowOwnRouteUrl(r);
+            const fromLabel = r.fromAlias || r.from, toLabel = r.toAlias || r.to;
             return (
               <div className="mt-card" key={r.id} onClick={() => openCard(r)}>
                 <div className="mt-card-top">
@@ -535,9 +537,19 @@ function DayGroup({ g, fid, depth, ctx }) {
                   </div>
                   <span className="mt-card-times">{r.startTime || "—"}{r.endTime ? ` – ${r.endTime}` : ""}</span>
                 </div>
-                <div className="mt-card-dest">{r.toAlias || r.to || r.fromAlias || r.from || "—"}</div>
+                {(fromLabel || toLabel) && (
+                  <div className="mt-card-route">
+                    <span dir="auto">{fromLabel || "—"}</span>
+                    {fromLabel && toLabel && <span className="mt-card-arrow">←</span>}
+                    {toLabel && <span dir="auto">{toLabel}</span>}
+                  </div>
+                )}
                 <div className="mt-card-bottom">
-                  <span style={{ fontSize: 12, color: "var(--muted)" }}>{r.from}{r.from && r.to ? " → " : ""}{r.to}</span>
+                  <span className="mt-card-icons" onClick={(e) => e.stopPropagation()}>
+                    {routeUrl && <a className="mt-link-icon" href={routeUrl} target="_blank" rel="noreferrer" title={T.routeTooltip}><Route size={15} /></a>}
+                    {r.link && <a className="mt-link-icon" href={r.link} target="_blank" rel="noreferrer" title={r.link}><Link2 size={15} /></a>}
+                    {r.notes && <span className="mt-link-icon has-note" title={r.notes}><StickyNote size={15} /></span>}
+                  </span>
                   {Number(r.costAmount) > 0 && <span className="mt-cost">{r.costCurrency}{r.costAmount}</span>}
                 </div>
               </div>
@@ -1207,12 +1219,31 @@ export default function MyTripApp() {
         .mt-loc-result { text-align:start; border:1px solid var(--border); border-radius:8px; padding:7px 9px; font-size:12px; background:#fff; }
         .mt-loc-result:hover { background:var(--teal-tint); border-color:var(--teal); }
         .mt-cards { display:flex; flex-direction:column; gap:9px; }
-        .mt-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:11px 13px; display:flex; flex-direction:column; gap:5px; }
+        .mt-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:11px 13px; display:flex; flex-direction:column; gap:6px; }
         .mt-card-top { display:flex; align-items:center; justify-content:space-between; }
-        .mt-card-times { font-size:12px; color:var(--muted); }
-        .mt-card-dest { font-size:13px; font-weight:600; }
+        .mt-card-times { font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; }
+        .mt-card-route { display:flex; align-items:center; gap:6px; font-size:13px; font-weight:600; flex-wrap:wrap; }
+        .mt-card-arrow { color:var(--muted); font-weight:400; }
         .mt-card-bottom { display:flex; align-items:center; justify-content:space-between; margin-top:2px; }
+        .mt-card-icons { display:flex; align-items:center; gap:10px; }
+        .mt-card-icons .mt-link-icon { padding:4px; }
         .mt-note { font-size:11px; color:var(--muted); margin-top:4px; }
+
+        @media (max-width: 640px) {
+          .mt-header { padding:10px 12px; }
+          .mt-toolbar { padding:8px 12px; gap:6px; }
+          .mt-content { padding:0 12px 32px; }
+          .mt-frame-header { padding:12px 10px; gap:7px; }
+          .mt-frame-actions button, .mt-row-actions button { min-width:32px; min-height:32px; justify-content:center; }
+          .mt-frame-range { order:3; flex-basis:100%; }
+          .mt-chip.small { order:4; }
+          .mt-frame-actions { order:2; }
+          .mt-group-header { padding:10px 6px; }
+          .mt-group-actions { gap:14px; }
+          .mt-group-add { min-height:32px; }
+          .mt-card { padding:12px 14px; }
+          .mt-icon-btn { padding:8px 10px; }
+        }
       `}</style>
 
       <div className="mt-header">
