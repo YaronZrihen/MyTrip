@@ -9,7 +9,7 @@ import {
   Smartphone, Monitor, AlertTriangle, GripVertical, Check, FolderPlus, Sparkles,
   Route, Waypoints, Download, Upload, MapPin, Search, CircleCheck, Clock, ArrowDownUp, Copy, StickyNote, TrainFront,
   Bus, Motorbike, Bike, Scooter, Sailboat, ShipWheel, Anchor, Kayak, Helicopter, Caravan, Building2, Landmark, Home,
-  CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2, MoreVertical
+  CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2, MoreVertical, Menu
 } from "lucide-react";
 
 /* ---------------------------------------------------------------------- */
@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "8.1.0";
+const APP_VERSION = "8.3.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -102,7 +102,7 @@ const DEFAULT_COLUMNS = [
 const T_DICT = {
   he: {
     appName: "MyTrip", addRow: "הוסף רשומה", addDay: "הוסף יום", newFrame: "מסגרת חדשה",
-    columns: "עמודות", addColumn: "הוסף עמודה", addType: "הוסף תיאור", resetColumnWidths: "איפוס רוחב עמודות (גרור את קצה כותרת העמודה לשינוי ידני)",
+    columns: "עמודות", addColumn: "הוסף עמודה", addType: "הוסף תיאור", resetColumnWidths: "איפוס רוחב עמודות (גרור את קצה כותרת העמודה לשינוי ידני)", actions: "פעולות", on: "פעיל", settings: "הגדרות", manageColumns: "ניהול עמודות",
     exportFile: "שמור לקובץ", importFile: "ייבוא מקובץ", importSuccess: "הייבוא הצליח", importError: "הקובץ אינו תקין",
     login: "התחברות עם Google", logout: "יציאה",
     desktop: "מחשב", mobile: "סלולר", lang: "English", editRecord: "כרטיס רשומה",
@@ -155,7 +155,7 @@ const T_DICT = {
   },
   en: {
     appName: "MyTrip", addRow: "Add record", addDay: "Add day", newFrame: "New frame",
-    columns: "Columns", addColumn: "Add column", addType: "Add description", resetColumnWidths: "Reset column widths (drag a header's edge to resize manually)",
+    columns: "Columns", addColumn: "Add column", addType: "Add description", resetColumnWidths: "Reset column widths (drag a header's edge to resize manually)", actions: "Actions", on: "On", settings: "Settings", manageColumns: "Manage columns",
     exportFile: "Save to file", importFile: "Import from file", importSuccess: "Import successful", importError: "This file isn't valid",
     login: "Sign in with Google", logout: "Sign out",
     desktop: "Desktop", mobile: "Mobile", lang: "עברית", editRecord: "Record card",
@@ -752,7 +752,10 @@ export default function MyTripApp() {
   const [weatherExpanded, setWeatherExpanded] = useState(false);
   const [remindersOn, setRemindersOn] = useState(false);
   const [firedReminders, setFiredReminders] = useState({});
-  const [shareMenuOpen, setShareMenuOpen] = useState(false);
+  const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
+  const [actionsMenuPos, setActionsMenuPos] = useState({ top: 60 });
+  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
+  const [settingsMenuPos, setSettingsMenuPos] = useState({ top: 60, left: 20 });
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const [aiMessages, setAiMessages] = useState([]);
   const [aiInput, setAiInput] = useState("");
@@ -768,8 +771,9 @@ export default function MyTripApp() {
   const [fxRates, setFxRates] = useState(null);
   const [fxIsLive, setFxIsLive] = useState(false);
   const columnsBtnRef = useRef(null);
-  const shareBtnRef = useRef(null);
+  const actionsBtnRef = useRef(null);
   const addTypeBtnRef = useRef(null);
+  const settingsBtnRef = useRef(null);
   const dir = lang === "he" ? "rtl" : "ltr";
   const T = T_DICT[lang];
 
@@ -1060,12 +1064,20 @@ export default function MyTripApp() {
     setNewTypeDraft({ name: "", icon: "Tag" }); setTypeMenuOpen(null);
   }
   function openColumnsMenu() {
-    if (columnsBtnRef.current) { const r = columnsBtnRef.current.getBoundingClientRect(); setColMenuPos({ top: r.bottom + 8, left: r.left }); }
-    setColMenuOpen((v) => !v);
+    if (settingsBtnRef.current) { const r = settingsBtnRef.current.getBoundingClientRect(); setColMenuPos({ top: r.bottom + 8, left: r.left }); }
+    setColMenuOpen(true);
   }
   function openAddTypeMenu() {
-    if (addTypeBtnRef.current) { const r = addTypeBtnRef.current.getBoundingClientRect(); setAddTypePos({ top: r.bottom + 8, left: r.left }); }
-    setAddTypeOpen((v) => !v);
+    if (settingsBtnRef.current) { const r = settingsBtnRef.current.getBoundingClientRect(); setAddTypePos({ top: r.bottom + 8, left: r.left }); }
+    setAddTypeOpen(true);
+  }
+  function openSettingsMenu() {
+    if (settingsBtnRef.current) { const r = settingsBtnRef.current.getBoundingClientRect(); setSettingsMenuPos({ top: r.bottom + 8, left: r.left }); }
+    setSettingsMenuOpen((v) => !v);
+  }
+  function openActionsMenu() {
+    if (actionsBtnRef.current) { const r = actionsBtnRef.current.getBoundingClientRect(); setActionsMenuPos({ top: r.bottom + 8 }); }
+    setActionsMenuOpen((v) => !v);
   }
   function submitAddType() {
     if (!addTypeDraft.name.trim()) return;
@@ -1503,35 +1515,42 @@ export default function MyTripApp() {
 
       <div className="mt-toolbar">
         <div className="mt-toolbar-group">
-          <button className="mt-icon-btn" onClick={() => openFrameModal(null, null)}><FolderPlus /> {T.newFrame}</button>
+          <button className="mt-icon-btn" ref={settingsBtnRef} onClick={openSettingsMenu}><Menu /> {T.settings}</button>
         </div>
         <div className="mt-toolbar-group">
-          <button className="mt-icon-btn" ref={addTypeBtnRef} onClick={openAddTypeMenu}><Plus /> {T.addType}</button>
-          <button className="mt-icon-btn" ref={columnsBtnRef} onClick={openColumnsMenu}><Settings2 /> {T.columns}</button>
-          <button className="mt-icon-btn" onClick={exportToFile}><Download /> {T.exportFile}</button>
-          <button className="mt-icon-btn" onClick={() => importInputRef.current && importInputRef.current.click()}><Upload /> {T.importFile}</button>
+          <button className="mt-icon-btn" ref={actionsBtnRef} onClick={openActionsMenu}><Menu /> {T.actions}</button>
           <input ref={importInputRef} type="file" accept="application/json,.json" style={{ display: "none" }}
             onChange={(e) => { importFromFile(e.target.files && e.target.files[0]); e.target.value = ""; }} />
           {importMsg && <span className="mt-hint" style={{ color: importMsg.ok ? "#3E8E5A" : "var(--danger)" }}>{importMsg.ok ? T.importSuccess : T.importError}</span>}
         </div>
-        <div className="mt-toolbar-group">
-          <button className="mt-icon-btn" onClick={exportToPDF} title={T.exportPdf}><Printer /></button>
-          <button className={"mt-icon-btn" + (remindersOn ? " active" : "")} onClick={toggleReminders} title={T.reminders}><Bell /></button>
-          <button className="mt-icon-btn" ref={shareBtnRef} onClick={() => setShareMenuOpen((v) => !v)} title={T.share}><Share2 /></button>
-          <button className="mt-icon-btn" onClick={() => setAiPanelOpen((v) => !v)} title={T.aiAssistant}><Wand2 /></button>
-        </div>
       </div>
 
-      {shareMenuOpen && (
+      {settingsMenuOpen && (
         <>
-          <div className="mt-floating-backdrop" onClick={() => setShareMenuOpen(false)} />
-          <div className="mt-floating-menu" style={{ top: shareBtnRef.current ? shareBtnRef.current.getBoundingClientRect().bottom + 8 : 60, insetInlineEnd: 20, minWidth: 230 }}>
-            <div className="mt-menu-head"><strong>{T.share}</strong><button className="mt-btn ghost" style={{ padding: "2px 6px" }} onClick={() => setShareMenuOpen(false)}><X size={14} /></button></div>
-            <button className="mt-share-opt" onClick={exportShareableHTML}><Share2 size={14} /> {T.shareExportHtml}</button>
-            <div className="mt-hint" style={{ padding: "2px 8px 6px" }}>{T.shareExportHtmlHint}</div>
+          <div className="mt-floating-backdrop" onClick={() => setSettingsMenuOpen(false)} />
+          <div className="mt-floating-menu mt-kebab-menu" style={{ top: settingsMenuPos.top, left: settingsMenuPos.left, minWidth: 220 }}>
+            <button className="mt-share-opt" onClick={() => { setSettingsMenuOpen(false); openColumnsMenu(); }}><Settings2 size={14} /> {T.manageColumns}</button>
+            <button className="mt-share-opt" onClick={() => { setSettingsMenuOpen(false); openAddTypeMenu(); }}><Plus size={14} /> {T.addType}</button>
+          </div>
+        </>
+      )}
+
+      {actionsMenuOpen && (
+        <>
+          <div className="mt-floating-backdrop" onClick={() => setActionsMenuOpen(false)} />
+          <div className="mt-floating-menu mt-kebab-menu" style={{ top: actionsMenuPos.top, insetInlineEnd: 20, minWidth: 240 }}>
+            <button className="mt-share-opt" onClick={() => { openFrameModal(null, null); setActionsMenuOpen(false); }}><FolderPlus size={14} /> {T.newFrame}</button>
             <div className="divider" />
-            <button className="mt-share-opt disabled" onClick={() => showDemoNotice(T.demoNeedsAccounts)}><UserPlus size={14} /> {T.shareWithUser}</button>
-            <button className="mt-share-opt disabled" onClick={() => showDemoNotice(T.demoNeedsAccounts)}><Users size={14} /> {T.shareEditAccess}</button>
+            <button className="mt-share-opt" onClick={() => { exportToFile(); setActionsMenuOpen(false); }}><Download size={14} /> {T.exportFile}</button>
+            <button className="mt-share-opt" onClick={() => { importInputRef.current && importInputRef.current.click(); setActionsMenuOpen(false); }}><Upload size={14} /> {T.importFile}</button>
+            <button className="mt-share-opt" onClick={() => { exportToPDF(); setActionsMenuOpen(false); }}><Printer size={14} /> {T.exportPdf}</button>
+            <button className="mt-share-opt" onClick={() => { toggleReminders(); setActionsMenuOpen(false); }}><Bell size={14} /> {T.reminders}{remindersOn ? ` (${T.on})` : ""}</button>
+            <div className="divider" />
+            <button className="mt-share-opt disabled" onClick={() => { showDemoNotice(T.demoNeedsAccounts); setActionsMenuOpen(false); }}><UserPlus size={14} /> {T.shareWithUser}</button>
+            <button className="mt-share-opt disabled" onClick={() => { showDemoNotice(T.demoNeedsAccounts); setActionsMenuOpen(false); }}><Users size={14} /> {T.shareEditAccess}</button>
+            <button className="mt-share-opt" onClick={() => { exportShareableHTML(); setActionsMenuOpen(false); }}><Share2 size={14} /> {T.shareExportHtml}</button>
+            <div className="divider" />
+            <button className="mt-share-opt" onClick={() => { setAiPanelOpen(true); setActionsMenuOpen(false); }}><Wand2 size={14} /> {T.aiAssistant}</button>
           </div>
         </>
       )}
