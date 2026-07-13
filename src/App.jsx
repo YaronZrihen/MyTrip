@@ -13,9 +13,9 @@ import {
 } from "lucide-react";
 
 /* ---------------------------------------------------------------------- */
-/*  MyTrip ג€” trip-planning table prototype                                 */
+/*  MyTrip — trip-planning table prototype                                 */
 /*  v4: chronology warnings, repositioned menus, location verification     */
-/*  (OpenStreetMap Nominatim ג€” free, no key), fixed-width indent column.   */
+/*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
 const APP_VERSION = "8.0.0";
@@ -28,50 +28,50 @@ L.Icon.Default.mergeOptions({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
-const DEFAULT_MAP_CENTER = [41.9, 12.49]; // Rome ג€” reasonable default for this itinerary
+const DEFAULT_MAP_CENTER = [41.9, 12.49]; // Rome — reasonable default for this itinerary
 const ICONS = { Plane, PlaneTakeoff, Car, BedDouble, Footprints, Users, Sun, Ship, KeySquare, Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music, TrainFront, Bus, Motorbike, Bike, Scooter, Sailboat, ShipWheel, Anchor, Kayak, Helicopter, Caravan, Building2, Landmark, Home };
-const HE_DAYS = ["׳¨׳׳©׳•׳", "׳©׳ ׳™", "׳©׳׳™׳©׳™", "׳¨׳‘׳™׳¢׳™", "׳—׳׳™׳©׳™", "׳©׳™׳©׳™", "׳©׳‘׳×"];
+const HE_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 const EN_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const FRAME_COLORS = ["#256D64", "#3E7CB1", "#8B6F47", "#7A5C9E", "#C1443A", "#5B8C5A"];
-const CURRENCIES = ["ג‚×", "$", "ג‚¬", "ֲ£"];
-const CURRENCY_CODE_MAP = { "ג‚×": "ILS", "$": "USD", "ג‚¬": "EUR", "ֲ£": "GBP" };
+const CURRENCIES = ["₪", "$", "€", "£"];
+const CURRENCY_CODE_MAP = { "₪": "ILS", "$": "USD", "€": "EUR", "£": "GBP" };
 const FALLBACK_RATES = { ILS: 1, USD: 0.27, EUR: 0.25, GBP: 0.21 };
 const FLIGHT_LOOKUP_ENABLED = false; // needs a real flight-data provider (e.g. AeroDataBox) + API key + server proxy
 
 const DEFAULT_TYPES = [
-  { id: "train", name: "׳¨׳›׳‘׳×", icon: "TrainFront", color: "#3E7CB1", category: "public-transport" },
-  { id: "high-speed-train", name: "׳¨׳›׳‘׳× ׳׳”׳™׳¨׳”", icon: "TrainFront", color: "#2F5F8A", category: "public-transport" },
-  { id: "bus", name: "׳׳•׳˜׳•׳‘׳•׳¡", icon: "Bus", color: "#3E7CB1", category: "public-transport" },
-  { id: "taxi", name: "׳׳•׳ ׳™׳×", icon: "Car", color: "#8B6F47", category: "public-transport" },
+  { id: "train", name: "רכבת", icon: "TrainFront", color: "#3E7CB1", category: "public-transport" },
+  { id: "high-speed-train", name: "רכבת מהירה", icon: "TrainFront", color: "#2F5F8A", category: "public-transport" },
+  { id: "bus", name: "אוטובוס", icon: "Bus", color: "#3E7CB1", category: "public-transport" },
+  { id: "taxi", name: "מונית", icon: "Car", color: "#8B6F47", category: "public-transport" },
 
-  { id: "car-rental", name: "׳”׳©׳›׳¨׳× ׳¨׳›׳‘", icon: "KeySquare", color: "#8B6F47", category: "road-transport" },
-  { id: "caravan", name: "׳§׳¨׳׳•׳•׳", icon: "Caravan", color: "#8B6F47", category: "road-transport" },
-  { id: "motorcycle", name: "׳׳•׳₪׳ ׳•׳¢", icon: "Motorbike", color: "#8B6F47", category: "road-transport" },
-  { id: "bicycle", name: "׳׳•׳₪׳ ׳™׳™׳", icon: "Bike", color: "#5B8C5A", category: "road-transport" },
-  { id: "scooter", name: "׳§׳•׳¨׳§׳™׳ ׳˜", icon: "Scooter", color: "#5B8C5A", category: "road-transport" },
+  { id: "car-rental", name: "השכרת רכב", icon: "KeySquare", color: "#8B6F47", category: "road-transport" },
+  { id: "caravan", name: "קראוון", icon: "Caravan", color: "#8B6F47", category: "road-transport" },
+  { id: "motorcycle", name: "אופנוע", icon: "Motorbike", color: "#8B6F47", category: "road-transport" },
+  { id: "bicycle", name: "אופניים", icon: "Bike", color: "#5B8C5A", category: "road-transport" },
+  { id: "scooter", name: "קורקינט", icon: "Scooter", color: "#5B8C5A", category: "road-transport" },
 
-  { id: "ferry", name: "׳׳¢׳‘׳•׳¨׳×", icon: "Ship", color: "#3E7CB1", category: "sea-transport" },
-  { id: "yacht", name: "׳™׳׳›׳˜׳”", icon: "Sailboat", color: "#2F7A8C", category: "sea-transport" },
-  { id: "ship", name: "׳׳•׳ ׳™׳”", icon: "ShipWheel", color: "#2F7A8C", category: "sea-transport" },
-  { id: "cruise", name: "׳©׳™׳™׳˜", icon: "Anchor", color: "#2F7A8C", category: "sea-transport" },
-  { id: "canoe", name: "׳§׳׳ ׳•", icon: "Kayak", color: "#2F7A8C", category: "sea-transport" },
+  { id: "ferry", name: "מעבורת", icon: "Ship", color: "#3E7CB1", category: "sea-transport" },
+  { id: "yacht", name: "יאכטה", icon: "Sailboat", color: "#2F7A8C", category: "sea-transport" },
+  { id: "ship", name: "אוניה", icon: "ShipWheel", color: "#2F7A8C", category: "sea-transport" },
+  { id: "cruise", name: "שייט", icon: "Anchor", color: "#2F7A8C", category: "sea-transport" },
+  { id: "canoe", name: "קאנו", icon: "Kayak", color: "#2F7A8C", category: "sea-transport" },
 
-  { id: "flight", name: "׳˜׳™׳¡׳” ׳‘׳™׳ ׳׳׳•׳׳™׳×", icon: "Plane", color: "#256D64", category: "air-transport" },
-  { id: "domestic-flight", name: "׳˜׳™׳¡׳× ׳₪׳ ׳™׳", icon: "PlaneTakeoff", color: "#3E7CB1", category: "air-transport" },
-  { id: "helicopter", name: "׳׳¡׳•׳§", icon: "Helicopter", color: "#256D64", category: "air-transport" },
+  { id: "flight", name: "טיסה בינלאומית", icon: "Plane", color: "#256D64", category: "air-transport" },
+  { id: "domestic-flight", name: "טיסת פנים", icon: "PlaneTakeoff", color: "#3E7CB1", category: "air-transport" },
+  { id: "helicopter", name: "מסוק", icon: "Helicopter", color: "#256D64", category: "air-transport" },
 
-  { id: "hotel", name: "׳׳׳•׳", icon: "BedDouble", color: "#D98E3F", category: "accommodation" },
-  { id: "hostel", name: "׳׳›׳¡׳ ׳™׳™׳”", icon: "Building2", color: "#D98E3F", category: "accommodation" },
-  { id: "apartment", name: "׳“׳™׳¨׳”", icon: "Home", color: "#D98E3F", category: "accommodation" },
+  { id: "hotel", name: "מלון", icon: "BedDouble", color: "#D98E3F", category: "accommodation" },
+  { id: "hostel", name: "אכסנייה", icon: "Building2", color: "#D98E3F", category: "accommodation" },
+  { id: "apartment", name: "דירה", icon: "Home", color: "#D98E3F", category: "accommodation" },
 
-  { id: "self-tour", name: "׳˜׳™׳•׳ ׳¢׳¦׳׳׳™", icon: "Footprints", color: "#5B8C5A", category: "activities" },
-  { id: "guided-tour", name: "׳˜׳™׳•׳ ׳׳•׳“׳¨׳", icon: "Users", color: "#5B8C5A", category: "activities" },
-  { id: "day-tour", name: "׳˜׳™׳•׳ ׳™׳•׳׳™", icon: "Sun", color: "#D9A23D", category: "activities" },
-  { id: "attraction", name: "׳׳˜׳¨׳§׳¦׳™׳”", icon: "Landmark", color: "#5B8C5A", category: "activities" },
+  { id: "self-tour", name: "טיול עצמאי", icon: "Footprints", color: "#5B8C5A", category: "activities" },
+  { id: "guided-tour", name: "טיול מודרך", icon: "Users", color: "#5B8C5A", category: "activities" },
+  { id: "day-tour", name: "טיול יומי", icon: "Sun", color: "#D9A23D", category: "activities" },
+  { id: "attraction", name: "אטרקציה", icon: "Landmark", color: "#5B8C5A", category: "activities" },
 ];
 const CATEGORY_ORDER = ["public-transport", "road-transport", "sea-transport", "air-transport", "accommodation", "activities", "other"];
 const CATEGORY_LABELS = {
-  he: { "public-transport": "׳×׳—׳‘׳•׳¨׳” ׳¦׳™׳‘׳•׳¨׳™׳×", "road-transport": "׳×׳—׳‘׳•׳¨׳” ׳›׳‘׳™׳©", "sea-transport": "׳×׳—׳‘׳•׳¨׳” ׳™׳׳™׳×", "air-transport": "׳×׳—׳‘׳•׳¨׳” ׳׳•׳•׳™׳¨׳™׳×", accommodation: "׳׳™׳ ׳”", activities: "׳₪׳¢׳™׳׳•׳™׳•׳×", other: "׳׳—׳¨" },
+  he: { "public-transport": "תחבורה ציבורית", "road-transport": "תחבורה כביש", "sea-transport": "תחבורה ימית", "air-transport": "תחבורה אווירית", accommodation: "לינה", activities: "פעילויות", other: "אחר" },
   en: { "public-transport": "Public Transport", "road-transport": "Road Transport", "sea-transport": "Sea Transport", "air-transport": "Air Transport", accommodation: "Accommodation", activities: "Activities", other: "Other" },
 };
 function groupTypesByCategory(types) {
@@ -84,88 +84,88 @@ const CUSTOM_COLOR_ROTATION = ["#7A5C9E", "#C1443A", "#3E7CB1", "#5B8C5A", "#8B6
 const TZ_HINT_TYPES = ["flight", "domestic-flight", "ferry"];
 
 const DEFAULT_COLUMNS = [
-  { key: "date", label_he: "׳×׳׳¨׳™׳", label_en: "Date", visible: false },
-  { key: "day", label_he: "׳™׳•׳", label_en: "Day", visible: false },
-  { key: "icon", label_he: "׳¡׳׳", label_en: "Icon", visible: true },
-  { key: "type", label_he: "׳×׳™׳׳•׳¨", label_en: "Description", visible: true },
-  { key: "from", label_he: "׳׳•׳¦׳", label_en: "Origin", visible: true },
-  { key: "to", label_he: "׳™׳¢׳“", label_en: "Destination", visible: true },
-  { key: "startTime", label_he: "׳‘׳©׳¢׳”", label_en: "At", visible: true },
-  { key: "duration", label_he: "׳׳©׳", label_en: "Dur.", visible: true },
-  { key: "endTime", label_he: "׳¢׳“ ׳©׳¢׳”", label_en: "Until", visible: true },
-  { key: "route", label_he: "׳׳¡׳׳•׳", label_en: "Route", visible: true },
-  { key: "link", label_he: "׳§׳™׳©׳•׳¨", label_en: "Link", visible: true },
-  { key: "cost", label_he: "׳¢׳׳•׳×", label_en: "Cost", visible: true },
-  { key: "notes", label_he: "׳”׳¢׳¨׳•׳×", label_en: "Notes", visible: true },
+  { key: "date", label_he: "תאריך", label_en: "Date", visible: false },
+  { key: "day", label_he: "יום", label_en: "Day", visible: false },
+  { key: "icon", label_he: "סמל", label_en: "Icon", visible: true },
+  { key: "type", label_he: "תיאור", label_en: "Description", visible: true },
+  { key: "from", label_he: "מוצא", label_en: "Origin", visible: true },
+  { key: "to", label_he: "יעד", label_en: "Destination", visible: true },
+  { key: "startTime", label_he: "בשעה", label_en: "At", visible: true },
+  { key: "duration", label_he: "משך", label_en: "Dur.", visible: true },
+  { key: "endTime", label_he: "עד שעה", label_en: "Until", visible: true },
+  { key: "route", label_he: "מסלול", label_en: "Route", visible: true },
+  { key: "link", label_he: "קישור", label_en: "Link", visible: true },
+  { key: "cost", label_he: "עלות", label_en: "Cost", visible: true },
+  { key: "notes", label_he: "הערות", label_en: "Notes", visible: true },
 ];
 
 const T_DICT = {
   he: {
-    appName: "MyTrip", addRow: "׳”׳•׳¡׳£ ׳¨׳©׳•׳׳”", addDay: "׳”׳•׳¡׳£ ׳™׳•׳", newFrame: "׳׳¡׳’׳¨׳× ׳—׳“׳©׳”",
-    columns: "׳¢׳׳•׳“׳•׳×", addColumn: "׳”׳•׳¡׳£ ׳¢׳׳•׳“׳”", addType: "׳”׳•׳¡׳£ ׳×׳™׳׳•׳¨", resetColumnWidths: "׳׳™׳₪׳•׳¡ ׳¨׳•׳—׳‘ ׳¢׳׳•׳“׳•׳× (׳’׳¨׳•׳¨ ׳׳× ׳§׳¦׳” ׳›׳•׳×׳¨׳× ׳”׳¢׳׳•׳“׳” ׳׳©׳™׳ ׳•׳™ ׳™׳“׳ ׳™)",
-    exportFile: "׳©׳׳•׳¨ ׳׳§׳•׳‘׳¥", importFile: "׳™׳™׳‘׳•׳ ׳׳§׳•׳‘׳¥", importSuccess: "׳”׳™׳™׳‘׳•׳ ׳”׳¦׳׳™׳—", importError: "׳”׳§׳•׳‘׳¥ ׳׳™׳ ׳• ׳×׳§׳™׳",
-    login: "׳”׳×׳—׳‘׳¨׳•׳× ׳¢׳ Google", logout: "׳™׳¦׳™׳׳”",
-    desktop: "׳׳—׳©׳‘", mobile: "׳¡׳׳•׳׳¨", lang: "English", editRecord: "׳›׳¨׳˜׳™׳¡ ׳¨׳©׳•׳׳”",
-    save: "׳©׳׳™׳¨׳”", cancel: "׳‘׳™׳˜׳•׳", delete: "׳׳—׳™׳§׳”", addSub: "׳”׳•׳¡׳£ ׳×׳×-׳¨׳©׳•׳׳”",
-    type: "׳¡׳•׳’", from: "׳׳•׳¦׳", to: "׳™׳¢׳“", start: "׳‘׳©׳¢׳”", end: "׳¢׳“ ׳©׳¢׳”", overnight: "׳—׳•׳¦׳” ׳—׳¦׳•׳×",
-    destination: "׳©׳ ׳”׳™׳¢׳“", link: "׳§׳™׳©׳•׳¨ ׳׳”׳–׳׳ ׳”", maplink: "׳§׳™׳©׳•׳¨ ׳׳׳™׳§׳•׳ / ׳׳¡׳׳•׳",
-    flightNo: "׳׳¡׳₪׳¨ ׳˜׳™׳¡׳”", cost: "׳¢׳׳•׳×", currency: "׳׳˜׳‘׳¢", notes: "׳”׳¢׳¨׳•׳×", frame: "׳׳¡׳’׳¨׳×",
-    noFrame: "׳׳׳ ׳׳¡׳’׳¨׳× (׳¨׳׳” ׳¢׳׳™׳•׳ ׳”)", selectType: "׳‘׳—׳¨...",
-    newType: "׳×׳™׳׳•׳¨ ׳—׳“׳©", typeName: "׳©׳ ׳×׳™׳׳•׳¨", add: "׳”׳•׳¡׳₪׳”",
-    totalPerCurrency: "׳¡׳”׳´׳› ׳˜׳™׳•׳", timeError: "׳©׳¢׳× ׳¡׳™׳•׳ ׳׳₪׳ ׳™ ׳©׳¢׳× ׳”׳”׳×׳—׳׳” ג€” ׳¡׳׳ \"׳—׳•׳¦׳” ׳—׳¦׳•׳×\" ׳׳ ׳׳“׳•׳‘׳¨ ׳‘׳׳™׳׳”",
-    noRows: "׳׳™׳ ׳¢׳“׳™׳™׳ ׳¨׳©׳•׳׳•׳× ׳›׳׳", dragHint: "׳’׳¨׳™׳¨׳” ׳׳©׳™׳ ׳•׳™ ׳¡׳“׳¨", mockNote: "*׳”׳“׳׳™׳™׳× ׳”׳×׳—׳‘׳¨׳•׳× ׳‘׳׳‘׳“ ׳‘׳₪׳¨׳•׳˜׳•׳˜׳™׳™׳₪",
-    frameModalNew: "׳׳¡׳’׳¨׳× ׳˜׳™׳•׳ ׳—׳“׳©׳”", frameModalEdit: "׳¢׳¨׳™׳›׳× ׳׳¡׳’׳¨׳×", frameName: "׳©׳ ׳”׳׳¡׳’׳¨׳×",
-    frameStart: "׳×׳׳¨׳™׳ ׳”׳×׳—׳׳”", frameEnd: "׳×׳׳¨׳™׳ ׳¡׳™׳•׳", parentFrame: "׳©׳™׳™׳›׳× ׳׳׳¡׳’׳¨׳×",
-    addSubFrame: "׳”׳•׳¡׳£ ׳׳¡׳’׳¨׳×-׳׳©׳ ׳”", suggestPrefix: "׳–׳•׳”׳•", suggestMid: "׳˜׳™׳¡׳•׳× ׳׳׳ ׳׳¡׳’׳¨׳×:",
-    fillDatesAbove: "׳”׳•׳¡׳£ ׳׳¡׳’׳¨׳× ׳׳¢׳ ׳”׳×׳׳¨׳™׳ ׳”׳§׳™׳™׳", fillDatesBelow: "׳”׳•׳¡׳£ ׳׳¡׳’׳¨׳× ׳׳×׳—׳× ׳׳×׳׳¨׳™׳ ׳”׳§׳™׳™׳",
-    suggestBtn: "׳¦׳•׳¨ ׳׳¡׳’׳¨׳× ׳˜׳™׳•׳ ׳׳•׳˜׳•׳׳˜׳™׳×", suggestDismiss: "׳”׳×׳¢׳׳",
-    fxApprox: "׳׳₪׳™ ׳©׳¢׳¨ ׳׳§׳•׳¨׳‘ (׳׳™׳ ׳—׳™׳‘׳•׳¨ ׳׳׳™׳ ׳˜׳¨׳ ׳˜)", fxLive: "׳׳₪׳™ ׳©׳¢׳¨ ׳¢׳“׳›׳ ׳™",
-    frameRangeInvalid: "׳×׳׳¨׳™׳ ׳”׳”׳×׳—׳׳” ׳—׳™׳™׳‘ ׳׳”׳™׳•׳× ׳׳₪׳ ׳™ ׳×׳׳¨׳™׳ ׳”׳¡׳™׳•׳",
-    frameRangeContent: "׳˜׳•׳•׳— ׳”׳×׳׳¨׳™׳›׳™׳ ׳—׳™׳™׳‘ ׳׳›׳׳•׳ ׳׳× ׳›׳ ׳”׳¨׳©׳•׳׳•׳×/׳×׳×-׳”׳׳¡׳’׳¨׳•׳× ׳©׳›׳‘׳¨ ׳§׳™׳™׳׳•׳× ׳‘׳׳¡׳’׳¨׳× ׳–׳•",
-    frameRangeParent: "׳˜׳•׳•׳— ׳”׳×׳׳¨׳™׳›׳™׳ ׳—׳™׳™׳‘ ׳׳”׳™׳•׳× ׳‘׳×׳•׳ ׳˜׳•׳•׳— ׳”׳׳¡׳’׳¨׳× ׳”׳׳›׳™׳׳”",
-    rowOutOfFrame: "׳”׳×׳׳¨׳™׳ ׳—׳™׳™׳‘ ׳׳”׳™׳•׳× ׳‘׳×׳•׳ ׳˜׳•׳•׳— ׳”׳׳¡׳’׳¨׳× ׳©׳׳׳™׳” ׳”׳¨׳©׳•׳׳” ׳׳©׳•׳™׳›׳×",
-    routeTooltip: "׳₪׳×׳— ׳׳¡׳׳•׳ ׳‘׳’׳•׳’׳ ׳׳₪׳•׳×", dayRoute: "׳׳¡׳׳•׳ ׳”׳™׳•׳", noRoute: "׳׳™׳ ׳׳¡׳₪׳™׳§ ׳ ׳×׳•׳ ׳™ ׳׳™׳§׳•׳",
-    fetchFlightData: "׳׳©׳•׳ ׳ ׳×׳•׳ ׳™׳ ׳׳₪׳™ ׳׳¡׳₪׳¨ ׳˜׳™׳¡׳”", flightApiMissing: "׳׳¦׳•׳¨׳ ׳׳©׳™׳›׳” ׳׳•׳˜׳•׳׳˜׳™׳× ׳™׳© ׳׳—׳‘׳¨ ׳¡׳₪׳§ ׳ ׳×׳•׳ ׳™ ׳˜׳™׳¡׳•׳× (׳›׳’׳•׳ AeroDataBox) ׳¢׳ ׳׳₪׳×׳— API ׳•׳₪׳¨׳•׳§׳¡׳™ ׳‘׳¦׳“ ׳”׳©׳¨׳×. ׳©׳“׳” ׳–׳” ׳׳•׳›׳ ׳׳—׳™׳‘׳•׳¨ ׳¢׳×׳™׳“׳™.",
-    chronoWarning: "׳¡׳“׳¨ ׳”׳¨׳©׳•׳׳•׳× ׳‘׳™׳•׳ ׳–׳” ׳׳™׳ ׳• ׳›׳¨׳•׳ ׳•׳׳•׳’׳™ ׳׳₪׳™ ׳©׳¢׳”", sortByTime: "׳׳™׳™׳ ׳׳₪׳™ ׳©׳¢׳”",
-    addDayModalTitle: "׳”׳•׳¡׳₪׳× ׳™׳•׳ ׳—׳“׳©", addDayDate: "׳×׳׳¨׳™׳", confirmAdd: "׳”׳•׳¡׳£",
-    verify: "׳׳׳× ׳׳•׳ ׳׳₪׳•׳×", verified: "׳׳׳•׳׳×", openMap: "׳₪׳×׳— ׳‘׳׳₪׳”", pickFromMap: "׳‘׳—׳¨ ׳׳”׳׳₪׳”",
-    fromAlias: "׳›׳™׳ ׳•׳™ ׳׳׳•׳¦׳", toAlias: "׳›׳™׳ ׳•׳™ ׳׳™׳¢׳“", aliasHint: "׳™׳•׳¦׳’ ׳‘׳¢׳׳•׳“׳” ׳‘׳׳§׳•׳ ׳”׳˜׳§׳¡׳˜ ׳”׳׳׳",
-    flightAliasPlaceholder: "׳׳“׳•׳’׳׳”: ׳×׳ ׳׳‘׳™׳‘ (TLV)", copyPrevDest: "׳”׳¢׳×׳§ ׳™׳¢׳“ ׳׳©׳•׳¨׳” ׳§׳•׳“׳׳×",
-    km: "׳§\"׳", min: "׳“׳§'", calculatingDistance: "׳׳—׳©׳‘ ׳׳¨׳—׳§...",
-    weatherAtArrival: "׳׳–׳’ ׳׳•׳•׳™׳¨ ׳‘׳™׳¢׳“", weatherLoading: "׳‘׳•׳“׳§ ׳׳–׳’ ׳׳•׳•׳™׳¨...", weatherUnavailable: "׳×׳—׳–׳™׳× ׳׳ ׳–׳׳™׳ ׳” (׳׳¢׳‘׳¨ ׳-16 ׳™׳•׳ ׳§׳“׳™׳׳”, ׳׳• ׳©׳”׳׳™׳§׳•׳ ׳׳ ׳–׳•׳”׳”)",
-    exportPdf: "׳™׳™׳¦׳•׳ PDF (׳”׳“׳₪׳¡׳”)", reminders: "׳×׳–׳›׳•׳¨׳•׳×", reminderIn: "׳‘׳¢׳•׳“ ׳›-{min} ׳“׳§׳•׳×",
-    share: "׳©׳™׳×׳•׳£", shareExportHtml: "׳™׳™׳¦׳•׳ ׳›׳“׳£ ׳©׳™׳×׳•׳£ (HTML)", shareExportHtmlHint: "׳§׳•׳‘׳¥ ׳¢׳¦׳׳׳™ ׳׳¦׳₪׳™׳™׳” ג€” ׳׳₪׳©׳¨ ׳׳©׳׳•׳— ׳׳›׳ ׳׳—׳“, ׳’׳ ׳‘׳׳™ ׳’׳™׳©׳” ׳׳׳×׳¨",
-    shareWithUser: "׳©׳×׳£ ׳¢׳ ׳׳©׳×׳׳© ׳‘׳׳¢׳¨׳›׳× (׳‘׳§׳¨׳•׳‘)", shareEditAccess: "׳©׳™׳×׳•׳£ ׳¢׳¨׳™׳›׳” ׳¢׳ ׳©׳•׳×׳₪׳™ ׳˜׳™׳•׳ (׳‘׳§׳¨׳•׳‘)",
-    demoNeedsAccounts: "׳”׳×׳›׳•׳ ׳” ׳”׳–׳• ׳“׳•׳¨׳©׳× ׳׳¢׳¨׳›׳× ׳׳©׳×׳׳©׳™׳ ׳•׳”׳¨׳©׳׳•׳× (׳—׳™׳‘׳•׳¨ ׳-DB), ׳¢׳“׳™׳™׳ ׳׳ ׳§׳™׳™׳׳× ׳‘׳₪׳¨׳•׳˜׳•׳˜׳™׳™׳₪. ׳–׳• ׳”׳¦׳’׳” ׳‘׳׳‘׳“ ׳©׳ ׳׳™׳ ׳–׳” ׳™׳™׳¨׳׳”.",
-    tryGooglePlaces: "׳—׳₪׳© ׳¢׳ Google Places (׳”׳“׳’׳׳”)", demoNeedsGoogleKey: "׳×׳•׳¦׳׳•׳× ׳׳“׳•׳™׳§׳•׳× ׳•׳¢׳©׳™׳¨׳•׳× ׳™׳•׳×׳¨ (׳›׳•׳׳ ׳¢׳‘׳¨׳™׳× ׳˜׳•׳‘׳” ׳‘׳”׳¨׳‘׳”) ׳׳₪׳©׳¨׳™׳•׳× ׳¢׳ Google Places API ג€” ׳“׳•׳¨׳© ׳׳₪׳×׳— API ׳•׳—׳™׳•׳‘ ׳‘׳¢׳ ׳ ׳©׳ ׳’׳•׳’׳. ׳–׳• ׳”׳¦׳’׳” ׳‘׳׳‘׳“; ׳”׳—׳™׳₪׳•׳© ׳”׳₪׳¢׳™׳ ׳›׳¨׳’׳¢ ׳׳©׳×׳׳© ׳‘-OpenStreetMap ׳”׳—׳™׳ ׳׳™.",
-    uploadFile: "׳”׳¢׳׳” ׳§׳•׳‘׳¥ (׳›׳¨׳˜׳™׳¡ ׳˜׳™׳¡׳”, ׳©׳•׳‘׳¨ ׳”׳–׳׳ ׳”...) ג€” ׳”׳“׳’׳׳”", demoNeedsStorage: "׳”׳¢׳׳׳× ׳§׳‘׳¦׳™׳ ׳“׳•׳¨׳©׳× ׳©׳™׳¨׳•׳× ׳׳—׳¡׳•׳ (׳›׳׳• Supabase Storage ׳׳• S3), ׳¢׳“׳™׳™׳ ׳׳ ׳׳—׳•׳‘׳¨ ׳‘׳₪׳¨׳•׳˜׳•׳˜׳™׳™׳₪. ׳–׳• ׳”׳¦׳’׳” ׳‘׳׳‘׳“.",
-    aiDemoNotice: "׳–׳• ׳”׳“׳’׳׳× ׳׳׳©׳§ ׳‘׳׳‘׳“. ׳—׳™׳‘׳•׳¨ ׳׳׳™׳×׳™ ׳-Claude ׳“׳•׳¨׳© ׳©׳¨׳×/׳₪׳•׳ ׳§׳¦׳™׳” ׳‘׳¦׳“ ׳”׳©׳¨׳× (׳׳ ׳ ׳™׳×׳ ׳׳—׳©׳•׳£ ׳׳₪׳×׳— API ׳‘׳¦׳“ ׳”׳׳§׳•׳—).",
-    aiSuggestItinerary: "׳”׳¦׳¢ ׳׳¡׳׳•׳ ׳™׳•׳׳™ ׳׳•׳˜׳•׳׳˜׳™", aiInputPlaceholder: "׳©׳׳ ׳©׳׳׳” ׳¢׳ ׳”׳˜׳™׳•׳...",
-    aiSuggestDemoText: "׳“׳•׳’׳׳” ׳׳”׳¦׳¢׳” (׳”׳“׳’׳׳”): ׳™׳•׳ 2 ג€” ׳‘׳•׳§׳¨: ׳‘׳™׳§׳•׳¨ ׳‘׳§׳•׳׳•׳¡׳™׳׳•׳ (09:00), ׳¦׳”׳¨׳™׳™׳: ׳׳¨׳•׳—׳” ׳‘׳˜׳¨׳¡׳˜׳‘׳¨, ׳׳—׳”׳´׳¦: ׳׳–׳¨׳§׳× ׳˜׳¨׳•׳•׳™ ׳•׳₪׳ ׳×׳™׳׳•׳. ׳׳—׳™׳‘׳•׳¨ ׳׳׳™׳×׳™ ׳ ׳“׳¨׳© ׳©׳¨׳× ׳©׳׳₪׳¢׳™׳ ׳׳× Claude API.",
-    aiChatDemoText: "׳–׳• ׳×׳’׳•׳‘׳× ׳”׳“׳’׳׳” ׳‘׳׳‘׳“. ׳‘׳’׳¨׳¡׳” ׳׳—׳•׳‘׳¨׳×, ׳”׳©׳׳׳” ׳”׳–׳• ׳”׳™׳™׳×׳” ׳ ׳©׳׳—׳× ׳-Claude ׳™׳—׳“ ׳¢׳ ׳ ׳×׳•׳ ׳™ ׳”׳˜׳™׳•׳ ׳©׳׳ ׳•׳׳§׳‘׳׳× ׳×׳©׳•׳‘׳” ׳׳‘׳•׳¡׳¡׳×.",
-    aiAssistant: "׳¢׳•׳–׳¨ AI (׳”׳“׳’׳׳”)", ok: "׳”׳‘׳ ׳×׳™",
-    locHint: "׳˜׳™׳₪: ׳׳ ׳”׳—׳™׳₪׳•׳© ׳׳ ׳׳•׳¦׳ ׳×׳•׳¦׳׳” ׳‘׳¢׳‘׳¨׳™׳×, ׳ ׳¡׳” ׳׳—׳₪׳© ׳‘׳©׳ ׳”׳׳§׳•׳׳™/׳׳ ׳’׳׳™ (׳׳׳©׳ \"Fiumicino Airport\" ׳•׳׳ \"׳₪׳™׳•׳׳™׳¦׳³׳™׳ ׳•\").",
-    tabSearch: "׳—׳™׳₪׳•׳© ׳˜׳§׳¡׳˜", tabMap: "׳‘׳—׳™׳¨׳” ׳‘׳׳₪׳”", mapPickHint: "׳׳—׳¥ ׳‘׳׳§׳•׳ ׳”׳¨׳¦׳•׳™ ׳¢׳ ׳”׳׳₪׳” ׳›׳“׳™ ׳׳¡׳׳ ׳׳•׳×׳•",
-    mapResolving: "׳׳–׳”׳” ׳›׳×׳•׳‘׳×...", mapNoName: "׳׳ ׳ ׳׳¦׳׳” ׳›׳×׳•׳‘׳× ׳׳“׳•׳™׳§׳× ׳׳ ׳§׳•׳“׳” ׳–׳• ג€” ׳ ׳™׳×׳ ׳¢׳“׳™׳™׳ ׳׳‘׳—׳•׳¨ ׳׳₪׳™ ׳”׳§׳•׳׳•׳¨׳“׳™׳ ׳˜׳•׳×",
-    confirmLocation: "׳׳©׳¨ ׳׳™׳§׳•׳ ׳–׳”",
-    locPickerTitle: "׳—׳™׳₪׳•׳© ׳׳™׳§׳•׳", locSearch: "׳—׳₪׳©", locSearching: "׳׳—׳₪׳©...", locNoResults: "׳׳ ׳ ׳׳¦׳׳• ׳×׳•׳¦׳׳•׳×",
-    locError: "׳”׳—׳™׳₪׳•׳© ׳ ׳›׳©׳ (׳‘׳¢׳™׳™׳× ׳¨׳©׳×/CORS ׳׳•׳ ׳©׳™׳¨׳•׳× ׳”׳׳™׳§׳•׳׳™׳). ׳׳₪׳©׳¨ ׳׳₪׳×׳•׳— ׳—׳™׳₪׳•׳© ׳™׳“׳ ׳™ ׳‘׳’׳•׳’׳ ׳׳₪׳•׳× ׳‘׳׳§׳•׳:",
-    openInGoogleSearch: "׳₪׳×׳— ׳—׳™׳₪׳•׳© ׳‘׳’׳•׳’׳ ׳׳₪׳•׳×",
-    flightPlaceholder: "׳¢׳™׳¨ (׳§׳•׳“ ׳©׳“׳” ׳×׳¢׳•׳₪׳”, ׳׳׳©׳ TLV)", tzNote: "׳”׳×׳׳׳× ׳©׳¢׳•׳ ׳׳•׳˜׳•׳׳˜׳™׳× ׳׳₪׳™ ׳׳–׳•׳¨׳™ ׳–׳׳ ׳“׳•׳¨׳©׳× ׳—׳™׳‘׳•׳¨ ׳-API ׳׳¡׳—׳¨׳™ (׳›׳’׳•׳ Google Time Zone) ׳¢׳ ׳׳₪׳×׳— ג€” ׳׳ ׳׳™׳•׳©׳׳× ׳‘׳₪׳¨׳•׳˜׳•׳˜׳™׳™׳₪. ׳™׳© ׳׳•׳•׳“׳ ׳™׳“׳ ׳™׳× ׳©׳”׳©׳¢׳•׳× ׳׳•׳–׳ ׳•׳× ׳׳₪׳™ ׳”׳©׳¢׳•׳ ׳”׳׳§׳•׳׳™ ׳‘׳›׳ ׳׳™׳§׳•׳.",
+    appName: "MyTrip", addRow: "הוסף רשומה", addDay: "הוסף יום", newFrame: "מסגרת חדשה",
+    columns: "עמודות", addColumn: "הוסף עמודה", addType: "הוסף תיאור", resetColumnWidths: "איפוס רוחב עמודות (גרור את קצה כותרת העמודה לשינוי ידני)",
+    exportFile: "שמור לקובץ", importFile: "ייבוא מקובץ", importSuccess: "הייבוא הצליח", importError: "הקובץ אינו תקין",
+    login: "התחברות עם Google", logout: "יציאה",
+    desktop: "מחשב", mobile: "סלולר", lang: "English", editRecord: "כרטיס רשומה",
+    save: "שמירה", cancel: "ביטול", delete: "מחיקה", addSub: "הוסף תת-רשומה",
+    type: "סוג", from: "מוצא", to: "יעד", start: "בשעה", end: "עד שעה", overnight: "חוצה חצות",
+    destination: "שם היעד", link: "קישור להזמנה", maplink: "קישור למיקום / מסלול",
+    flightNo: "מספר טיסה", cost: "עלות", currency: "מטבע", notes: "הערות", frame: "מסגרת",
+    noFrame: "ללא מסגרת (רמה עליונה)", selectType: "בחר...",
+    newType: "תיאור חדש", typeName: "שם תיאור", add: "הוספה",
+    totalPerCurrency: "סה״כ טיול", timeError: "שעת סיום לפני שעת ההתחלה — סמן \"חוצה חצות\" אם מדובר בלילה",
+    noRows: "אין עדיין רשומות כאן", dragHint: "גרירה לשינוי סדר", mockNote: "*הדמיית התחברות בלבד בפרוטוטייפ",
+    frameModalNew: "מסגרת טיול חדשה", frameModalEdit: "עריכת מסגרת", frameName: "שם המסגרת",
+    frameStart: "תאריך התחלה", frameEnd: "תאריך סיום", parentFrame: "שייכת למסגרת",
+    addSubFrame: "הוסף מסגרת-משנה", suggestPrefix: "זוהו", suggestMid: "טיסות ללא מסגרת:",
+    fillDatesAbove: "הוסף מסגרת מעל התאריך הקיים", fillDatesBelow: "הוסף מסגרת מתחת לתאריך הקיים",
+    suggestBtn: "צור מסגרת טיול אוטומטית", suggestDismiss: "התעלם",
+    fxApprox: "לפי שער מקורב (אין חיבור לאינטרנט)", fxLive: "לפי שער עדכני",
+    frameRangeInvalid: "תאריך ההתחלה חייב להיות לפני תאריך הסיום",
+    frameRangeContent: "טווח התאריכים חייב לכלול את כל הרשומות/תת-המסגרות שכבר קיימות במסגרת זו",
+    frameRangeParent: "טווח התאריכים חייב להיות בתוך טווח המסגרת המכילה",
+    rowOutOfFrame: "התאריך חייב להיות בתוך טווח המסגרת שאליה הרשומה משויכת",
+    routeTooltip: "פתח מסלול בגוגל מפות", dayRoute: "מסלול היום", noRoute: "אין מספיק נתוני מיקום",
+    fetchFlightData: "משוך נתונים לפי מספר טיסה", flightApiMissing: "לצורך משיכה אוטומטית יש לחבר ספק נתוני טיסות (כגון AeroDataBox) עם מפתח API ופרוקסי בצד השרת. שדה זה מוכן לחיבור עתידי.",
+    chronoWarning: "סדר הרשומות ביום זה אינו כרונולוגי לפי שעה", sortByTime: "מיין לפי שעה",
+    addDayModalTitle: "הוספת יום חדש", addDayDate: "תאריך", confirmAdd: "הוסף",
+    verify: "אמת מול מפות", verified: "מאומת", openMap: "פתח במפה", pickFromMap: "בחר מהמפה",
+    fromAlias: "כינוי למוצא", toAlias: "כינוי ליעד", aliasHint: "יוצג בעמודה במקום הטקסט המלא",
+    flightAliasPlaceholder: "לדוגמה: תל אביב (TLV)", copyPrevDest: "העתק יעד משורה קודמת",
+    km: "ק\"מ", min: "דק'", calculatingDistance: "מחשב מרחק...",
+    weatherAtArrival: "מזג אוויר ביעד", weatherLoading: "בודק מזג אוויר...", weatherUnavailable: "תחזית לא זמינה (מעבר ל-16 יום קדימה, או שהמיקום לא זוהה)",
+    exportPdf: "ייצוא PDF (הדפסה)", reminders: "תזכורות", reminderIn: "בעוד כ-{min} דקות",
+    share: "שיתוף", shareExportHtml: "ייצוא כדף שיתוף (HTML)", shareExportHtmlHint: "קובץ עצמאי לצפייה — אפשר לשלוח לכל אחד, גם בלי גישה לאתר",
+    shareWithUser: "שתף עם משתמש במערכת (בקרוב)", shareEditAccess: "שיתוף עריכה עם שותפי טיול (בקרוב)",
+    demoNeedsAccounts: "התכונה הזו דורשת מערכת משתמשים והרשאות (חיבור ל-DB), עדיין לא קיימת בפרוטוטייפ. זו הצגה בלבד של איך זה ייראה.",
+    tryGooglePlaces: "חפש עם Google Places (הדגמה)", demoNeedsGoogleKey: "תוצאות מדויקות ועשירות יותר (כולל עברית טובה בהרבה) אפשריות עם Google Places API — דורש מפתח API וחיוב בענן של גוגל. זו הצגה בלבד; החיפוש הפעיל כרגע משתמש ב-OpenStreetMap החינמי.",
+    uploadFile: "העלה קובץ (כרטיס טיסה, שובר הזמנה...) — הדגמה", demoNeedsStorage: "העלאת קבצים דורשת שירות אחסון (כמו Supabase Storage או S3), עדיין לא מחובר בפרוטוטייפ. זו הצגה בלבד.",
+    aiDemoNotice: "זו הדגמת ממשק בלבד. חיבור אמיתי ל-Claude דורש שרת/פונקציה בצד השרת (לא ניתן לחשוף מפתח API בצד הלקוח).",
+    aiSuggestItinerary: "הצע מסלול יומי אוטומטי", aiInputPlaceholder: "שאל שאלה על הטיול...",
+    aiSuggestDemoText: "דוגמה להצעה (הדגמה): יום 2 — בוקר: ביקור בקולוסיאום (09:00), צהריים: ארוחה בטרסטבר, אחה״צ: מזרקת טרווי ופנתיאון. לחיבור אמיתי נדרש שרת שמפעיל את Claude API.",
+    aiChatDemoText: "זו תגובת הדגמה בלבד. בגרסה מחוברת, השאלה הזו הייתה נשלחת ל-Claude יחד עם נתוני הטיול שלך ומקבלת תשובה מבוססת.",
+    aiAssistant: "עוזר AI (הדגמה)", ok: "הבנתי",
+    locHint: "טיפ: אם החיפוש לא מוצא תוצאה בעברית, נסה לחפש בשם המקומי/אנגלי (למשל \"Fiumicino Airport\" ולא \"פיומיצ׳ינו\").",
+    tabSearch: "חיפוש טקסט", tabMap: "בחירה במפה", mapPickHint: "לחץ במקום הרצוי על המפה כדי לסמן אותו",
+    mapResolving: "מזהה כתובת...", mapNoName: "לא נמצאה כתובת מדויקת לנקודה זו — ניתן עדיין לבחור לפי הקואורדינטות",
+    confirmLocation: "אשר מיקום זה",
+    locPickerTitle: "חיפוש מיקום", locSearch: "חפש", locSearching: "מחפש...", locNoResults: "לא נמצאו תוצאות",
+    locError: "החיפוש נכשל (בעיית רשת/CORS מול שירות המיקומים). אפשר לפתוח חיפוש ידני בגוגל מפות במקום:",
+    openInGoogleSearch: "פתח חיפוש בגוגל מפות",
+    flightPlaceholder: "עיר (קוד שדה תעופה, למשל TLV)", tzNote: "התאמת שעון אוטומטית לפי אזורי זמן דורשת חיבור ל-API מסחרי (כגון Google Time Zone) עם מפתח — לא מיושמת בפרוטוטייפ. יש לוודא ידנית שהשעות מוזנות לפי השעון המקומי בכל מיקום.",
   },
   en: {
     appName: "MyTrip", addRow: "Add record", addDay: "Add day", newFrame: "New frame",
     columns: "Columns", addColumn: "Add column", addType: "Add description", resetColumnWidths: "Reset column widths (drag a header's edge to resize manually)",
     exportFile: "Save to file", importFile: "Import from file", importSuccess: "Import successful", importError: "This file isn't valid",
     login: "Sign in with Google", logout: "Sign out",
-    desktop: "Desktop", mobile: "Mobile", lang: "׳¢׳‘׳¨׳™׳×", editRecord: "Record card",
+    desktop: "Desktop", mobile: "Mobile", lang: "עברית", editRecord: "Record card",
     save: "Save", cancel: "Cancel", delete: "Delete", addSub: "Add sub-record",
     type: "Type", from: "Origin", to: "Destination", start: "At", end: "Until", overnight: "Crosses midnight",
     destination: "Venue", link: "Booking link", maplink: "Map / route link",
     flightNo: "Flight number", cost: "Cost", currency: "Currency", notes: "Notes", frame: "Frame",
     noFrame: "No frame (top level)", selectType: "Select...",
     newType: "New description", typeName: "Description name", add: "Add",
-    totalPerCurrency: "Trip total", timeError: "End time is before start time ג€” check \"crosses midnight\" for overnight legs",
+    totalPerCurrency: "Trip total", timeError: "End time is before start time — check \"crosses midnight\" for overnight legs",
     noRows: "No records here yet", dragHint: "Drag to reorder", mockNote: "*Sign-in is a prototype mock only",
     frameModalNew: "New trip frame", frameModalEdit: "Edit frame", frameName: "Frame name",
     frameStart: "Start date", frameEnd: "End date", parentFrame: "Belongs to frame",
@@ -187,24 +187,24 @@ const T_DICT = {
     km: "km", min: "min", calculatingDistance: "Calculating distance...",
     weatherAtArrival: "Weather at destination", weatherLoading: "Checking weather...", weatherUnavailable: "Forecast unavailable (beyond 16 days out, or location unresolved)",
     exportPdf: "Export PDF (print)", reminders: "Reminders", reminderIn: "in about {min} minutes",
-    share: "Share", shareExportHtml: "Export as a share page (HTML)", shareExportHtmlHint: "Standalone file to view ג€” send to anyone, even without site access",
+    share: "Share", shareExportHtml: "Export as a share page (HTML)", shareExportHtmlHint: "Standalone file to view — send to anyone, even without site access",
     shareWithUser: "Share with a system user (coming soon)", shareEditAccess: "Share edit access with trip partners (coming soon)",
     demoNeedsAccounts: "This feature needs a user/permission system (a database connection) that doesn't exist in the prototype yet. This is just a preview of how it will look.",
-    tryGooglePlaces: "Search with Google Places (preview)", demoNeedsGoogleKey: "Richer, more accurate results (including much better Hebrew support) are possible with the Google Places API ג€” needs an API key and billing on Google Cloud. This is a preview only; the active search currently uses free OpenStreetMap data.",
-    uploadFile: "Upload a file (boarding pass, booking voucher...) ג€” preview", demoNeedsStorage: "File uploads need a storage service (like Supabase Storage or S3), not yet connected in the prototype. This is a preview only.",
+    tryGooglePlaces: "Search with Google Places (preview)", demoNeedsGoogleKey: "Richer, more accurate results (including much better Hebrew support) are possible with the Google Places API — needs an API key and billing on Google Cloud. This is a preview only; the active search currently uses free OpenStreetMap data.",
+    uploadFile: "Upload a file (boarding pass, booking voucher...) — preview", demoNeedsStorage: "File uploads need a storage service (like Supabase Storage or S3), not yet connected in the prototype. This is a preview only.",
     aiDemoNotice: "This is a UI preview only. A real Claude connection needs a server-side function (an API key can't be exposed client-side).",
     aiSuggestItinerary: "Suggest an automatic day plan", aiInputPlaceholder: "Ask a question about the trip...",
-    aiSuggestDemoText: "Example suggestion (demo): Day 2 ג€” Morning: visit the Colosseum (9:00), Lunch in Trastevere, Afternoon: Trevi Fountain and the Pantheon. A real connection needs a server running the Claude API.",
+    aiSuggestDemoText: "Example suggestion (demo): Day 2 — Morning: visit the Colosseum (9:00), Lunch in Trastevere, Afternoon: Trevi Fountain and the Pantheon. A real connection needs a server running the Claude API.",
     aiChatDemoText: "This is a demo reply only. In a connected version, this question would be sent to Claude along with your trip data and get a grounded answer.",
     aiAssistant: "AI Assistant (preview)", ok: "Got it",
     locHint: "Tip: if the search finds nothing in Hebrew, try the local/English name instead (e.g. \"Fiumicino Airport\").",
     tabSearch: "Text search", tabMap: "Pick on map", mapPickHint: "Click anywhere on the map to mark it",
-    mapResolving: "Resolving address...", mapNoName: "No exact address found for this point ג€” you can still pick it by coordinates",
+    mapResolving: "Resolving address...", mapNoName: "No exact address found for this point — you can still pick it by coordinates",
     confirmLocation: "Confirm this location",
     locPickerTitle: "Location search", locSearch: "Search", locSearching: "Searching...", locNoResults: "No results found",
     locError: "Search failed (network/CORS issue reaching the location service). You can open a manual Google Maps search instead:",
     openInGoogleSearch: "Open Google Maps search",
-    flightPlaceholder: "City (airport code, e.g. TLV)", tzNote: "Automatic time-zone adjustment needs a commercial API (e.g. Google Time Zone) with a key ג€” not implemented in this prototype. Please double-check that times are entered in each location's local time.",
+    flightPlaceholder: "City (airport code, e.g. TLV)", tzNote: "Automatic time-zone adjustment needs a commercial API (e.g. Google Time Zone) with a key — not implemented in this prototype. Please double-check that times are entered in each location's local time.",
   }
 };
 
@@ -212,12 +212,12 @@ const T_DICT = {
 function getTypeHint() { return ""; }
 
 function uid() { return Math.random().toString(36).slice(2, 10); }
-function heDay(dateStr, lang) { if (!dateStr) return "ג€”"; const d = new Date(dateStr + "T00:00:00"); if (isNaN(d)) return "ג€”"; return lang === "he" ? HE_DAYS[d.getDay()] : EN_DAYS[d.getDay()]; }
-function fmtDate(dateStr, lang) { if (!dateStr) return "ג€”"; const d = new Date(dateStr + "T00:00:00"); if (isNaN(d)) return dateStr; const dd = String(d.getDate()).padStart(2, "0"); const mm = String(d.getMonth() + 1).padStart(2, "0"); return `${dd}/${mm}/${d.getFullYear()}`; }
+function heDay(dateStr, lang) { if (!dateStr) return "—"; const d = new Date(dateStr + "T00:00:00"); if (isNaN(d)) return "—"; return lang === "he" ? HE_DAYS[d.getDay()] : EN_DAYS[d.getDay()]; }
+function fmtDate(dateStr, lang) { if (!dateStr) return "—"; const d = new Date(dateStr + "T00:00:00"); if (isNaN(d)) return dateStr; const dd = String(d.getDate()).padStart(2, "0"); const mm = String(d.getMonth() + 1).padStart(2, "0"); return `${dd}/${mm}/${d.getFullYear()}`; }
 function computeDuration(start, end, overnight) {
-  if (!start || !end) return "ג€”";
+  if (!start || !end) return "—";
   const [sh, sm] = start.split(":").map(Number); const [eh, em] = end.split(":").map(Number);
-  if ([sh, sm, eh, em].some((n) => Number.isNaN(n))) return "ג€”";
+  if ([sh, sm, eh, em].some((n) => Number.isNaN(n))) return "—";
   let mins = (eh * 60 + em) - (sh * 60 + sm);
   if (overnight && mins < 0) mins += 24 * 60;
   if (mins < 0) return null;
@@ -233,7 +233,7 @@ function detectTextAlign(text) {
   return undefined;
 }
 function typeMeta(typeId, types, T) {
-  if (!typeId || typeId === "unset") return { id: "unset", name: (T && T.selectType) || "׳‘׳—׳¨...", icon: "Tag", color: "#C1443A" };
+  if (!typeId || typeId === "unset") return { id: "unset", name: (T && T.selectType) || "בחר...", icon: "Tag", color: "#C1443A" };
   return types.find((t) => t.id === typeId) || types[0];
 }
 function childFramesPure(frames, pid) { return frames.filter((f) => f.parentFrameId === pid).sort((a, b) => (a.startDate || "").localeCompare(b.startDate || "")); }
@@ -313,20 +313,20 @@ function fetchDrivingRoute(a, b) {
     });
 }
 
-/* Weather ג€” Open-Meteo (free, no API key). Forecast only covers ~16 days ahead. */
+/* Weather — Open-Meteo (free, no API key). Forecast only covers ~16 days ahead. */
 const WMO_ICON_MAP = {
-  0: { icon: "Sun", he: "׳‘׳”׳™׳¨", en: "Clear" },
-  1: { icon: "CloudSun", he: "׳‘׳”׳™׳¨ ׳‘׳¢׳™׳§׳¨׳•", en: "Mostly clear" },
-  2: { icon: "CloudSun", he: "׳׳¢׳•׳ ׳ ׳—׳׳§׳™׳×", en: "Partly cloudy" },
-  3: { icon: "Cloud", he: "׳׳¢׳•׳ ׳", en: "Overcast" },
-  45: { icon: "CloudFog", he: "׳¢׳¨׳₪׳", en: "Fog" }, 48: { icon: "CloudFog", he: "׳¢׳¨׳₪׳ ׳§׳₪׳•׳", en: "Fog" },
-  51: { icon: "CloudRain", he: "׳˜׳₪׳˜׳•׳£ ׳§׳", en: "Light drizzle" }, 53: { icon: "CloudRain", he: "׳˜׳₪׳˜׳•׳£", en: "Drizzle" }, 55: { icon: "CloudRain", he: "׳˜׳₪׳˜׳•׳£ ׳›׳‘׳“", en: "Heavy drizzle" },
-  61: { icon: "CloudRain", he: "׳’׳©׳ ׳§׳", en: "Light rain" }, 63: { icon: "CloudRain", he: "׳’׳©׳", en: "Rain" }, 65: { icon: "CloudRain", he: "׳’׳©׳ ׳›׳‘׳“", en: "Heavy rain" },
-  71: { icon: "CloudSnow", he: "׳©׳׳’ ׳§׳", en: "Light snow" }, 73: { icon: "CloudSnow", he: "׳©׳׳’", en: "Snow" }, 75: { icon: "CloudSnow", he: "׳©׳׳’ ׳›׳‘׳“", en: "Heavy snow" },
-  80: { icon: "CloudRain", he: "׳׳׳˜׳¨׳™׳", en: "Showers" }, 81: { icon: "CloudRain", he: "׳׳׳˜׳¨׳™׳", en: "Showers" }, 82: { icon: "CloudRain", he: "׳׳׳˜׳¨׳™׳ ׳¢׳–׳™׳", en: "Violent showers" },
-  95: { icon: "CloudLightning", he: "׳¡׳•׳₪׳× ׳¨׳¢׳׳™׳", en: "Thunderstorm" }, 96: { icon: "CloudLightning", he: "׳¡׳•׳₪׳× ׳¨׳¢׳׳™׳", en: "Thunderstorm" }, 99: { icon: "CloudLightning", he: "׳¡׳•׳₪׳× ׳¨׳¢׳׳™׳", en: "Thunderstorm" },
+  0: { icon: "Sun", he: "בהיר", en: "Clear" },
+  1: { icon: "CloudSun", he: "בהיר בעיקרו", en: "Mostly clear" },
+  2: { icon: "CloudSun", he: "מעונן חלקית", en: "Partly cloudy" },
+  3: { icon: "Cloud", he: "מעונן", en: "Overcast" },
+  45: { icon: "CloudFog", he: "ערפל", en: "Fog" }, 48: { icon: "CloudFog", he: "ערפל קפוא", en: "Fog" },
+  51: { icon: "CloudRain", he: "טפטוף קל", en: "Light drizzle" }, 53: { icon: "CloudRain", he: "טפטוף", en: "Drizzle" }, 55: { icon: "CloudRain", he: "טפטוף כבד", en: "Heavy drizzle" },
+  61: { icon: "CloudRain", he: "גשם קל", en: "Light rain" }, 63: { icon: "CloudRain", he: "גשם", en: "Rain" }, 65: { icon: "CloudRain", he: "גשם כבד", en: "Heavy rain" },
+  71: { icon: "CloudSnow", he: "שלג קל", en: "Light snow" }, 73: { icon: "CloudSnow", he: "שלג", en: "Snow" }, 75: { icon: "CloudSnow", he: "שלג כבד", en: "Heavy snow" },
+  80: { icon: "CloudRain", he: "ממטרים", en: "Showers" }, 81: { icon: "CloudRain", he: "ממטרים", en: "Showers" }, 82: { icon: "CloudRain", he: "ממטרים עזים", en: "Violent showers" },
+  95: { icon: "CloudLightning", he: "סופת רעמים", en: "Thunderstorm" }, 96: { icon: "CloudLightning", he: "סופת רעמים", en: "Thunderstorm" }, 99: { icon: "CloudLightning", he: "סופת רעמים", en: "Thunderstorm" },
 };
-function weatherMeta(code) { return WMO_ICON_MAP[code] || { icon: "Cloud", he: "׳׳ ׳™׳“׳•׳¢", en: "Unknown" }; }
+function weatherMeta(code) { return WMO_ICON_MAP[code] || { icon: "Cloud", he: "לא ידוע", en: "Unknown" }; }
 const WEATHER_ICONS = { Sun, CloudSun, Cloud, CloudFog, CloudRain, CloudSnow, CloudLightning };
 function fetchWeather(lat, lon, dateStr) {
   return fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=auto&start_date=${dateStr}&end_date=${dateStr}`)
@@ -364,14 +364,14 @@ function isChronological(rowsList) {
 }
 function initialRows() {
   const base = [
-    { date: "2026-09-10", typeId: "flight", from: "Ben Gurion Airport", to: "Aeroporto di Roma - Fiumicino Leonardo da Vinci", fromAlias: "׳×׳ ׳׳‘׳™׳‘ (TLV)", toAlias: "׳¨׳•׳׳ (FCO)", startTime: "07:40", endTime: "10:35", link: "https://www.google.com/flights", costAmount: 1450, costCurrency: "ג‚×", flightNumber: "LY386" },
-    { date: "2026-09-10", typeId: "taxi", from: "Aeroporto di Roma - Fiumicino Leonardo da Vinci", to: "Hilton Garden Inn Rome Airport", startTime: "11:15", endTime: "12:00", costAmount: 45, costCurrency: "ג‚¬" },
-    { date: "2026-09-10", typeId: "hotel", from: "Hilton Garden Inn Rome Airport", to: "Hilton Garden Inn Rome Airport", startTime: "12:00", endTime: "15:00", notes: "׳׳ ׳•׳—׳” ׳‘׳׳׳•׳", link: "https://www.booking.com", costAmount: 620, costCurrency: "ג‚¬" },
-    { date: "2026-09-10", typeId: "train", from: "Hilton Garden Inn Rome Airport", to: "Fontana di Trevi", startTime: "15:30", endTime: "16:10", costAmount: 8, costCurrency: "ג‚¬" },
-    { date: "2026-09-10", typeId: "day-tour", from: "Fontana di Trevi", to: "Fontana di Trevi", startTime: "16:15", endTime: "19:00", costAmount: 0, costCurrency: "ג‚¬" },
-    { date: "2026-09-11", typeId: "guided-tour", from: "", to: "", startTime: "09:00", endTime: "13:00", link: "https://maps.google.com", costAmount: 280, costCurrency: "ג‚¬" },
-    { date: "2026-09-11", typeId: "self-tour", from: "", to: "", startTime: "16:00", endTime: "19:30", costAmount: 0, costCurrency: "ג‚¬" },
-    { date: "2026-09-14", typeId: "flight", from: "Aeroporto di Roma - Fiumicino Leonardo da Vinci", to: "Ben Gurion Airport", fromAlias: "׳¨׳•׳׳ (FCO)", toAlias: "׳×׳ ׳׳‘׳™׳‘ (TLV)", startTime: "18:20", endTime: "21:50", costAmount: 1390, costCurrency: "ג‚×", flightNumber: "LY387" },
+    { date: "2026-09-10", typeId: "flight", from: "Ben Gurion Airport", to: "Aeroporto di Roma - Fiumicino Leonardo da Vinci", fromAlias: "תל אביב (TLV)", toAlias: "רומא (FCO)", startTime: "07:40", endTime: "10:35", link: "https://www.google.com/flights", costAmount: 1450, costCurrency: "₪", flightNumber: "LY386" },
+    { date: "2026-09-10", typeId: "taxi", from: "Aeroporto di Roma - Fiumicino Leonardo da Vinci", to: "Hilton Garden Inn Rome Airport", startTime: "11:15", endTime: "12:00", costAmount: 45, costCurrency: "€" },
+    { date: "2026-09-10", typeId: "hotel", from: "Hilton Garden Inn Rome Airport", to: "Hilton Garden Inn Rome Airport", startTime: "12:00", endTime: "15:00", notes: "מנוחה במלון", link: "https://www.booking.com", costAmount: 620, costCurrency: "€" },
+    { date: "2026-09-10", typeId: "train", from: "Hilton Garden Inn Rome Airport", to: "Fontana di Trevi", startTime: "15:30", endTime: "16:10", costAmount: 8, costCurrency: "€" },
+    { date: "2026-09-10", typeId: "day-tour", from: "Fontana di Trevi", to: "Fontana di Trevi", startTime: "16:15", endTime: "19:00", costAmount: 0, costCurrency: "€" },
+    { date: "2026-09-11", typeId: "guided-tour", from: "", to: "", startTime: "09:00", endTime: "13:00", link: "https://maps.google.com", costAmount: 280, costCurrency: "€" },
+    { date: "2026-09-11", typeId: "self-tour", from: "", to: "", startTime: "16:00", endTime: "19:30", costAmount: 0, costCurrency: "€" },
+    { date: "2026-09-14", typeId: "flight", from: "Aeroporto di Roma - Fiumicino Leonardo da Vinci", to: "Ben Gurion Airport", fromAlias: "רומא (FCO)", toAlias: "תל אביב (TLV)", startTime: "18:20", endTime: "21:50", costAmount: 1390, costCurrency: "₪", flightNumber: "LY387" },
   ];
   return base.map((r) => ({ id: uid(), parentId: null, frameId: null, overnight: false, notes: "", mapLink: "", fromVerifiedUrl: "", fromVerifiedText: "", toVerifiedUrl: "", toVerifiedText: "", fromAlias: "", toAlias: "", fromLat: null, fromLon: null, toLat: null, toLon: null, routeDistanceKm: null, routeDurationMin: null, custom: {}, ...r }));
 }
@@ -496,7 +496,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
       case "endTime": return <input className="mt-editable mt-time" type="time" value={row.endTime} onChange={(e) => updateRow(row.id, { endTime: e.target.value })} />;
       case "route": return routeUrl ? (
         <a className="mt-link-icon" href={routeUrl} target="_blank" rel="noreferrer" onMouseEnter={handleRouteHover}
-          title={distLoading ? T.calculatingDistance : (row.routeDistanceKm != null ? `${T.routeTooltip} ג€” ${row.routeDistanceKm.toFixed(1)} ${T.km} (~${Math.round(row.routeDurationMin)} ${T.min})` : T.routeTooltip)}>
+          title={distLoading ? T.calculatingDistance : (row.routeDistanceKm != null ? `${T.routeTooltip} — ${row.routeDistanceKm.toFixed(1)} ${T.km} (~${Math.round(row.routeDurationMin)} ${T.min})` : T.routeTooltip)}>
           <Route size={14} />
         </a>
       ) : <span className="mt-link-icon empty" title={T.noRoute}><Route size={14} /></span>;
@@ -585,12 +585,12 @@ function DayGroup({ g, fid, depth, ctx }) {
                     <span className="mt-type-icon" style={{ background: tm.color }}><Icon /></span>
                     <strong style={{ fontSize: 13.5 }}>{tm.name}</strong>
                   </div>
-                  <span className="mt-card-times">{r.startTime || "ג€”"}{r.endTime ? ` ג€“ ${r.endTime}` : ""}</span>
+                  <span className="mt-card-times">{r.startTime || "—"}{r.endTime ? ` – ${r.endTime}` : ""}</span>
                 </div>
                 {(fromLabel || toLabel) && (
                   <div className="mt-card-route">
-                    <span dir="auto">{fromLabel || "ג€”"}</span>
-                    {fromLabel && toLabel && <span className="mt-card-arrow">ג†</span>}
+                    <span dir="auto">{fromLabel || "—"}</span>
+                    {fromLabel && toLabel && <span className="mt-card-arrow">←</span>}
                     {toLabel && <span dir="auto">{toLabel}</span>}
                   </div>
                 )}
@@ -657,7 +657,7 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
       <div className="mt-frame-header" onClick={() => toggleFrameCollapse(frame.id)}>
         <span className="chev">{frame.collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}</span>
         <span className="mt-frame-name">{frame.name}</span>
-        <span className="mt-frame-range">{fmtDate(frame.startDate, lang)} ג€“ {fmtDate(frame.endDate, lang)}</span>
+        <span className="mt-frame-range">{fmtDate(frame.startDate, lang)} – {fmtDate(frame.endDate, lang)}</span>
         {convertedTotal > 0 && (
           <span className="mt-chip small">{displayCurrency} {convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
         )}
@@ -726,7 +726,7 @@ export default function MyTripApp() {
   const [locPicker, setLocPicker] = useState(null); // { field, query, results, loading }
   const [dragId, setDragId] = useState(null);
   const [dismissedKey, setDismissedKey] = useState("");
-  const [displayCurrency, setDisplayCurrency] = useState("ג‚×");
+  const [displayCurrency, setDisplayCurrency] = useState("₪");
   const [fxRates, setFxRates] = useState(null);
   const [fxIsLive, setFxIsLive] = useState(false);
   const columnsBtnRef = useRef(null);
@@ -798,7 +798,7 @@ export default function MyTripApp() {
         if (diffMin > 0 && diffMin <= 120) {
           const tm = typeMeta(r.typeId, types, T);
           if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-            new Notification(`${tm.name} ג€” ${T.reminderIn.replace("{min}", Math.round(diffMin))}`, { body: r.toAlias || r.to || r.fromAlias || r.from || "" });
+            new Notification(`${tm.name} — ${T.reminderIn.replace("{min}", Math.round(diffMin))}`, { body: r.toAlias || r.to || r.fromAlias || r.from || "" });
           }
           setFiredReminders((p) => ({ ...p, [r.id]: true }));
         }
@@ -823,21 +823,21 @@ export default function MyTripApp() {
       const tm = typeMeta(r.typeId, types, T);
       const from = r.fromAlias || r.from || "", to = r.toAlias || r.to || "";
       return `<div style="padding:7px 0;padding-inline-start:${depth * 16}px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;gap:10px;">
-        <div><strong>${esc(tm.name)}</strong> ג€” ${esc(from)}${from && to ? " ג†’ " : ""}${esc(to)}${r.notes ? `<br><span style="color:#888;font-size:12px;">${esc(r.notes)}</span>` : ""}</div>
-        <div style="color:#666;font-size:12px;white-space:nowrap;">${r.startTime || ""}${r.endTime ? " ג€“ " + r.endTime : ""}${Number(r.costAmount) > 0 ? ` ֲ· ${esc(r.costCurrency)}${r.costAmount}` : ""}</div>
+        <div><strong>${esc(tm.name)}</strong> — ${esc(from)}${from && to ? " → " : ""}${esc(to)}${r.notes ? `<br><span style="color:#888;font-size:12px;">${esc(r.notes)}</span>` : ""}</div>
+        <div style="color:#666;font-size:12px;white-space:nowrap;">${r.startTime || ""}${r.endTime ? " – " + r.endTime : ""}${Number(r.costAmount) > 0 ? ` · ${esc(r.costCurrency)}${r.costAmount}` : ""}</div>
       </div>`;
     }
     function dayHtml(fid) {
       return dayGroupsAt(fid).map((g) => {
         const rowsHtml = g.rows.map((r) => rowHtml(r, 0) + childrenOf(r.id).map((c) => rowHtml(c, 1)).join("")).join("");
-        return `<div style="margin-top:14px;"><div style="font-weight:700;margin-bottom:4px;">${fmtDate(g.date, lang)} ג€” ${heDay(g.date, lang)}</div>${rowsHtml}</div>`;
+        return `<div style="margin-top:14px;"><div style="font-weight:700;margin-bottom:4px;">${fmtDate(g.date, lang)} — ${heDay(g.date, lang)}</div>${rowsHtml}</div>`;
       }).join("");
     }
     function frameHtml(fid) {
       let out = dayHtml(fid);
       childFrames(fid).forEach((f) => {
         out += `<div style="border:1px solid #ddd;border-radius:10px;padding:12px;margin-top:16px;">
-          <div style="font-weight:700;font-size:15px;">${esc(f.name)} <span style="font-weight:400;color:#888;font-size:12px;">(${fmtDate(f.startDate, lang)} ג€“ ${fmtDate(f.endDate, lang)})</span></div>
+          <div style="font-weight:700;font-size:15px;">${esc(f.name)} <span style="font-weight:400;color:#888;font-size:12px;">(${fmtDate(f.startDate, lang)} – ${fmtDate(f.endDate, lang)})</span></div>
           ${frameHtml(f.id)}
         </div>`;
       });
@@ -896,7 +896,7 @@ export default function MyTripApp() {
   function frameOptionsList(excludeId) {
     const result = [];
     function walk(list, depth) {
-      list.forEach((f) => { if (f.id === excludeId) return; result.push({ id: f.id, label: "ג€”".repeat(depth) + " " + f.name }); walk(childFrames(f.id), depth + 1); });
+      list.forEach((f) => { if (f.id === excludeId) return; result.push({ id: f.id, label: "—".repeat(depth) + " " + f.name }); walk(childFrames(f.id), depth + 1); });
     }
     walk(childFrames(null), 0);
     return result;
@@ -951,7 +951,7 @@ export default function MyTripApp() {
   function createFrameFromSuggestion() {
     const dates = unassignedFlights.map((r) => r.date).sort();
     const start = dates[0], end = dates[dates.length - 1];
-    const nf = { id: uid(), name: lang === "he" ? "׳˜׳™׳•׳ ׳—׳“׳©" : "New trip", startDate: start, endDate: end, parentFrameId: null, collapsed: false };
+    const nf = { id: uid(), name: lang === "he" ? "טיול חדש" : "New trip", startDate: start, endDate: end, parentFrameId: null, collapsed: false };
     setFrames((prev) => [...prev, nf]);
     setRows((prev) => prev.map((r) => (!r.parentId && !r.frameId && r.date >= start && r.date <= end) ? { ...r, frameId: nf.id } : r));
     setDismissedKey(suggestionKey);
@@ -964,7 +964,7 @@ export default function MyTripApp() {
     const nr = {
       id: uid(), parentId, frameId, date: date || new Date().toISOString().slice(0, 10),
       typeId: "unset", from: "", to: "", startTime: "", endTime: "", overnight: false,
-      destination: "", link: "", mapLink: "", flightNumber: "", costAmount: 0, costCurrency: "ג‚×", fromAlias: "", toAlias: "",
+      destination: "", link: "", mapLink: "", flightNumber: "", costAmount: 0, costCurrency: "₪", fromAlias: "", toAlias: "",
       notes: "", fromVerifiedUrl: "", fromVerifiedText: "", toVerifiedUrl: "", toVerifiedText: "",
       fromLat: null, fromLon: null, toLat: null, toLon: null, routeDistanceKm: null, routeDurationMin: null, custom: {},
     };
@@ -1037,7 +1037,7 @@ export default function MyTripApp() {
     setAddTypeDraft({ name: "", icon: "Tag" }); setAddTypeOpen(false);
   }
 
-  /* ---------- location verification (OpenStreetMap Nominatim ג€” free, no API key) ---------- */
+  /* ---------- location verification (OpenStreetMap Nominatim — free, no API key) ---------- */
   function openLocationPicker(field) {
     const initialQuery = cardDraft ? (cardDraft[field] || "") : "";
     setLocPicker({ field, mode: "search", query: initialQuery, results: [], loading: false, error: null, mapMarker: null, mapCenter: DEFAULT_MAP_CENTER });
@@ -1556,7 +1556,7 @@ export default function MyTripApp() {
         {showSuggestion && (
           <div className="mt-suggest">
             <Sparkles />
-            <span>{T.suggestPrefix} {unassignedFlights.length} {T.suggestMid} {fmtDate(unassignedFlights[0].date, lang)} ג€“ {fmtDate(unassignedFlights[unassignedFlights.length - 1].date, lang)}</span>
+            <span>{T.suggestPrefix} {unassignedFlights.length} {T.suggestMid} {fmtDate(unassignedFlights[0].date, lang)} – {fmtDate(unassignedFlights[unassignedFlights.length - 1].date, lang)}</span>
             <button className="mt-btn primary" onClick={createFrameFromSuggestion}>{T.suggestBtn}</button>
             <button className="mt-btn ghost" onClick={() => setDismissedKey(suggestionKey)}>{T.suggestDismiss}</button>
           </div>
@@ -1567,7 +1567,7 @@ export default function MyTripApp() {
         <div className="mt-summary">
           <span className="mt-summary-label">{T.totalPerCurrency}:</span>
           {Object.keys(grandTotals).length === 0 ? (
-            <span style={{ fontSize: 12.5, color: "var(--muted)" }}>ג€”</span>
+            <span style={{ fontSize: 12.5, color: "var(--muted)" }}>—</span>
           ) : (
             <>
               <span className="mt-chip mt-chip-total">{displayCurrency} {convertedGrandTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
@@ -1684,7 +1684,7 @@ export default function MyTripApp() {
                     ))}
                   </select>
                 </div>
-                <div className="mt-field"><label>׳×׳׳¨׳™׳</label><DateField value={cardDraft.date} onChange={(e) => setCardDraft({ ...cardDraft, date: e.target.value })} /></div>
+                <div className="mt-field"><label>תאריך</label><DateField value={cardDraft.date} onChange={(e) => setCardDraft({ ...cardDraft, date: e.target.value })} /></div>
               </div>
               <div className="mt-field">
                 <label>{T.frame}</label>
@@ -1703,7 +1703,7 @@ export default function MyTripApp() {
                     <button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openLocationPicker("from")}><MapPin size={13} /></button>
                     <button className="mt-btn ghost mt-btn-icon" title={T.copyPrevDest} disabled={!prevRowForCard || !prevRowForCard.to} onClick={copyPrevDestinationToFrom}><Copy size={13} /></button>
                   </div>
-                  {fromVerifiedCard && <div className="mt-verified-row"><CircleCheck size={12} /> {T.verified} ג€” <a href={cardDraft.fromVerifiedUrl} target="_blank" rel="noreferrer">{T.openMap}</a></div>}
+                  {fromVerifiedCard && <div className="mt-verified-row"><CircleCheck size={12} /> {T.verified} — <a href={cardDraft.fromVerifiedUrl} target="_blank" rel="noreferrer">{T.openMap}</a></div>}
                   <div className="mt-field" style={{ marginTop: 6 }}>
                     <label>{T.fromAlias}</label>
                     <input dir="auto" value={cardDraft.fromAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "fromAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, fromAlias: e.target.value })} />
@@ -1716,7 +1716,7 @@ export default function MyTripApp() {
                     <div><input dir="auto" value={cardDraft.to} placeholder={getTypeHint(cardDraft.typeId, "to", lang)} onChange={(e) => setCardDraft({ ...cardDraft, to: e.target.value })} /></div>
                     <button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openLocationPicker("to")}><MapPin size={13} /></button>
                   </div>
-                  {toVerifiedCard && <div className="mt-verified-row"><CircleCheck size={12} /> {T.verified} ג€” <a href={cardDraft.toVerifiedUrl} target="_blank" rel="noreferrer">{T.openMap}</a></div>}
+                  {toVerifiedCard && <div className="mt-verified-row"><CircleCheck size={12} /> {T.verified} — <a href={cardDraft.toVerifiedUrl} target="_blank" rel="noreferrer">{T.openMap}</a></div>}
                   <div className="mt-field" style={{ marginTop: 6 }}>
                     <label>{T.toAlias}</label>
                     <input dir="auto" value={cardDraft.toAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "toAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, toAlias: e.target.value })} />
@@ -1737,7 +1737,7 @@ export default function MyTripApp() {
                 {weatherData && weatherData.loading && <span className="mt-hint">{T.weatherLoading}</span>}
                 {weatherData && weatherData.error && <span className="mt-hint">{T.weatherUnavailable}</span>}
                 {weatherData && weatherData.data && weatherExpanded && (
-                  <span className="mt-weather-detail">{weatherMeta(weatherData.data.code)[lang]} ֲ· {Math.round(weatherData.data.min)}ֲ°ג€“{Math.round(weatherData.data.max)}ֲ°C</span>
+                  <span className="mt-weather-detail">{weatherMeta(weatherData.data.code)[lang]} · {Math.round(weatherData.data.min)}°–{Math.round(weatherData.data.max)}°C</span>
                 )}
               </div>
 
