@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "9.0.0";
+const APP_VERSION = "9.1.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1041,7 +1041,7 @@ function SplashIntro({ onFinish, lang }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   function skip() { setExiting(true); setTimeout(onFinish, 350); }
-  const pins = [{ x: 225, y: 112, n: 1 }, { x: 253, y: 148, n: 2 }, { x: 214, y: 176, n: 3 }, { x: 262, y: 202, n: 4 }];
+  const pins = [{ x: 152, y: 165, n: 1 }, { x: 145, y: 195, n: 2 }, { x: 168, y: 215, n: 3 }, { x: 174, y: 242, n: 4 }];
   const routeD = "M" + pins.map((p) => `${p.x},${p.y}`).join(" L");
   return (
     <div className={"mt-intro" + (exiting ? " exiting" : "")} onClick={skip}>
@@ -1054,10 +1054,10 @@ function SplashIntro({ onFinish, lang }) {
             </linearGradient>
           </defs>
           <rect x="0" y="0" width="400" height="260" fill="url(#mtSkyGrad)" />
-          <path className="mt-intro-land" d="M150,35 C185,28 215,50 232,82 C250,116 268,138 262,172 C256,204 224,228 188,222 C160,217 152,190 132,174 C106,154 100,122 106,92 C112,64 118,42 150,35 Z" />
-          <path className="mt-intro-flightpath" d="M15,60 Q110,-5 195,75" />
-          <polygon points="0,-5 11,0 0,5 3,0" className="mt-intro-plane">
-            <animateMotion dur="2s" begin="0.2s" fill="freeze" rotate="auto" path="M15,60 Q110,-5 195,75" />
+          <path className="mt-intro-land" d="M158,22 C182,18 205,28 214,48 C221,63 218,78 206,86 C216,92 224,100 220,112 C216,124 200,126 196,138 C204,144 210,154 204,166 C198,178 184,180 182,192 C190,198 196,208 190,220 C184,232 176,238 178,250 C179,257 172,259 168,252 C162,241 166,230 160,220 C154,210 158,198 152,190 C146,182 150,172 146,164 C142,178 128,180 122,168 C116,156 124,146 120,136 C110,140 100,132 100,120 C100,108 110,100 108,88 C106,74 96,64 104,50 C112,36 130,32 140,40 C144,28 150,25 158,22 Z" />
+          <path className="mt-intro-flightpath" d="M10,65 Q100,-10 178,55" />
+          <polygon points="0,-9 20,0 0,9 5,0" className="mt-intro-plane">
+            <animateMotion dur="2s" begin="0.2s" fill="freeze" rotate="auto" path="M10,65 Q100,-10 178,55" />
           </polygon>
           <path className="mt-intro-route" d={routeD} />
           {pins.map((p, i) => (
@@ -1922,10 +1922,10 @@ export default function MyTripApp() {
         .mt-intro-plane { fill:#174C45; }
         .mt-intro-route { fill:none; stroke:#D98E3F; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; stroke-dasharray:400; stroke-dashoffset:400; animation:mt-route-draw 1.3s ease forwards; animation-delay:1.8s; }
         @keyframes mt-route-draw { to { stroke-dashoffset:0; } }
-        .mt-intro-pin { opacity:0; transform-box:fill-box; transform-origin:center; animation:mt-pin-pop .5s ease forwards; }
+        .mt-intro-pin { opacity:0; transform-box:fill-box; transform-origin:center; animation:mt-pin-drop .6s cubic-bezier(.34,1.56,.64,1) forwards; }
         .mt-intro-pin circle { fill:#D98E3F; stroke:#fff; stroke-width:1.5; }
         .mt-intro-pin text { fill:#fff; font-size:9px; font-weight:700; font-family:Heebo,sans-serif; }
-        @keyframes mt-pin-pop { 0% { opacity:0; transform:scale(.3); } 60% { opacity:1; transform:scale(1.15); } 100% { opacity:1; transform:scale(1); } }
+        @keyframes mt-pin-drop { 0% { opacity:0; transform:translateY(-90px); } 65% { opacity:1; } 100% { opacity:1; transform:translateY(0); } }
         .mt-intro-brand { display:flex; flex-direction:column; align-items:center; gap:4px; opacity:0; animation:mt-intro-fadein .8s ease forwards; animation-delay:.35s; }
         .mt-intro-logo { font-family:'Frank Ruhl Libre',serif; font-size:26px; font-weight:700; color:#174C45; }
         .mt-intro-tag { font-size:12.5px; color:#6B7C76; }
