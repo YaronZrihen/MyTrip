@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "8.6.0";
+const APP_VERSION = "8.8.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -238,6 +238,10 @@ function computeDuration(start, end, overnight) {
   const h = Math.floor(mins / 60), m = mins % 60;
   return `${h}:${String(m).padStart(2, "0")}`;
 }
+function truncateChars(text, n) {
+  if (!text) return text;
+  return text.length > n ? text.slice(0, n) + "…" : text;
+}
 function detectTextAlign(text) {
   if (!text) return undefined;
   for (const ch of text) {
@@ -312,19 +316,25 @@ function rowOwnRouteUrl(row) {
   if (mode) url += `&travelmode=${mode}`;
   return url;
 }
+let __apiQueue = Promise.resolve();
+function throttledCall(fn) {
+  const run = __apiQueue.then(() => new Promise((resolve) => setTimeout(resolve, 350))).then(fn);
+  __apiQueue = run.then(() => {}, () => {});
+  return run;
+}
 function geocodeText(text) {
-  return fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=he,en&q=${encodeURIComponent(text)}`, { headers: { Accept: "application/json" } })
+  return throttledCall(() => fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=he,en&q=${encodeURIComponent(text)}`, { headers: { Accept: "application/json" } })
     .then((r) => { if (!r.ok) throw new Error("http-" + r.status); return r.json(); })
-    .then((data) => (data && data[0] ? { lat: Number(data[0].lat), lon: Number(data[0].lon) } : null));
+    .then((data) => (data && data[0] ? { lat: Number(data[0].lat), lon: Number(data[0].lon) } : null)));
 }
 function fetchDrivingRoute(a, b) {
-  return fetch(`https://router.project-osrm.org/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?overview=false`)
+  return throttledCall(() => fetch(`https://router.project-osrm.org/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?overview=false`)
     .then((r) => { if (!r.ok) throw new Error("http-" + r.status); return r.json(); })
     .then((data) => {
       const route = data && data.routes && data.routes[0];
       if (!route) return null;
       return { distanceKm: route.distance / 1000, durationMin: route.duration / 60 };
-    });
+    }));
 }
 
 /* Weather — Open-Meteo (free, no API key). Forecast only covers ~16 days ahead. */
@@ -343,12 +353,14 @@ const WMO_ICON_MAP = {
 function weatherMeta(code) { return WMO_ICON_MAP[code] || { icon: "Cloud", he: "לא ידוע", en: "Unknown" }; }
 const WEATHER_ICONS = { Sun, CloudSun, Cloud, CloudFog, CloudRain, CloudSnow, CloudLightning };
 function fetchWeather(lat, lon, dateStr) {
-  return fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=auto&start_date=${dateStr}&end_date=${dateStr}`)
+  return throttledCall(() => fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&start_date=${dateStr}&end_date=${dateStr}`)
     .then((r) => { if (!r.ok) throw new Error("http-" + r.status); return r.json(); })
     .then((data) => {
       if (!data || !data.daily || !data.daily.time || !data.daily.time.length) return null;
-      return { code: data.daily.weathercode[0], max: data.daily.temperature_2m_max[0], min: data.daily.temperature_2m_min[0] };
-    });
+      const codeArr = data.daily.weather_code || data.daily.weathercode;
+      if (!codeArr) return null;
+      return { code: codeArr[0], max: data.daily.temperature_2m_max[0], min: data.daily.temperature_2m_min[0] };
+    }));
 }
 
 const COL_WIDTHS = {
@@ -644,6 +656,151 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
   );
 }
 
+function FrameInlineDatePicker({ frame, ctx }) {
+  const { T, lang, rows, frames, updateFrameDates } = ctx;
+  const [open, setOpen] = useState(false);
+  const [viewMonth, setViewMonth] = useState(() => { const d = new Date(frame.startDate + "T00:00:00"); d.setDate(1); return d; });
+  const [tempStart, setTempStart] = useState(frame.startDate);
+  const [tempEnd, setTempEnd] = useState(frame.endDate);
+  const [issue, setIssue] = useState(null);
+
+  function openPicker(e) {
+    e.stopPropagation();
+    setTempStart(frame.startDate); setTempEnd(frame.endDate); setIssue(null);
+    const d = new Date(frame.startDate + "T00:00:00"); d.setDate(1); setViewMonth(d);
+    setOpen(true);
+  }
+  function pad(n) { return String(n).padStart(2, "0"); }
+  function toISO(y, m, day) { return `${y}-${pad(m + 1)}-${pad(day)}`; }
+  function clickDay(iso) {
+    let s, e;
+    if (!tempStart || (tempStart && tempEnd)) { s = iso; e = ""; }
+    else { s = tempStart; e = iso; if (e < s) { const t = s; s = e; e = t; } }
+    setTempStart(s); setTempEnd(e);
+    if (e) {
+      const draft = { ...frame, startDate: s, endDate: e };
+      const problem = frameDateIssue(draft, rows, frames, T);
+      if (problem) setIssue(problem);
+      else { updateFrameDates(frame.id, s, e); setIssue(null); setOpen(false); }
+    }
+  }
+  function shiftMonth(delta) { setViewMonth((prev) => { const d = new Date(prev); d.setMonth(d.getMonth() + delta); return d; }); }
+  const y = viewMonth.getFullYear(), m = viewMonth.getMonth();
+  const firstDow = new Date(y, m, 1).getDay();
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < firstDow; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  const monthLabel = viewMonth.toLocaleDateString(lang === "he" ? "he-IL" : "en-US", { month: "long", year: "numeric" });
+
+  return (
+    <span style={{ position: "relative" }}>
+      <button type="button" className="mt-frame-date-inline mt-frame-date-btn" onClick={openPicker}>
+        {fmtDate(frame.startDate, lang)} – {fmtDate(frame.endDate, lang)}
+      </button>
+      {open && (
+        <>
+          <div className="mt-floating-backdrop" onClick={(e) => { e.stopPropagation(); setOpen(false); }} />
+          <div className="mt-floating-menu mt-daterange-cal" dir="ltr" onClick={(e) => e.stopPropagation()}>
+            <div className="mt-cal-header">
+              <button type="button" onClick={() => shiftMonth(-1)}><ChevronLeft size={16} /></button>
+              <strong>{monthLabel}</strong>
+              <button type="button" onClick={() => shiftMonth(1)}><ChevronRight size={16} /></button>
+            </div>
+            <div className="mt-cal-grid mt-cal-weekdays">
+              {(lang === "he" ? ["א", "ב", "ג", "ד", "ה", "ו", "ש"] : ["S", "M", "T", "W", "T", "F", "S"]).map((d, i) => <span key={i}>{d}</span>)}
+            </div>
+            <div className="mt-cal-grid">
+              {cells.map((d, i) => {
+                if (!d) return <span key={i} />;
+                const iso = toISO(y, m, d);
+                const isEdge = iso === tempStart || iso === tempEnd;
+                const inRange = tempStart && tempEnd && iso > tempStart && iso < tempEnd;
+                return <button type="button" key={i} className={"mt-cal-day" + (isEdge ? " edge" : "") + (inRange ? " in-range" : "")} onClick={() => clickDay(iso)}>{d}</button>;
+              })}
+            </div>
+            {issue && <div className="mt-error" style={{ marginTop: 6 }}><AlertTriangle size={13} /> {issue}</div>}
+          </div>
+        </>
+      )}
+    </span>
+  );
+}
+
+function DateField({ value, onChange }) {
+  return (
+    <input type="date" value={value} onChange={onChange}
+      onClick={(e) => { if (e.target.showPicker) { try { e.target.showPicker(); } catch (err) {} } }} />
+  );
+}
+
+function DateRangeField({ startDate, endDate, onChange, lang, T }) {
+  const [open, setOpen] = useState(false);
+  const [viewMonth, setViewMonth] = useState(() => { const d = startDate ? new Date(startDate + "T00:00:00") : new Date(); d.setDate(1); return d; });
+  const [tempStart, setTempStart] = useState(startDate || "");
+  const [tempEnd, setTempEnd] = useState(endDate || "");
+  const btnRef = useRef(null);
+  function toggleOpen() {
+    if (!open) { const d = tempStart ? new Date(tempStart + "T00:00:00") : new Date(); d.setDate(1); setViewMonth(d); }
+    setOpen((v) => !v);
+  }
+  function pad(n) { return String(n).padStart(2, "0"); }
+  function toISO(y, m, day) { return `${y}-${pad(m + 1)}-${pad(day)}`; }
+  function clickDay(iso) {
+    if (!tempStart || (tempStart && tempEnd)) { setTempStart(iso); setTempEnd(""); onChange(iso, ""); }
+    else {
+      let s = tempStart, e = iso;
+      if (e < s) { const t = s; s = e; e = t; }
+      setTempStart(s); setTempEnd(e); onChange(s, e);
+    }
+  }
+  function shiftMonth(delta) { setViewMonth((prev) => { const d = new Date(prev); d.setMonth(d.getMonth() + delta); return d; }); }
+  const y = viewMonth.getFullYear(), m = viewMonth.getMonth();
+  const firstDow = new Date(y, m, 1).getDay();
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < firstDow; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  const monthLabel = viewMonth.toLocaleDateString(lang === "he" ? "he-IL" : "en-US", { month: "long", year: "numeric" });
+  return (
+    <div style={{ position: "relative" }}>
+      <button ref={btnRef} type="button" className="mt-daterange-btn" onClick={toggleOpen}>
+        <CalendarIcon size={14} />
+        <span>{startDate ? fmtDate(startDate, lang) : "—"} – {endDate ? fmtDate(endDate, lang) : "—"}</span>
+      </button>
+      {open && (
+        <>
+          <div className="mt-floating-backdrop" onClick={() => setOpen(false)} />
+          <div className="mt-floating-menu mt-daterange-cal" dir="ltr">
+            <div className="mt-cal-header">
+              <button type="button" onClick={() => shiftMonth(-1)}><ChevronLeft size={16} /></button>
+              <strong>{monthLabel}</strong>
+              <button type="button" onClick={() => shiftMonth(1)}><ChevronRight size={16} /></button>
+            </div>
+            <div className="mt-cal-grid mt-cal-weekdays">
+              {(lang === "he" ? ["א", "ב", "ג", "ד", "ה", "ו", "ש"] : ["S", "M", "T", "W", "T", "F", "S"]).map((d, i) => <span key={i}>{d}</span>)}
+            </div>
+            <div className="mt-cal-grid">
+              {cells.map((d, i) => {
+                if (!d) return <span key={i} />;
+                const iso = toISO(y, m, d);
+                const isStart = iso === tempStart, isEnd = iso === tempEnd;
+                const inRange = tempStart && tempEnd && iso > tempStart && iso < tempEnd;
+                return (
+                  <button type="button" key={i}
+                    className={"mt-cal-day" + (isStart || isEnd ? " edge" : "") + (inRange ? " in-range" : "")}
+                    onClick={() => clickDay(iso)}>{d}</button>
+                );
+              })}
+            </div>
+            <button type="button" className="mt-btn primary" style={{ width: "100%", marginTop: 8 }} onClick={() => setOpen(false)}>{T.ok}</button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function MobileCardMeta({ row, ctx }) {
   const { T, updateRow } = ctx;
   const [distLoading, setDistLoading] = useState(false);
@@ -759,9 +916,9 @@ function DayGroup({ g, fid, depth, ctx }) {
                 </div>
                 {(fromLabel || toLabel) && (
                   <div className="mt-card-route">
-                    <span dir="auto">{fromLabel || "—"}</span>
+                    <span dir="auto" title={fromLabel || ""}>{truncateChars(fromLabel, 18) || "—"}</span>
                     {fromLabel && toLabel && <span className="mt-card-arrow">←</span>}
-                    {toLabel && <span dir="auto">{toLabel}</span>}
+                    {toLabel && <span dir="auto" title={toLabel}>{truncateChars(toLabel, 18)}</span>}
                   </div>
                 )}
                 <div className="mt-card-bottom">
@@ -831,9 +988,9 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
       <div className="mt-frame-header" onClick={() => toggleFrameCollapse(frame.id)}>
         <span className="chev">{frame.collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}</span>
         <span className="mt-frame-name">{frame.name}</span>
-        <span className="mt-frame-range">{fmtDate(frame.startDate, lang)} – {fmtDate(frame.endDate, lang)}</span>
+        <FrameInlineDatePicker frame={frame} ctx={ctx} />
         {convertedTotal > 0 && (
-          <span className="mt-chip small">{displayCurrency} {convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+          <span className="mt-frame-cost-inline">{displayCurrency} {convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
         )}
         <span className="mt-frame-actions" onClick={(e) => e.stopPropagation()}>
           <button ref={menuBtnRef} onClick={toggleMenu} title={T.moreOptions}><MoreVertical size={16} /></button>
@@ -1203,7 +1360,7 @@ export default function MyTripApp() {
   function createFrameFromSuggestion() {
     const dates = unassignedFlights.map((r) => r.date).sort();
     const start = dates[0], end = dates[dates.length - 1];
-    const nf = { id: uid(), name: lang === "he" ? "טיול חדש" : "New trip", startDate: start, endDate: end, parentFrameId: null, collapsed: false };
+    const nf = { id: uid(), name: lang === "he" ? "הטיול שלנו לרומא" : "Our trip to Rome", startDate: start, endDate: end, parentFrameId: null, collapsed: false };
     setFrames((prev) => [...prev, nf]);
     setRows((prev) => prev.map((r) => (!r.parentId && !r.frameId && r.date >= start && r.date <= end) ? { ...r, frameId: nf.id } : r));
     setDismissedKey(suggestionKey);
@@ -1415,6 +1572,7 @@ export default function MyTripApp() {
     setRows((prev) => prev.map((r) => (r.frameId === id ? { ...r, frameId: f.parentFrameId } : r)));
   }
   function toggleFrameCollapse(id) { setFrames((prev) => prev.map((f) => (f.id === id ? { ...f, collapsed: !f.collapsed } : f))); }
+  function updateFrameDates(frameId, start, end) { setFrames((prev) => prev.map((f) => (f.id === frameId ? { ...f, startDate: start, endDate: end } : f))); }
 
   /* ---------- recursive render ---------- */
   const ctx = {
@@ -1422,7 +1580,7 @@ export default function MyTripApp() {
     updateRow, deleteRow, openCard, addRow, dragId, setDragId, onDropRow,
     typeMenuOpen, setTypeMenuOpen, newTypeDraft, setNewTypeDraft, addCustomType,
     collapsedParents, setCollapsedParents, collapsedGroups, setCollapsedGroups,
-    toggleFrameCollapse, openFrameModal, deleteFrame, nextDateInContext, lastDateInContext, frameTotals,
+    toggleFrameCollapse, openFrameModal, deleteFrame, updateFrameDates, nextDateInContext, lastDateInContext, frameTotals,
     openAddDayModal, sortDayByTime, getColWidth, startResize, displayCurrency, convertAmount,
     frameMenuOpenId, setFrameMenuOpenId, frameMenuPos, setFrameMenuPos,
   };
@@ -1451,80 +1609,6 @@ export default function MyTripApp() {
     return nodes.map((n) => n.type === "frame"
       ? <FrameBlock key={n.key} frame={n.frame} depth={depth} ctx={ctx} renderContext={renderContext} />
       : <DayGroup key={n.key} g={n.group} fid={fid} depth={depth} ctx={ctx} />
-    );
-  }
-
-  function DateField({ value, onChange }) {
-    return (
-      <input type="date" value={value} onChange={onChange}
-        onClick={(e) => { if (e.target.showPicker) { try { e.target.showPicker(); } catch (err) {} } }} />
-    );
-  }
-
-  function DateRangeField({ startDate, endDate, onChange }) {
-    const [open, setOpen] = useState(false);
-    const [viewMonth, setViewMonth] = useState(() => { const d = startDate ? new Date(startDate + "T00:00:00") : new Date(); d.setDate(1); return d; });
-    const [tempStart, setTempStart] = useState(startDate || "");
-    const [tempEnd, setTempEnd] = useState(endDate || "");
-    const btnRef = useRef(null);
-    function toggleOpen() {
-      if (!open) { const d = tempStart ? new Date(tempStart + "T00:00:00") : new Date(); d.setDate(1); setViewMonth(d); }
-      setOpen((v) => !v);
-    }
-    function pad(n) { return String(n).padStart(2, "0"); }
-    function toISO(y, m, day) { return `${y}-${pad(m + 1)}-${pad(day)}`; }
-    function clickDay(iso) {
-      if (!tempStart || (tempStart && tempEnd)) { setTempStart(iso); setTempEnd(""); onChange(iso, ""); }
-      else {
-        let s = tempStart, e = iso;
-        if (e < s) { const t = s; s = e; e = t; }
-        setTempStart(s); setTempEnd(e); onChange(s, e);
-      }
-    }
-    function shiftMonth(delta) { setViewMonth((prev) => { const d = new Date(prev); d.setMonth(d.getMonth() + delta); return d; }); }
-    const y = viewMonth.getFullYear(), m = viewMonth.getMonth();
-    const firstDow = new Date(y, m, 1).getDay();
-    const daysInMonth = new Date(y, m + 1, 0).getDate();
-    const cells = [];
-    for (let i = 0; i < firstDow; i++) cells.push(null);
-    for (let d = 1; d <= daysInMonth; d++) cells.push(d);
-    const monthLabel = viewMonth.toLocaleDateString(lang === "he" ? "he-IL" : "en-US", { month: "long", year: "numeric" });
-    return (
-      <div style={{ position: "relative" }}>
-        <button ref={btnRef} type="button" className="mt-daterange-btn" onClick={toggleOpen}>
-          <CalendarIcon size={14} />
-          <span>{startDate ? fmtDate(startDate, lang) : "—"} – {endDate ? fmtDate(endDate, lang) : "—"}</span>
-        </button>
-        {open && (
-          <>
-            <div className="mt-floating-backdrop" onClick={() => setOpen(false)} />
-            <div className="mt-floating-menu mt-daterange-cal" dir="ltr">
-              <div className="mt-cal-header">
-                <button type="button" onClick={() => shiftMonth(-1)}><ChevronLeft size={16} /></button>
-                <strong>{monthLabel}</strong>
-                <button type="button" onClick={() => shiftMonth(1)}><ChevronRight size={16} /></button>
-              </div>
-              <div className="mt-cal-grid mt-cal-weekdays">
-                {(lang === "he" ? ["א", "ב", "ג", "ד", "ה", "ו", "ש"] : ["S", "M", "T", "W", "T", "F", "S"]).map((d, i) => <span key={i}>{d}</span>)}
-              </div>
-              <div className="mt-cal-grid">
-                {cells.map((d, i) => {
-                  if (!d) return <span key={i} />;
-                  const iso = toISO(y, m, d);
-                  const isStart = iso === tempStart, isEnd = iso === tempEnd;
-                  const inRange = tempStart && tempEnd && iso > tempStart && iso < tempEnd;
-                  return (
-                    <button type="button" key={i}
-                      className={"mt-cal-day" + (isStart || isEnd ? " edge" : "") + (inRange ? " in-range" : "")}
-                      onClick={() => clickDay(iso)}>{d}</button>
-                  );
-                })}
-              </div>
-              <button type="button" className="mt-btn primary" style={{ width: "100%", marginTop: 8 }} onClick={() => setOpen(false)}>{T.ok}</button>
-            </div>
-          </>
-        )}
-      </div>
     );
   }
 
@@ -1590,9 +1674,12 @@ export default function MyTripApp() {
         .mt-suggest .mt-btn { margin-inline-start:auto; }
         .mt-frame-block { border:1px solid var(--border); border-inline-start:4px solid var(--frame-color,var(--teal)); border-radius:12px; margin-top:16px; background:var(--surface); }
         .mt-frame-header { display:flex; align-items:center; gap:9px; padding:10px 12px; cursor:pointer; user-select:none; flex-wrap:wrap; background:#FBFDFC; border-radius:11px 11px 0 0; }
-        .mt-frame-name { font-weight:700; font-size:14px; font-family:'Frank Ruhl Libre',serif; }
-        .mt-frame-range { font-size:11.5px; color:var(--muted); background:var(--bg); padding:2px 8px; border-radius:20px; }
-        .mt-frame-actions { display:flex; gap:2px; margin-inline-start:auto; }
+        .mt-frame-name { font-weight:700; font-size:14px; font-family:'Frank Ruhl Libre',serif; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:24px; flex-shrink:1; }
+        .mt-frame-date-inline { font-size:12.5px; font-weight:700; color:var(--ink); white-space:nowrap; flex-shrink:0; font-variant-numeric:tabular-nums; }
+        .mt-frame-date-btn { border:none; background:none; padding:0; cursor:pointer; }
+        .mt-frame-date-btn:hover { text-decoration:underline; }
+        .mt-frame-cost-inline { font-size:12.5px; font-weight:700; color:var(--amber); white-space:nowrap; flex-shrink:0; }
+        .mt-frame-actions { display:flex; gap:2px; margin-inline-start:auto; flex-shrink:0; }
         .mt-kebab-menu { min-width:180px; }
         .mt-daterange-btn { display:flex; align-items:center; gap:7px; width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:13px; background:#fff; color:var(--ink); }
         .mt-daterange-btn:hover { border-color:var(--teal); }
@@ -1655,7 +1742,7 @@ export default function MyTripApp() {
         .mt-editable:hover { border-color:var(--border); }
         .mt-editable:focus { outline:none; border-color:var(--teal); background:#fff; }
         .mt-editable.mt-time:focus, .mt-editable[type=number]:focus { outline:none; border-color:var(--teal); background:#fff; }
-        .mt-editable.mt-time { min-width:76px; }
+        .mt-editable.mt-time { min-width:76px; font-weight:700; color:var(--ink); }
         .mt-editable[type=number] { min-width:38px; padding-inline-start:1px; -moz-appearance:textfield; }
         .mt-editable[type=number]::-webkit-outer-spin-button, .mt-editable[type=number]::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
         .mt-cost { display:flex; align-items:center; gap:0; font-weight:600; color:var(--amber); }
@@ -1744,7 +1831,7 @@ export default function MyTripApp() {
         .mt-cards { display:flex; flex-direction:column; gap:9px; }
         .mt-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:11px 13px; display:flex; flex-direction:column; gap:6px; }
         .mt-card-top { display:flex; align-items:center; justify-content:space-between; }
-        .mt-card-times { font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; }
+        .mt-card-times { font-size:13px; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums; }
         .mt-card-route { display:flex; align-items:center; gap:6px; font-size:13px; font-weight:600; flex-wrap:wrap; }
         .mt-card-arrow { color:var(--muted); font-weight:400; }
         .mt-card-bottom { display:flex; align-items:center; justify-content:space-between; margin-top:2px; }
@@ -1761,9 +1848,6 @@ export default function MyTripApp() {
           .mt-content { padding:0 12px 32px; }
           .mt-frame-header { padding:12px 10px; gap:7px; }
           .mt-frame-actions button, .mt-row-actions button { min-width:32px; min-height:32px; justify-content:center; }
-          .mt-frame-range { order:3; flex-basis:100%; }
-          .mt-chip.small { order:4; }
-          .mt-frame-actions { order:2; }
           .mt-group-header { padding:10px 6px; }
           .mt-group-actions { gap:14px; }
           .mt-group-add { min-height:32px; }
@@ -2209,7 +2293,7 @@ export default function MyTripApp() {
               <div className="mt-field"><label>{T.frameName}</label><input value={frameDraft.name} onChange={(e) => setFrameDraft({ ...frameDraft, name: e.target.value })} /></div>
               <div className="mt-field">
                 <label>{T.frameDateRange}</label>
-                <DateRangeField startDate={frameDraft.startDate} endDate={frameDraft.endDate}
+                <DateRangeField startDate={frameDraft.startDate} endDate={frameDraft.endDate} lang={lang} T={T}
                   onChange={(s, e) => setFrameDraft({ ...frameDraft, startDate: s, endDate: e })} />
               </div>
               <div className="mt-field-row">
