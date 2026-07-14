@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "8.5.0";
+const APP_VERSION = "8.5.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -145,6 +145,7 @@ const T_DICT = {
     aiChatDemoText: "זו תגובת הדגמה בלבד. בגרסה מחוברת, השאלה הזו הייתה נשלחת ל-Claude יחד עם נתוני הטיול שלך ומקבלת תשובה מבוססת.",
     importRoute: "ייבא מסלול מגוגל מפות", importRouteHint: "הדבק קישור למסלול רב-תחנתי מגוגל מפות (Share → Copy link, אחרי תכנון מסלול עם כמה נקודות עצירה). כל תחנה תהפוך לרשומת \"אטרקציה\" נפרדת.",
     importRouteParse: "פענח", importRouteNoStops: "לא זוהו תחנות בקישור — ודא שזה קישור מסלול (Directions) עם כמה תחנות, לא קישור למקום בודד.",
+    importRouteShortLink: "זה קישור מקוצר (maps.app.goo.gl) — שמות המקומות האמיתיים מוסתרים מאחוריו ואי אפשר לפענח אותם ישירות בדפדפן (חסימת גוגל, לא באג). פתרון: פתח את הקישור בדפדפן/באפליקציה, וכשהמסלול נפתח - העתק את הכתובת המלאה משורת הכתובת (תתחיל ב-google.com/maps/dir/...) והדבק אותה כאן במקום.",
     importRouteConfirm: "צור רשומות",
     aiAssistant: "עוזר AI (הדגמה)", ok: "הבנתי",
     locHint: "טיפ: אם החיפוש לא מוצא תוצאה בעברית, נסה לחפש בשם המקומי/אנגלי (למשל \"Fiumicino Airport\" ולא \"פיומיצ׳ינו\").",
@@ -201,6 +202,7 @@ const T_DICT = {
     aiChatDemoText: "This is a demo reply only. In a connected version, this question would be sent to Claude along with your trip data and get a grounded answer.",
     importRoute: "Import route from Google Maps", importRouteHint: "Paste a multi-stop Google Maps directions link (Share → Copy link, after planning a route with several stops). Each stop becomes a separate \"Attraction\" record.",
     importRouteParse: "Parse", importRouteNoStops: "No stops detected in this link — make sure it's a Directions link with several stops, not a link to a single place.",
+    importRouteShortLink: "This is a shortened link (maps.app.goo.gl) — the real place names are hidden behind it and can't be read directly in the browser (a Google restriction, not a bug). Fix: open the link in your browser/app, and once the route loads, copy the full address from the address bar (starts with google.com/maps/dir/...) and paste that here instead.",
     importRouteConfirm: "Create records",
     aiAssistant: "AI Assistant (preview)", ok: "Got it",
     locHint: "Tip: if the search finds nothing in Hebrew, try the local/English name instead (e.g. \"Fiumicino Airport\").",
@@ -367,6 +369,12 @@ function isChronological(rowsList) {
     last = r.startTime;
   }
   return true;
+}
+function isShortGoogleMapsLink(url) {
+  try {
+    const host = new URL(url.trim()).hostname.replace(/^www\./, "");
+    return host === "maps.app.goo.gl" || host === "goo.gl";
+  } catch (e) { return false; }
 }
 function parseGoogleMapsWaypoints(url) {
   try {
@@ -874,6 +882,7 @@ export default function MyTripApp() {
   const [routeImportStops, setRouteImportStops] = useState(null);
   const [routeImportDate, setRouteImportDate] = useState("");
   const [routeImportStartTime, setRouteImportStartTime] = useState("09:00");
+  const [routeImportShortLink, setRouteImportShortLink] = useState(false);
   const [frameMenuOpenId, setFrameMenuOpenId] = useState(null);
   const [frameMenuPos, setFrameMenuPos] = useState({ top: 0, left: 0 });
   const [frameDraft, setFrameDraft] = useState(null);
@@ -974,10 +983,16 @@ export default function MyTripApp() {
   }
 
   function openRouteImport() {
-    setRouteImportUrl(""); setRouteImportStops(null); setRouteImportDate(nextDateInContext(null));
+    setRouteImportUrl(""); setRouteImportStops(null); setRouteImportDate(nextDateInContext(null)); setRouteImportShortLink(false);
     setRouteImportOpen(true); setActionsMenuOpen(false);
   }
   function parseRouteImport() {
+    if (isShortGoogleMapsLink(routeImportUrl)) {
+      setRouteImportShortLink(true);
+      setRouteImportStops([]);
+      return;
+    }
+    setRouteImportShortLink(false);
     const stops = parseGoogleMapsWaypoints(routeImportUrl);
     setRouteImportStops(stops);
   }
@@ -1731,7 +1746,9 @@ export default function MyTripApp() {
                 <div><input value={routeImportUrl} placeholder="https://www.google.com/maps/dir/..." onChange={(e) => setRouteImportUrl(e.target.value)} /></div>
                 <button className="mt-btn primary" onClick={parseRouteImport}><Search size={13} /> {T.importRouteParse}</button>
               </div>
-              {routeImportStops && routeImportStops.length === 0 && <div className="mt-error"><AlertTriangle /> {T.importRouteNoStops}</div>}
+              {routeImportStops && routeImportStops.length === 0 && (
+                <div className="mt-error"><AlertTriangle /> {routeImportShortLink ? T.importRouteShortLink : T.importRouteNoStops}</div>
+              )}
               {routeImportStops && routeImportStops.length > 0 && (
                 <>
                   <div className="mt-loc-results">
