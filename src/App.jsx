@@ -4,12 +4,12 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import {
   Plane, PlaneTakeoff, Car, BedDouble, Footprints, Users, Sun, Ship, KeySquare,
-  Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music, ChevronDown, ChevronRight,
+  Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music, ChevronDown, ChevronRight, ChevronLeft,
   Plus, X, Settings2, Pencil, Trash2, Link2, Globe, LogIn, User,
   Smartphone, Monitor, AlertTriangle, GripVertical, Check, FolderPlus, Sparkles,
   Route, Waypoints, Download, Upload, MapPin, Search, CircleCheck, Clock, ArrowDownUp, Copy, StickyNote, TrainFront,
   Bus, Motorbike, Bike, Scooter, Sailboat, ShipWheel, Anchor, Kayak, Helicopter, Caravan, Building2, Landmark, Home,
-  CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2, MoreVertical, Menu
+  CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2, MoreVertical, Menu, Calendar as CalendarIcon, Undo2, Redo2
 } from "lucide-react";
 
 /* ---------------------------------------------------------------------- */
@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "8.5.1";
+const APP_VERSION = "8.6.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -38,36 +38,41 @@ const CURRENCY_CODE_MAP = { "₪": "ILS", "$": "USD", "€": "EUR", "£": "GBP" 
 const FALLBACK_RATES = { ILS: 1, USD: 0.27, EUR: 0.25, GBP: 0.21 };
 const FLIGHT_LOOKUP_ENABLED = false; // needs a real flight-data provider (e.g. AeroDataBox) + API key + server proxy
 
+const CATEGORY_COLORS = {
+  "public-transport": "#3E7CB1", "road-transport": "#8B6F47", "sea-transport": "#2F7A8C",
+  "air-transport": "#256D64", accommodation: "#D98E3F", activities: "#5B8C5A", other: "#7A5C9E",
+};
 const DEFAULT_TYPES = [
-  { id: "train", name: "רכבת", icon: "TrainFront", color: "#3E7CB1", category: "public-transport" },
-  { id: "high-speed-train", name: "רכבת מהירה", icon: "TrainFront", color: "#2F5F8A", category: "public-transport" },
-  { id: "bus", name: "אוטובוס", icon: "Bus", color: "#3E7CB1", category: "public-transport" },
-  { id: "taxi", name: "מונית", icon: "Car", color: "#8B6F47", category: "public-transport" },
+  { id: "train", name: "רכבת", icon: "TrainFront", color: CATEGORY_COLORS["public-transport"], category: "public-transport" },
+  { id: "high-speed-train", name: "רכבת מהירה", icon: "TrainFront", color: CATEGORY_COLORS["public-transport"], category: "public-transport" },
+  { id: "bus", name: "אוטובוס", icon: "Bus", color: CATEGORY_COLORS["public-transport"], category: "public-transport" },
+  { id: "taxi", name: "מונית", icon: "Car", color: CATEGORY_COLORS["public-transport"], category: "public-transport" },
 
-  { id: "car-rental", name: "השכרת רכב", icon: "KeySquare", color: "#8B6F47", category: "road-transport" },
-  { id: "caravan", name: "קראוון", icon: "Caravan", color: "#8B6F47", category: "road-transport" },
-  { id: "motorcycle", name: "אופנוע", icon: "Motorbike", color: "#8B6F47", category: "road-transport" },
-  { id: "bicycle", name: "אופניים", icon: "Bike", color: "#5B8C5A", category: "road-transport" },
-  { id: "scooter", name: "קורקינט", icon: "Scooter", color: "#5B8C5A", category: "road-transport" },
+  { id: "car-rental", name: "השכרת רכב", icon: "KeySquare", color: CATEGORY_COLORS["road-transport"], category: "road-transport" },
+  { id: "caravan", name: "קראוון", icon: "Caravan", color: CATEGORY_COLORS["road-transport"], category: "road-transport" },
+  { id: "motorcycle", name: "אופנוע", icon: "Motorbike", color: CATEGORY_COLORS["road-transport"], category: "road-transport" },
+  { id: "bicycle", name: "אופניים", icon: "Bike", color: CATEGORY_COLORS["road-transport"], category: "road-transport" },
+  { id: "scooter", name: "קורקינט", icon: "Scooter", color: CATEGORY_COLORS["road-transport"], category: "road-transport" },
 
-  { id: "ferry", name: "מעבורת", icon: "Ship", color: "#3E7CB1", category: "sea-transport" },
-  { id: "yacht", name: "יאכטה", icon: "Sailboat", color: "#2F7A8C", category: "sea-transport" },
-  { id: "ship", name: "אוניה", icon: "ShipWheel", color: "#2F7A8C", category: "sea-transport" },
-  { id: "cruise", name: "שייט", icon: "Anchor", color: "#2F7A8C", category: "sea-transport" },
-  { id: "canoe", name: "קאנו", icon: "Kayak", color: "#2F7A8C", category: "sea-transport" },
+  { id: "ferry", name: "מעבורת", icon: "Ship", color: CATEGORY_COLORS["sea-transport"], category: "sea-transport" },
+  { id: "yacht", name: "יאכטה", icon: "Sailboat", color: CATEGORY_COLORS["sea-transport"], category: "sea-transport" },
+  { id: "ship", name: "אוניה", icon: "ShipWheel", color: CATEGORY_COLORS["sea-transport"], category: "sea-transport" },
+  { id: "cruise", name: "שייט", icon: "Anchor", color: CATEGORY_COLORS["sea-transport"], category: "sea-transport" },
+  { id: "canoe", name: "קאנו", icon: "Kayak", color: CATEGORY_COLORS["sea-transport"], category: "sea-transport" },
 
-  { id: "flight", name: "טיסה בינלאומית", icon: "Plane", color: "#256D64", category: "air-transport" },
-  { id: "domestic-flight", name: "טיסת פנים", icon: "PlaneTakeoff", color: "#3E7CB1", category: "air-transport" },
-  { id: "helicopter", name: "מסוק", icon: "Helicopter", color: "#256D64", category: "air-transport" },
+  { id: "flight", name: "טיסה בינלאומית", icon: "Plane", color: CATEGORY_COLORS["air-transport"], category: "air-transport" },
+  { id: "domestic-flight", name: "טיסת פנים", icon: "PlaneTakeoff", color: CATEGORY_COLORS["air-transport"], category: "air-transport" },
+  { id: "helicopter", name: "מסוק", icon: "Helicopter", color: CATEGORY_COLORS["air-transport"], category: "air-transport" },
 
-  { id: "hotel", name: "מלון", icon: "BedDouble", color: "#D98E3F", category: "accommodation" },
-  { id: "hostel", name: "אכסנייה", icon: "Building2", color: "#D98E3F", category: "accommodation" },
-  { id: "apartment", name: "דירה", icon: "Home", color: "#D98E3F", category: "accommodation" },
+  { id: "hotel", name: "מלון", icon: "BedDouble", color: CATEGORY_COLORS.accommodation, category: "accommodation" },
+  { id: "hostel", name: "אכסנייה", icon: "Building2", color: CATEGORY_COLORS.accommodation, category: "accommodation" },
+  { id: "apartment", name: "דירה", icon: "Home", color: CATEGORY_COLORS.accommodation, category: "accommodation" },
 
-  { id: "self-tour", name: "טיול עצמאי", icon: "Footprints", color: "#5B8C5A", category: "activities" },
-  { id: "guided-tour", name: "טיול מודרך", icon: "Users", color: "#5B8C5A", category: "activities" },
-  { id: "day-tour", name: "טיול יומי", icon: "Sun", color: "#D9A23D", category: "activities" },
-  { id: "attraction", name: "אטרקציה", icon: "Landmark", color: "#5B8C5A", category: "activities" },
+  { id: "self-tour", name: "טיול עצמאי", icon: "Footprints", color: CATEGORY_COLORS.activities, category: "activities" },
+  { id: "guided-tour", name: "טיול מודרך", icon: "Users", color: CATEGORY_COLORS.activities, category: "activities" },
+  { id: "day-tour", name: "טיול יומי", icon: "Sun", color: CATEGORY_COLORS.activities, category: "activities" },
+  { id: "attraction", name: "אטרקציה", icon: "Landmark", color: CATEGORY_COLORS.activities, category: "activities" },
+  { id: "restaurant", name: "מסעדה", icon: "Utensils", color: CATEGORY_COLORS.activities, category: "activities" },
 ];
 const CATEGORY_ORDER = ["public-transport", "road-transport", "sea-transport", "air-transport", "accommodation", "activities", "other"];
 const CATEGORY_LABELS = {
@@ -97,12 +102,13 @@ const DEFAULT_COLUMNS = [
   { key: "link", label_he: "קישור", label_en: "Link", visible: true },
   { key: "cost", label_he: "עלות", label_en: "Cost", visible: true },
   { key: "notes", label_he: "הערות", label_en: "Notes", visible: true },
+  { key: "weather", label_he: "תחזית", label_en: "Forecast", visible: true },
 ];
 
 const T_DICT = {
   he: {
     appName: "MyTrip", addRow: "הוסף רשומה", addDay: "הוסף יום", newFrame: "מסגרת חדשה",
-    columns: "עמודות", addColumn: "הוסף עמודה", addType: "הוסף תיאור", resetColumnWidths: "איפוס רוחב עמודות (גרור את קצה כותרת העמודה לשינוי ידני)", actions: "פעולות", on: "פעיל", settings: "הגדרות", manageColumns: "ניהול עמודות",
+    columns: "עמודות", addColumn: "הוסף עמודה", addType: "הוסף תיאור", resetColumnWidths: "איפוס רוחב עמודות (גרור את קצה כותרת העמודה לשינוי ידני)", actions: "פעולות", on: "פעיל", settings: "הגדרות", manageColumns: "ניהול עמודות", undo: "בטל פעולה אחרונה", redo: "חזור על פעולה",
     exportFile: "שמור לקובץ", importFile: "ייבוא מקובץ", importSuccess: "הייבוא הצליח", importError: "הקובץ אינו תקין",
     login: "התחברות עם Google", logout: "יציאה",
     desktop: "מחשב", mobile: "סלולר", lang: "English", editRecord: "כרטיס רשומה",
@@ -115,8 +121,8 @@ const T_DICT = {
     totalPerCurrency: "סה״כ טיול", timeError: "שעת סיום לפני שעת ההתחלה — סמן \"חוצה חצות\" אם מדובר בלילה",
     noRows: "אין עדיין רשומות כאן", dragHint: "גרירה לשינוי סדר", mockNote: "*הדמיית התחברות בלבד בפרוטוטייפ",
     frameModalNew: "מסגרת טיול חדשה", frameModalEdit: "עריכת מסגרת", frameName: "שם המסגרת",
-    frameStart: "תאריך התחלה", frameEnd: "תאריך סיום", parentFrame: "שייכת למסגרת",
-    addSubFrame: "הוסף מסגרת-משנה", suggestPrefix: "זוהו", suggestMid: "טיסות ללא מסגרת:", moreOptions: "עוד אפשרויות",
+    frameStart: "תאריך התחלה", frameEnd: "תאריך סיום", frameDateRange: "טווח תאריכים", parentFrame: "שייכת למסגרת",
+    addSubFrame: "הוסף מסגרת-משנה", suggestPrefix: "זוהו", suggestMid: "טיסות ללא מסגרת:", moreOptions: "עוד אפשרויות", editFrame: "ערוך מסגרת",
     fillDatesAbove: "הוסף מסגרת מעל התאריך הקיים", fillDatesBelow: "הוסף מסגרת מתחת לתאריך הקיים",
     suggestBtn: "צור מסגרת טיול אוטומטית", suggestDismiss: "התעלם",
     fxApprox: "לפי שער מקורב (אין חיבור לאינטרנט)", fxLive: "לפי שער עדכני",
@@ -159,7 +165,7 @@ const T_DICT = {
   },
   en: {
     appName: "MyTrip", addRow: "Add record", addDay: "Add day", newFrame: "New frame",
-    columns: "Columns", addColumn: "Add column", addType: "Add description", resetColumnWidths: "Reset column widths (drag a header's edge to resize manually)", actions: "Actions", on: "On", settings: "Settings", manageColumns: "Manage columns",
+    columns: "Columns", addColumn: "Add column", addType: "Add description", resetColumnWidths: "Reset column widths (drag a header's edge to resize manually)", actions: "Actions", on: "On", settings: "Settings", manageColumns: "Manage columns", undo: "Undo last action", redo: "Redo action",
     exportFile: "Save to file", importFile: "Import from file", importSuccess: "Import successful", importError: "This file isn't valid",
     login: "Sign in with Google", logout: "Sign out",
     desktop: "Desktop", mobile: "Mobile", lang: "עברית", editRecord: "Record card",
@@ -172,8 +178,8 @@ const T_DICT = {
     totalPerCurrency: "Trip total", timeError: "End time is before start time — check \"crosses midnight\" for overnight legs",
     noRows: "No records here yet", dragHint: "Drag to reorder", mockNote: "*Sign-in is a prototype mock only",
     frameModalNew: "New trip frame", frameModalEdit: "Edit frame", frameName: "Frame name",
-    frameStart: "Start date", frameEnd: "End date", parentFrame: "Belongs to frame",
-    addSubFrame: "Add sub-frame", suggestPrefix: "Found", suggestMid: "flights without a frame:", moreOptions: "More options",
+    frameStart: "Start date", frameEnd: "End date", frameDateRange: "Date range", parentFrame: "Belongs to frame",
+    addSubFrame: "Add sub-frame", suggestPrefix: "Found", suggestMid: "flights without a frame:", moreOptions: "More options", editFrame: "Edit frame",
     fillDatesAbove: "Add frame above the existing date", fillDatesBelow: "Add frame below the existing date",
     suggestBtn: "Auto-create a trip frame", suggestDismiss: "Dismiss",
     fxApprox: "Approximate rate (no internet connection)", fxLive: "Live rate",
@@ -348,7 +354,7 @@ function fetchWeather(lat, lon, dateStr) {
 const COL_WIDTHS = {
   handle: 26, actions: 64,
   date: 78, day: 48, icon: 30, type: 112, from: 138, to: 138,
-  startTime: 58, duration: 44, endTime: 58, route: 72, link: 30, cost: 84, notes: 30,
+  startTime: 58, duration: 44, endTime: 58, route: 72, link: 30, cost: 84, notes: 30, weather: 34,
 };
 function colFixedWidth(key) {
   if (COL_WIDTHS[key] != null) return COL_WIDTHS[key];
@@ -461,6 +467,24 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
     fetchRouteDistance();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [row.id, row.from, row.to, row.fromLat, row.fromLon, row.toLat, row.toLon]);
+
+  const [weatherLoading, setWeatherLoading] = useState(false);
+  const hasWeather = row.weatherCode != null && row.weatherForDate === row.date;
+  useEffect(() => {
+    if (hasWeather || weatherLoading || !row.date) return;
+    const dest = row.to || row.toAlias || "";
+    if (!dest) return;
+    setWeatherLoading(true);
+    const p = (row.toLat != null && row.toLon != null) ? Promise.resolve({ lat: row.toLat, lon: row.toLon }) : geocodeText(dest);
+    p.then((coords) => {
+      setWeatherLoading(false);
+      if (!coords) return;
+      return fetchWeather(coords.lat, coords.lon, row.date).then((w) => {
+        if (w) updateRow(row.id, { weatherCode: w.code, weatherMin: w.min, weatherMax: w.max, weatherForDate: row.date });
+      });
+    }).catch(() => setWeatherLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [row.id, row.date, row.to, row.toAlias, row.toLat, row.toLon]);
 
   function computeTypeMenuPos() {
     if (!typeBtnRef.current) return;
@@ -589,6 +613,11 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
       ) : (
         <button className="mt-link-icon empty" title={T.notes} onClick={() => openCard(row)}><StickyNote size={14} /></button>
       );
+      case "weather": {
+        if (weatherLoading) return <span className="mt-link-icon" title={T.weatherLoading}><Cloud size={14} className="mt-weather-spin" /></span>;
+        if (hasWeather) { const meta = weatherMeta(row.weatherCode); const WI = WEATHER_ICONS[meta.icon] || Cloud; return <span className="mt-link-icon" title={`${meta[lang]} · ${Math.round(row.weatherMin)}°–${Math.round(row.weatherMax)}°C`}><WI size={14} /></span>; }
+        return <span className="mt-link-icon empty" title={T.weatherAtArrival}><Cloud size={14} /></span>;
+      }
       default:
         if (col.custom) return <input className="mt-editable" title={(row.custom && row.custom[col.key]) || ""} value={(row.custom && row.custom[col.key]) || ""} onChange={(e) => updateRow(row.id, { custom: { ...row.custom, [col.key]: e.target.value } })} />;
         return null;
@@ -816,7 +845,7 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
           <div className="mt-floating-menu mt-kebab-menu" style={{ top: frameMenuPos.top, left: frameMenuPos.left }}>
             <button className="mt-share-opt" onClick={() => { openAddDayModal(frame.id); setFrameMenuOpenId(null); }}><Plus size={14} /> {T.addDay}</button>
             <button className="mt-share-opt" onClick={() => { openFrameModal(null, frame.id); setFrameMenuOpenId(null); }}><FolderPlus size={14} /> {T.addSubFrame}</button>
-            <button className="mt-share-opt" onClick={() => { openFrameModal(frame); setFrameMenuOpenId(null); }}><Pencil size={14} /> {T.editRecord}</button>
+            <button className="mt-share-opt" onClick={() => { openFrameModal(frame); setFrameMenuOpenId(null); }}><Pencil size={14} /> {T.editFrame}</button>
             <div className="divider" />
             <button className="mt-share-opt" style={{ color: "var(--danger)" }} onClick={() => { deleteFrame(frame.id); setFrameMenuOpenId(null); }}><Trash2 size={14} /> {T.delete}</button>
           </div>
@@ -825,7 +854,6 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
       {!frame.collapsed && (
         <div className="mt-frame-body">
           {renderContext(frame.id, depth + 1)}
-          <button className="mt-group-add mt-frame-add-row" onClick={() => addRow(lastDateInContext(frame.id), null, frame.id)}><Plus size={13} /> {T.addRow}</button>
         </div>
       )}
     </div>
@@ -844,6 +872,9 @@ function MapClickCapture({ onPick }) {
 export default function MyTripApp() {
   const [rows, setRows] = useState(initialRows);
   const [frames, setFrames] = useState([]);
+  const [history, setHistory] = useState([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const isApplyingHistory = useRef(false);
   const [types, setTypes] = useState(DEFAULT_TYPES);
   const [columns, setColumns] = useState(DEFAULT_COLUMNS);
   const [columnWidths, setColumnWidths] = useState({});
@@ -939,6 +970,34 @@ export default function MyTripApp() {
     window.addEventListener("mouseup", onUp);
   }
   function resetColumnWidths() { setColumnWidths({}); }
+
+  useEffect(() => {
+    if (isApplyingHistory.current) { isApplyingHistory.current = false; return; }
+    setHistory((prev) => {
+      const trimmed = prev.slice(0, historyIndex + 1);
+      const next = [...trimmed, { rows, frames }];
+      return next.length > 50 ? next.slice(next.length - 50) : next;
+    });
+    setHistoryIndex((i) => Math.min(i + 1, 49));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, frames]);
+
+  function undo() {
+    if (historyIndex <= 0) return;
+    const snap = history[historyIndex - 1];
+    isApplyingHistory.current = true;
+    setRows(snap.rows); setFrames(snap.frames);
+    setHistoryIndex(historyIndex - 1);
+  }
+  function redo() {
+    if (historyIndex >= history.length - 1) return;
+    const snap = history[historyIndex + 1];
+    isApplyingHistory.current = true;
+    setRows(snap.rows); setFrames(snap.frames);
+    setHistoryIndex(historyIndex + 1);
+  }
+  const canUndo = historyIndex > 0;
+  const canRedo = historyIndex < history.length - 1;
 
   function exportToPDF() { window.print(); }
   function toggleReminders() {
@@ -1209,8 +1268,7 @@ export default function MyTripApp() {
   function addCustomType(rowIdToApply) {
     if (!newTypeDraft.name.trim()) return;
     const id = "custom-" + uid();
-    const color = CUSTOM_COLOR_ROTATION[types.length % CUSTOM_COLOR_ROTATION.length];
-    setTypes((prev) => [...prev, { id, name: newTypeDraft.name, icon: newTypeDraft.icon, color }]);
+    setTypes((prev) => [...prev, { id, name: newTypeDraft.name, icon: newTypeDraft.icon, color: CATEGORY_COLORS.other, category: "other" }]);
     if (rowIdToApply) updateRow(rowIdToApply, { typeId: id });
     setNewTypeDraft({ name: "", icon: "Tag" }); setTypeMenuOpen(null);
   }
@@ -1233,8 +1291,7 @@ export default function MyTripApp() {
   function submitAddType() {
     if (!addTypeDraft.name.trim()) return;
     const id = "custom-" + uid();
-    const color = CUSTOM_COLOR_ROTATION[types.length % CUSTOM_COLOR_ROTATION.length];
-    setTypes((prev) => [...prev, { id, name: addTypeDraft.name, icon: addTypeDraft.icon, color }]);
+    setTypes((prev) => [...prev, { id, name: addTypeDraft.name, icon: addTypeDraft.icon, color: CATEGORY_COLORS.other, category: "other" }]);
     setAddTypeDraft({ name: "", icon: "Tag" }); setAddTypeOpen(false);
   }
 
@@ -1404,6 +1461,73 @@ export default function MyTripApp() {
     );
   }
 
+  function DateRangeField({ startDate, endDate, onChange }) {
+    const [open, setOpen] = useState(false);
+    const [viewMonth, setViewMonth] = useState(() => { const d = startDate ? new Date(startDate + "T00:00:00") : new Date(); d.setDate(1); return d; });
+    const [tempStart, setTempStart] = useState(startDate || "");
+    const [tempEnd, setTempEnd] = useState(endDate || "");
+    const btnRef = useRef(null);
+    function toggleOpen() {
+      if (!open) { const d = tempStart ? new Date(tempStart + "T00:00:00") : new Date(); d.setDate(1); setViewMonth(d); }
+      setOpen((v) => !v);
+    }
+    function pad(n) { return String(n).padStart(2, "0"); }
+    function toISO(y, m, day) { return `${y}-${pad(m + 1)}-${pad(day)}`; }
+    function clickDay(iso) {
+      if (!tempStart || (tempStart && tempEnd)) { setTempStart(iso); setTempEnd(""); onChange(iso, ""); }
+      else {
+        let s = tempStart, e = iso;
+        if (e < s) { const t = s; s = e; e = t; }
+        setTempStart(s); setTempEnd(e); onChange(s, e);
+      }
+    }
+    function shiftMonth(delta) { setViewMonth((prev) => { const d = new Date(prev); d.setMonth(d.getMonth() + delta); return d; }); }
+    const y = viewMonth.getFullYear(), m = viewMonth.getMonth();
+    const firstDow = new Date(y, m, 1).getDay();
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const cells = [];
+    for (let i = 0; i < firstDow; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+    const monthLabel = viewMonth.toLocaleDateString(lang === "he" ? "he-IL" : "en-US", { month: "long", year: "numeric" });
+    return (
+      <div style={{ position: "relative" }}>
+        <button ref={btnRef} type="button" className="mt-daterange-btn" onClick={toggleOpen}>
+          <CalendarIcon size={14} />
+          <span>{startDate ? fmtDate(startDate, lang) : "—"} – {endDate ? fmtDate(endDate, lang) : "—"}</span>
+        </button>
+        {open && (
+          <>
+            <div className="mt-floating-backdrop" onClick={() => setOpen(false)} />
+            <div className="mt-floating-menu mt-daterange-cal" dir="ltr">
+              <div className="mt-cal-header">
+                <button type="button" onClick={() => shiftMonth(-1)}><ChevronLeft size={16} /></button>
+                <strong>{monthLabel}</strong>
+                <button type="button" onClick={() => shiftMonth(1)}><ChevronRight size={16} /></button>
+              </div>
+              <div className="mt-cal-grid mt-cal-weekdays">
+                {(lang === "he" ? ["א", "ב", "ג", "ד", "ה", "ו", "ש"] : ["S", "M", "T", "W", "T", "F", "S"]).map((d, i) => <span key={i}>{d}</span>)}
+              </div>
+              <div className="mt-cal-grid">
+                {cells.map((d, i) => {
+                  if (!d) return <span key={i} />;
+                  const iso = toISO(y, m, d);
+                  const isStart = iso === tempStart, isEnd = iso === tempEnd;
+                  const inRange = tempStart && tempEnd && iso > tempStart && iso < tempEnd;
+                  return (
+                    <button type="button" key={i}
+                      className={"mt-cal-day" + (isStart || isEnd ? " edge" : "") + (inRange ? " in-range" : "")}
+                      onClick={() => clickDay(iso)}>{d}</button>
+                  );
+                })}
+              </div>
+              <button type="button" className="mt-btn primary" style={{ width: "100%", marginTop: 8 }} onClick={() => setOpen(false)}>{T.ok}</button>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
   const showFlightHint = cardDraft && (cardDraft.typeId === "flight" || cardDraft.typeId === "domestic-flight");
   const showTzHint = cardDraft && TZ_HINT_TYPES.includes(cardDraft.typeId);
   const fromVerifiedCard = cardDraft && cardDraft.fromVerifiedUrl && cardDraft.fromVerifiedText === cardDraft.from;
@@ -1435,6 +1559,7 @@ export default function MyTripApp() {
         .mt-brand-version { font-size:10px; color:var(--muted); font-weight:600; letter-spacing:.02em; }
         .mt-header-actions { display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
         .mt-icon-btn { border:1px solid var(--border); background:var(--surface); color:var(--ink); border-radius:8px; padding:6px 9px; display:flex; align-items:center; gap:5px; font-size:12.5px; font-weight:500; }
+        .mt-icon-btn:disabled { opacity:.35; cursor:not-allowed; }
         .mt-icon-btn:hover { background:var(--teal-tint); border-color:var(--teal); }
         .mt-icon-btn.active { background:var(--teal); color:#fff; border-color:var(--teal); }
         .mt-icon-btn svg { width:14px; height:14px; }
@@ -1469,6 +1594,21 @@ export default function MyTripApp() {
         .mt-frame-range { font-size:11.5px; color:var(--muted); background:var(--bg); padding:2px 8px; border-radius:20px; }
         .mt-frame-actions { display:flex; gap:2px; margin-inline-start:auto; }
         .mt-kebab-menu { min-width:180px; }
+        .mt-daterange-btn { display:flex; align-items:center; gap:7px; width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:13px; background:#fff; color:var(--ink); }
+        .mt-daterange-btn:hover { border-color:var(--teal); }
+        .mt-daterange-btn svg { color:var(--muted); flex-shrink:0; }
+        .mt-daterange-cal { padding:10px; min-width:230px; }
+        .mt-cal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+        .mt-cal-header button { border:none; background:none; color:var(--muted); display:flex; padding:4px; border-radius:6px; }
+        .mt-cal-header button:hover { background:var(--bg); }
+        .mt-cal-header strong { font-size:12.5px; }
+        .mt-cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
+        .mt-cal-weekdays { margin-bottom:2px; }
+        .mt-cal-weekdays span { text-align:center; font-size:10px; color:var(--muted); font-weight:600; }
+        .mt-cal-day { border:none; background:none; border-radius:6px; padding:6px 0; font-size:12px; color:var(--ink); font-variant-numeric:tabular-nums; }
+        .mt-cal-day:hover { background:var(--teal-tint); }
+        .mt-cal-day.in-range { background:var(--teal-tint); border-radius:0; }
+        .mt-cal-day.edge { background:var(--teal); color:#fff; font-weight:700; }
         .mt-frame-actions button { border:none; background:none; color:var(--muted); padding:4px; border-radius:5px; display:flex; }
         .mt-frame-actions button:hover { background:var(--teal-tint); color:var(--teal-dark); }
         .mt-frame-body { padding:2px 12px 12px 12px; }
@@ -1494,7 +1634,7 @@ export default function MyTripApp() {
         .mt-table tbody tr:hover { background:#FBFDFC; }
         .mt-table th.handle, .mt-table td.handle { white-space:nowrap; }
         .mt-table th.icon, .mt-table td.icon, .mt-table th.route, .mt-table td.route { white-space:nowrap; text-align:center; }
-        .mt-table th.link, .mt-table td.link, .mt-table th.actions, .mt-table td.actions, .mt-table th.notes, .mt-table td.notes { white-space:nowrap; text-align:center; }
+        .mt-table th.link, .mt-table td.link, .mt-table th.actions, .mt-table td.actions, .mt-table th.notes, .mt-table td.notes, .mt-table th.weather, .mt-table td.weather { white-space:nowrap; text-align:center; }
         .mt-table th.duration, .mt-table td.duration { white-space:nowrap; }
         .mt-table th.type, .mt-table td.type { overflow:visible; }
         .mt-table td.from, .mt-table td.to { overflow:hidden; text-overflow:ellipsis; }
@@ -1669,6 +1809,8 @@ export default function MyTripApp() {
           <button className="mt-icon-btn" ref={settingsBtnRef} onClick={openSettingsMenu}><Menu /> {T.settings}</button>
         </div>
         <div className="mt-toolbar-group">
+          <button className="mt-icon-btn" onClick={undo} disabled={!canUndo} title={T.undo}><Undo2 /></button>
+          <button className="mt-icon-btn" onClick={redo} disabled={!canRedo} title={T.redo}><Redo2 /></button>
           <button className="mt-icon-btn" ref={actionsBtnRef} onClick={openActionsMenu}><Menu /> {T.actions}</button>
           <input ref={importInputRef} type="file" accept="application/json,.json" style={{ display: "none" }}
             onChange={(e) => { importFromFile(e.target.files && e.target.files[0]); e.target.value = ""; }} />
@@ -2065,9 +2207,10 @@ export default function MyTripApp() {
             </div>
             <div className="mt-modal-body">
               <div className="mt-field"><label>{T.frameName}</label><input value={frameDraft.name} onChange={(e) => setFrameDraft({ ...frameDraft, name: e.target.value })} /></div>
-              <div className="mt-field-row">
-                <div className="mt-field"><label>{T.frameStart}</label><DateField value={frameDraft.startDate} onChange={(e) => setFrameDraft({ ...frameDraft, startDate: e.target.value })} /></div>
-                <div className="mt-field"><label>{T.frameEnd}</label><DateField value={frameDraft.endDate} onChange={(e) => setFrameDraft({ ...frameDraft, endDate: e.target.value })} /></div>
+              <div className="mt-field">
+                <label>{T.frameDateRange}</label>
+                <DateRangeField startDate={frameDraft.startDate} endDate={frameDraft.endDate}
+                  onChange={(s, e) => setFrameDraft({ ...frameDraft, startDate: s, endDate: e })} />
               </div>
               <div className="mt-field-row">
                 <button className="mt-btn ghost" style={{ width: "100%" }} onClick={fillFrameDatesAbove}><ArrowDownUp size={13} /> {T.fillDatesAbove}</button>
