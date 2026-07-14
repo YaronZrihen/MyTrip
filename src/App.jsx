@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "8.4.0";
+const APP_VERSION = "8.5.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -143,6 +143,9 @@ const T_DICT = {
     aiSuggestItinerary: "הצע מסלול יומי אוטומטי", aiInputPlaceholder: "שאל שאלה על הטיול...",
     aiSuggestDemoText: "דוגמה להצעה (הדגמה): יום 2 — בוקר: ביקור בקולוסיאום (09:00), צהריים: ארוחה בטרסטבר, אחה״צ: מזרקת טרווי ופנתיאון. לחיבור אמיתי נדרש שרת שמפעיל את Claude API.",
     aiChatDemoText: "זו תגובת הדגמה בלבד. בגרסה מחוברת, השאלה הזו הייתה נשלחת ל-Claude יחד עם נתוני הטיול שלך ומקבלת תשובה מבוססת.",
+    importRoute: "ייבא מסלול מגוגל מפות", importRouteHint: "הדבק קישור למסלול רב-תחנתי מגוגל מפות (Share → Copy link, אחרי תכנון מסלול עם כמה נקודות עצירה). כל תחנה תהפוך לרשומת \"אטרקציה\" נפרדת.",
+    importRouteParse: "פענח", importRouteNoStops: "לא זוהו תחנות בקישור — ודא שזה קישור מסלול (Directions) עם כמה תחנות, לא קישור למקום בודד.",
+    importRouteConfirm: "צור רשומות",
     aiAssistant: "עוזר AI (הדגמה)", ok: "הבנתי",
     locHint: "טיפ: אם החיפוש לא מוצא תוצאה בעברית, נסה לחפש בשם המקומי/אנגלי (למשל \"Fiumicino Airport\" ולא \"פיומיצ׳ינו\").",
     tabSearch: "חיפוש טקסט", tabMap: "בחירה במפה", mapPickHint: "לחץ במקום הרצוי על המפה כדי לסמן אותו",
@@ -196,6 +199,9 @@ const T_DICT = {
     aiSuggestItinerary: "Suggest an automatic day plan", aiInputPlaceholder: "Ask a question about the trip...",
     aiSuggestDemoText: "Example suggestion (demo): Day 2 — Morning: visit the Colosseum (9:00), Lunch in Trastevere, Afternoon: Trevi Fountain and the Pantheon. A real connection needs a server running the Claude API.",
     aiChatDemoText: "This is a demo reply only. In a connected version, this question would be sent to Claude along with your trip data and get a grounded answer.",
+    importRoute: "Import route from Google Maps", importRouteHint: "Paste a multi-stop Google Maps directions link (Share → Copy link, after planning a route with several stops). Each stop becomes a separate \"Attraction\" record.",
+    importRouteParse: "Parse", importRouteNoStops: "No stops detected in this link — make sure it's a Directions link with several stops, not a link to a single place.",
+    importRouteConfirm: "Create records",
     aiAssistant: "AI Assistant (preview)", ok: "Got it",
     locHint: "Tip: if the search finds nothing in Hebrew, try the local/English name instead (e.g. \"Fiumicino Airport\").",
     tabSearch: "Text search", tabMap: "Pick on map", mapPickHint: "Click anywhere on the map to mark it",
@@ -340,7 +346,7 @@ function fetchWeather(lat, lon, dateStr) {
 const COL_WIDTHS = {
   handle: 26, actions: 64,
   date: 78, day: 48, icon: 30, type: 112, from: 138, to: 138,
-  startTime: 58, duration: 44, endTime: 58, route: 30, link: 30, cost: 84, notes: 30,
+  startTime: 58, duration: 44, endTime: 58, route: 72, link: 30, cost: 84, notes: 30,
 };
 function colFixedWidth(key) {
   if (COL_WIDTHS[key] != null) return COL_WIDTHS[key];
@@ -362,16 +368,49 @@ function isChronological(rowsList) {
   }
   return true;
 }
+function parseGoogleMapsWaypoints(url) {
+  try {
+    const u = new URL(url.trim());
+    if (!/google\.[a-z.]+$/i.test(u.hostname.replace(/^www\./, "")) && !/^maps\.app\.goo\.gl$/i.test(u.hostname)) {
+      // still try to parse — some short/regional domains won't match, but structure may still work
+    }
+    const clean = (s) => decodeURIComponent(s.replace(/\+/g, " ")).trim();
+    if (u.searchParams.get("waypoints") || u.searchParams.get("destination") || u.searchParams.get("origin")) {
+      const parts = [];
+      const origin = u.searchParams.get("origin");
+      const waypoints = u.searchParams.get("waypoints");
+      const destination = u.searchParams.get("destination");
+      if (origin) parts.push(origin);
+      if (waypoints) parts.push(...waypoints.split("|"));
+      if (destination) parts.push(destination);
+      return parts.map(clean).filter(Boolean);
+    }
+    const match = u.pathname.match(/\/dir\/(.+)/);
+    if (match) {
+      const segments = match[1].split("/").filter(Boolean);
+      const names = segments.filter((s) => !/^@/.test(s) && !/^data=/.test(s) && !/^\d+(\.\d+)?,\d+(\.\d+)?,\d+/.test(s));
+      return names.map(clean).filter(Boolean);
+    }
+  } catch (e) { /* invalid URL */ }
+  return [];
+}
+function seedDateOffset(daysFromStart) {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 3 + daysFromStart);
+  return d.toISOString().slice(0, 10);
+}
 function initialRows() {
+  const day1 = seedDateOffset(0), day2 = seedDateOffset(1), day5 = seedDateOffset(4);
   const base = [
-    { date: "2026-09-10", typeId: "flight", from: "Ben Gurion Airport", to: "Aeroporto di Roma - Fiumicino Leonardo da Vinci", fromAlias: "תל אביב (TLV)", toAlias: "רומא (FCO)", startTime: "07:40", endTime: "10:35", link: "https://www.google.com/flights", costAmount: 1450, costCurrency: "₪", flightNumber: "LY386" },
-    { date: "2026-09-10", typeId: "taxi", from: "Aeroporto di Roma - Fiumicino Leonardo da Vinci", to: "Hilton Garden Inn Rome Airport", startTime: "11:15", endTime: "12:00", costAmount: 45, costCurrency: "€" },
-    { date: "2026-09-10", typeId: "hotel", from: "Hilton Garden Inn Rome Airport", to: "Hilton Garden Inn Rome Airport", startTime: "12:00", endTime: "15:00", notes: "מנוחה במלון", link: "https://www.booking.com", costAmount: 620, costCurrency: "€" },
-    { date: "2026-09-10", typeId: "train", from: "Hilton Garden Inn Rome Airport", to: "Fontana di Trevi", startTime: "15:30", endTime: "16:10", costAmount: 8, costCurrency: "€" },
-    { date: "2026-09-10", typeId: "day-tour", from: "Fontana di Trevi", to: "Fontana di Trevi", startTime: "16:15", endTime: "19:00", costAmount: 0, costCurrency: "€" },
-    { date: "2026-09-11", typeId: "guided-tour", from: "", to: "", startTime: "09:00", endTime: "13:00", link: "https://maps.google.com", costAmount: 280, costCurrency: "€" },
-    { date: "2026-09-11", typeId: "self-tour", from: "", to: "", startTime: "16:00", endTime: "19:30", costAmount: 0, costCurrency: "€" },
-    { date: "2026-09-14", typeId: "flight", from: "Aeroporto di Roma - Fiumicino Leonardo da Vinci", to: "Ben Gurion Airport", fromAlias: "רומא (FCO)", toAlias: "תל אביב (TLV)", startTime: "18:20", endTime: "21:50", costAmount: 1390, costCurrency: "₪", flightNumber: "LY387" },
+    { date: day1, typeId: "flight", from: "Ben Gurion Airport", to: "Aeroporto di Roma - Fiumicino Leonardo da Vinci", fromAlias: "תל אביב (TLV)", toAlias: "רומא (FCO)", startTime: "07:40", endTime: "10:35", link: "https://www.google.com/flights", costAmount: 1450, costCurrency: "₪", flightNumber: "LY386" },
+    { date: day1, typeId: "taxi", from: "Aeroporto di Roma - Fiumicino Leonardo da Vinci", to: "Hilton Garden Inn Rome Airport", startTime: "11:15", endTime: "12:00", costAmount: 45, costCurrency: "€" },
+    { date: day1, typeId: "hotel", from: "Hilton Garden Inn Rome Airport", to: "Hilton Garden Inn Rome Airport", startTime: "12:00", endTime: "15:00", notes: "מנוחה במלון", link: "https://www.booking.com", costAmount: 620, costCurrency: "€" },
+    { date: day1, typeId: "train", from: "Hilton Garden Inn Rome Airport", to: "Fontana di Trevi", startTime: "15:30", endTime: "16:10", costAmount: 8, costCurrency: "€" },
+    { date: day1, typeId: "day-tour", from: "Fontana di Trevi", to: "Fontana di Trevi", startTime: "16:15", endTime: "19:00", costAmount: 0, costCurrency: "€" },
+    { date: day2, typeId: "guided-tour", from: "", to: "", startTime: "09:00", endTime: "13:00", link: "https://maps.google.com", costAmount: 280, costCurrency: "€" },
+    { date: day2, typeId: "self-tour", from: "", to: "", startTime: "16:00", endTime: "19:30", costAmount: 0, costCurrency: "€" },
+    { date: day5, typeId: "flight", from: "Aeroporto di Roma - Fiumicino Leonardo da Vinci", to: "Ben Gurion Airport", fromAlias: "רומא (FCO)", toAlias: "תל אביב (TLV)", startTime: "18:20", endTime: "21:50", costAmount: 1390, costCurrency: "₪", flightNumber: "LY387" },
   ];
   return base.map((r) => ({ id: uid(), parentId: null, frameId: null, overnight: false, notes: "", mapLink: "", fromVerifiedUrl: "", fromVerifiedText: "", toVerifiedUrl: "", toVerifiedText: "", fromAlias: "", toAlias: "", fromLat: null, fromLon: null, toLat: null, toLon: null, routeDistanceKm: null, routeDurationMin: null, custom: {}, ...r }));
 }
@@ -395,7 +434,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
   const [showAddTypeForm, setShowAddTypeForm] = useState(false);
   const [distLoading, setDistLoading] = useState(false);
 
-  function handleRouteHover() {
+  function fetchRouteDistance() {
     if (row.routeDistanceKm != null || distLoading) return;
     const origin = rowStartPoint(row), dest = rowEndPoint(row);
     if (!origin || !dest) return;
@@ -403,13 +442,17 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
     const originP = (row.fromLat != null && row.fromLon != null) ? Promise.resolve({ lat: row.fromLat, lon: row.fromLon }) : geocodeText(origin);
     const destP = (row.toLat != null && row.toLon != null) ? Promise.resolve({ lat: row.toLat, lon: row.toLon }) : geocodeText(dest);
     Promise.all([originP, destP]).then(([a, b]) => {
-      if (!a || !b) { setDistLoading(false); return; }
+      setDistLoading(false);
+      if (!a || !b) return;
       return fetchDrivingRoute(a, b).then((info) => {
-        setDistLoading(false);
         if (info) updateRow(row.id, { routeDistanceKm: info.distanceKm, routeDurationMin: info.durationMin, fromLat: a.lat, fromLon: a.lon, toLat: b.lat, toLon: b.lon });
       });
     }).catch(() => setDistLoading(false));
   }
+  useEffect(() => {
+    fetchRouteDistance();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [row.id, row.from, row.to, row.fromLat, row.fromLon, row.toLat, row.toLon]);
 
   function computeTypeMenuPos() {
     if (!typeBtnRef.current) return;
@@ -514,10 +557,14 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
       case "duration": return <span title={dur === null ? "" : dur} style={{ color: dur === null ? "var(--danger)" : "var(--muted)", fontSize: 12 }}>{dur === null ? "!" : dur}</span>;
       case "endTime": return <input className="mt-editable mt-time" type="time" value={row.endTime} onChange={(e) => updateRow(row.id, { endTime: e.target.value })} />;
       case "route": return routeUrl ? (
-        <a className="mt-link-icon" href={routeUrl} target="_blank" rel="noreferrer" onMouseEnter={handleRouteHover}
-          title={distLoading ? T.calculatingDistance : (row.routeDistanceKm != null ? `${T.routeTooltip} — ${row.routeDistanceKm.toFixed(1)} ${T.km} (~${Math.round(row.routeDurationMin)} ${T.min})` : T.routeTooltip)}>
-          <Route size={14} />
-        </a>
+        <span className="mt-route-mini">
+          <a className="mt-link-icon" href={routeUrl} target="_blank" rel="noreferrer" title={T.routeTooltip}><Route size={14} /></a>
+          {row.routeDistanceKm != null ? (
+            <span className="mt-route-km">{row.routeDistanceKm.toFixed(1)} {T.km}</span>
+          ) : distLoading ? (
+            <span className="mt-route-km">…</span>
+          ) : null}
+        </span>
       ) : <span className="mt-link-icon empty" title={T.noRoute}><Route size={14} /></span>;
       case "link": return row.link ? (
         <a className="mt-link-icon" href={row.link} target="_blank" rel="noreferrer" title={row.link}><Link2 size={14} /></a>
@@ -561,26 +608,29 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
 }
 
 function MobileCardMeta({ row, ctx }) {
-  const { T, lang, updateRow } = ctx;
-  const [weatherState, setWeatherState] = useState(null);
-  const [weatherOpen, setWeatherOpen] = useState(false);
+  const { T, updateRow } = ctx;
   const [distLoading, setDistLoading] = useState(false);
+  const [weatherLoading, setWeatherLoading] = useState(false);
   const routeUrl = rowOwnRouteUrl(row);
+  const hasWeather = row.weatherCode != null && row.weatherForDate === row.date;
 
-  function handleWeatherClick(e) {
-    e.stopPropagation();
-    if (weatherState && weatherState.data) { setWeatherOpen((v) => !v); return; }
-    if (!row.date) return;
-    setWeatherState({ loading: true });
+  useEffect(() => {
+    if (hasWeather || weatherLoading || !row.date) return;
     const dest = row.to || row.toAlias || "";
+    if (!dest) return;
+    setWeatherLoading(true);
     const p = (row.toLat != null && row.toLon != null) ? Promise.resolve({ lat: row.toLat, lon: row.toLon }) : geocodeText(dest);
     p.then((coords) => {
-      if (!coords) { setWeatherState({ loading: false, error: true }); return; }
-      return fetchWeather(coords.lat, coords.lon, row.date).then((w) => setWeatherState({ loading: false, data: w, error: !w }));
-    }).catch(() => setWeatherState({ loading: false, error: true }));
-  }
-  function handleDistClick(e) {
-    e.stopPropagation();
+      setWeatherLoading(false);
+      if (!coords) return;
+      return fetchWeather(coords.lat, coords.lon, row.date).then((w) => {
+        if (w) updateRow(row.id, { weatherCode: w.code, weatherMin: w.min, weatherMax: w.max, weatherForDate: row.date });
+      });
+    }).catch(() => setWeatherLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [row.id, row.date, row.to, row.toAlias, row.toLat, row.toLon]);
+
+  useEffect(() => {
     if (row.routeDistanceKm != null || distLoading) return;
     const origin = rowStartPoint(row), dest = rowEndPoint(row);
     if (!origin || !dest) return;
@@ -588,33 +638,35 @@ function MobileCardMeta({ row, ctx }) {
     const originP = (row.fromLat != null && row.fromLon != null) ? Promise.resolve({ lat: row.fromLat, lon: row.fromLon }) : geocodeText(origin);
     const destP = (row.toLat != null && row.toLon != null) ? Promise.resolve({ lat: row.toLat, lon: row.toLon }) : geocodeText(dest);
     Promise.all([originP, destP]).then(([a, b]) => {
-      if (!a || !b) { setDistLoading(false); return; }
+      setDistLoading(false);
+      if (!a || !b) return;
       return fetchDrivingRoute(a, b).then((info) => {
-        setDistLoading(false);
         if (info) updateRow(row.id, { routeDistanceKm: info.distanceKm, routeDurationMin: info.durationMin, fromLat: a.lat, fromLon: a.lon, toLat: b.lat, toLon: b.lon });
       });
     }).catch(() => setDistLoading(false));
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [row.id, row.from, row.to, row.fromLat, row.fromLon, row.toLat, row.toLon]);
+
   function weatherIconEl() {
-    if (weatherState && weatherState.loading) return <Cloud size={15} className="mt-weather-spin" />;
-    if (weatherState && weatherState.data) { const meta = weatherMeta(weatherState.data.code); const WI = WEATHER_ICONS[meta.icon] || Cloud; return <WI size={15} />; }
-    return <Cloud size={15} />;
+    if (weatherLoading) return <Cloud size={15} className="mt-weather-spin" />;
+    if (hasWeather) { const meta = weatherMeta(row.weatherCode); const WI = WEATHER_ICONS[meta.icon] || Cloud; return <WI size={15} />; }
+    return <Cloud size={15} style={{ opacity: 0.35 }} />;
   }
 
   return (
     <span className="mt-card-icons" onClick={(e) => e.stopPropagation()}>
-      <button className="mt-link-icon" onClick={handleWeatherClick} title={T.weatherAtArrival}>{weatherIconEl()}</button>
-      {weatherState && weatherState.data && weatherOpen && (
-        <span className="mt-weather-detail">{weatherMeta(weatherState.data.code)[lang]} · {Math.round(weatherState.data.min)}°–{Math.round(weatherState.data.max)}°</span>
-      )}
+      <span className="mt-route-mini" title={T.weatherAtArrival}>
+        {weatherIconEl()}
+        {hasWeather && <span className="mt-route-km">{Math.round(row.weatherMin)}°–{Math.round(row.weatherMax)}°</span>}
+      </span>
       {routeUrl && (
         <span className="mt-route-mini">
           <a className="mt-link-icon" href={routeUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} title={T.routeTooltip}><Route size={15} /></a>
           {row.routeDistanceKm != null ? (
             <span className="mt-route-km">{row.routeDistanceKm.toFixed(1)} {T.km}</span>
-          ) : (
-            <button className="mt-route-km-btn" onClick={handleDistClick}>{distLoading ? "…" : T.km + "?"}</button>
-          )}
+          ) : distLoading ? (
+            <span className="mt-route-km">…</span>
+          ) : null}
         </span>
       )}
       {row.link && <a className="mt-link-icon" href={row.link} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} title={row.link}><Link2 size={15} /></a>}
@@ -807,7 +859,6 @@ export default function MyTripApp() {
   const [cardDraft, setCardDraft] = useState(null);
   const [flightLookupMsg, setFlightLookupMsg] = useState("");
   const [weatherData, setWeatherData] = useState(null);
-  const [weatherExpanded, setWeatherExpanded] = useState(false);
   const [remindersOn, setRemindersOn] = useState(false);
   const [firedReminders, setFiredReminders] = useState({});
   const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
@@ -818,6 +869,11 @@ export default function MyTripApp() {
   const [aiMessages, setAiMessages] = useState([]);
   const [aiInput, setAiInput] = useState("");
   const [demoNotice, setDemoNotice] = useState(null);
+  const [routeImportOpen, setRouteImportOpen] = useState(false);
+  const [routeImportUrl, setRouteImportUrl] = useState("");
+  const [routeImportStops, setRouteImportStops] = useState(null);
+  const [routeImportDate, setRouteImportDate] = useState("");
+  const [routeImportStartTime, setRouteImportStartTime] = useState("09:00");
   const [frameMenuOpenId, setFrameMenuOpenId] = useState(null);
   const [frameMenuPos, setFrameMenuPos] = useState({ top: 0, left: 0 });
   const [frameDraft, setFrameDraft] = useState(null);
@@ -909,12 +965,35 @@ export default function MyTripApp() {
     return () => clearInterval(id);
   }, [remindersOn, rows, firedReminders]);
 
-  function showDemoNotice(msg) { setDemoNotice(msg); setShareMenuOpen(false); }
+  function showDemoNotice(msg) { setDemoNotice(msg); setActionsMenuOpen(false); }
   function handleAiSuggest() { setAiMessages((p) => [...p, { role: "assistant", text: T.aiSuggestDemoText }]); }
   function handleAiSend() {
     if (!aiInput.trim()) return;
     setAiMessages((p) => [...p, { role: "user", text: aiInput }, { role: "assistant", text: T.aiChatDemoText }]);
     setAiInput("");
+  }
+
+  function openRouteImport() {
+    setRouteImportUrl(""); setRouteImportStops(null); setRouteImportDate(nextDateInContext(null));
+    setRouteImportOpen(true); setActionsMenuOpen(false);
+  }
+  function parseRouteImport() {
+    const stops = parseGoogleMapsWaypoints(routeImportUrl);
+    setRouteImportStops(stops);
+  }
+  function removeRouteImportStop(idx) {
+    setRouteImportStops((prev) => prev.filter((_, i) => i !== idx));
+  }
+  function confirmRouteImport() {
+    if (!routeImportStops || !routeImportStops.length || !routeImportDate) return;
+    let [h, m] = routeImportStartTime.split(":").map(Number);
+    routeImportStops.forEach((name) => {
+      const startTime = `${String(h % 24).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+      h += 1;
+      const id = addRow(routeImportDate, null, null);
+      updateRow(id, { typeId: "attraction", from: name, to: name, startTime });
+    });
+    setRouteImportOpen(false);
   }
 
   function buildShareHTML() {
@@ -955,7 +1034,6 @@ export default function MyTripApp() {
     a.href = url; a.download = `mytrip-share-${new Date().toISOString().slice(0, 10)}.html`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    setShareMenuOpen(false);
   }
   function exportToFile() {
     const payload = { version: APP_VERSION, exportedAt: new Date().toISOString(), rows, frames, displayCurrency };
@@ -1192,21 +1270,18 @@ export default function MyTripApp() {
 
   /* ---------- record card ---------- */
   function openCard(row) {
-    setCardRowId(row.id); setCardDraft({ ...row }); setFlightLookupMsg(""); setWeatherData(null); setWeatherExpanded(false);
-    if (row.date && row.toLat != null && row.toLon != null) {
-      setWeatherData({ loading: true });
-      fetchWeather(row.toLat, row.toLon, row.date).then((w) => setWeatherData({ loading: false, data: w, error: !w })).catch(() => setWeatherData({ loading: false, error: true }));
+    setCardRowId(row.id); setCardDraft({ ...row }); setFlightLookupMsg(""); setWeatherData(null);
+    if (row.date) {
+      const dest = row.to || row.toAlias || "";
+      if (dest) {
+        setWeatherData({ loading: true });
+        const p = (row.toLat != null && row.toLon != null) ? Promise.resolve({ lat: row.toLat, lon: row.toLon }) : geocodeText(dest);
+        p.then((coords) => {
+          if (!coords) { setWeatherData({ loading: false, error: true }); return; }
+          return fetchWeather(coords.lat, coords.lon, row.date).then((w) => setWeatherData({ loading: false, data: w, error: !w }));
+        }).catch(() => setWeatherData({ loading: false, error: true }));
+      }
     }
-  }
-  function checkWeatherManually() {
-    if (weatherData && weatherData.data) { setWeatherExpanded((v) => !v); return; }
-    if (!cardDraft || !cardDraft.to || !cardDraft.date) return;
-    setWeatherData({ loading: true });
-    const p = (cardDraft.toLat != null && cardDraft.toLon != null) ? Promise.resolve({ lat: cardDraft.toLat, lon: cardDraft.toLon }) : geocodeText(cardDraft.to);
-    p.then((coords) => {
-      if (!coords) { setWeatherData({ loading: false, error: true }); return; }
-      return fetchWeather(coords.lat, coords.lon, cardDraft.date).then((w) => setWeatherData({ loading: false, data: w, error: !w }));
-    }).catch(() => setWeatherData({ loading: false, error: true }));
   }
   function closeCard() { setCardRowId(null); setCardDraft(null); setFlightLookupMsg(""); setLocPicker(null); }
   function findPrevRowInDay(rowId) {
@@ -1612,6 +1687,8 @@ export default function MyTripApp() {
             <button className="mt-share-opt" onClick={() => { exportShareableHTML(); setActionsMenuOpen(false); }}><Share2 size={14} /> {T.shareExportHtml}</button>
             <div className="divider" />
             <button className="mt-share-opt" onClick={() => { setAiPanelOpen(true); setActionsMenuOpen(false); }}><Wand2 size={14} /> {T.aiAssistant}</button>
+            <div className="divider" />
+            <button className="mt-share-opt" onClick={openRouteImport}><Route size={14} /> {T.importRoute}</button>
           </div>
         </>
       )}
@@ -1639,6 +1716,42 @@ export default function MyTripApp() {
                 <div><input value={aiInput} placeholder={T.aiInputPlaceholder} onChange={(e) => setAiInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleAiSend()} /></div>
                 <button className="mt-btn primary" onClick={handleAiSend}><MessageCircle size={13} /></button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {routeImportOpen && (
+        <div className="mt-modal-backdrop" onClick={() => setRouteImportOpen(false)}>
+          <div className="mt-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="mt-modal-header"><span className="mt-modal-title">{T.importRoute}</span><button className="mt-btn ghost" onClick={() => setRouteImportOpen(false)}><X size={16} /></button></div>
+            <div className="mt-modal-body">
+              <div className="mt-hint">{T.importRouteHint}</div>
+              <div className="mt-field-inline">
+                <div><input value={routeImportUrl} placeholder="https://www.google.com/maps/dir/..." onChange={(e) => setRouteImportUrl(e.target.value)} /></div>
+                <button className="mt-btn primary" onClick={parseRouteImport}><Search size={13} /> {T.importRouteParse}</button>
+              </div>
+              {routeImportStops && routeImportStops.length === 0 && <div className="mt-error"><AlertTriangle /> {T.importRouteNoStops}</div>}
+              {routeImportStops && routeImportStops.length > 0 && (
+                <>
+                  <div className="mt-loc-results">
+                    {routeImportStops.map((name, i) => (
+                      <div key={i} className="mt-loc-result" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                        <span>{name}</span>
+                        <button className="mt-btn ghost mt-btn-icon" onClick={() => removeRouteImportStop(i)}><X size={13} /></button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-field-row">
+                    <div className="mt-field"><label>{T.addDayDate}</label><DateField value={routeImportDate} onChange={(e) => setRouteImportDate(e.target.value)} /></div>
+                    <div className="mt-field"><label>{T.start}</label><input type="time" value={routeImportStartTime} onChange={(e) => setRouteImportStartTime(e.target.value)} /></div>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="mt-modal-footer">
+              <button className="mt-btn ghost" onClick={() => setRouteImportOpen(false)}>{T.cancel}</button>
+              <button className="mt-btn primary" disabled={!routeImportStops || !routeImportStops.length || !routeImportDate} onClick={confirmRouteImport}><Check size={13} /> {T.importRouteConfirm}</button>
             </div>
           </div>
         </div>
@@ -1855,17 +1968,17 @@ export default function MyTripApp() {
               </div>
 
               <div className="mt-weather-row">
-                <button className="mt-link-icon mt-weather-icon-btn" onClick={checkWeatherManually} title={T.weatherAtArrival}>
+                <span className="mt-link-icon mt-weather-icon-btn" title={T.weatherAtArrival}>
                   {(() => {
                     if (weatherData && weatherData.loading) return <Cloud size={17} className="mt-weather-spin" />;
                     if (weatherData && weatherData.data) { const meta = weatherMeta(weatherData.data.code); const WI = WEATHER_ICONS[meta.icon] || Cloud; return <WI size={17} />; }
-                    return <Cloud size={17} />;
+                    return <Cloud size={17} style={{ opacity: 0.35 }} />;
                   })()}
-                </button>
+                </span>
                 <span className="mt-hint">{T.weatherAtArrival}</span>
                 {weatherData && weatherData.loading && <span className="mt-hint">{T.weatherLoading}</span>}
                 {weatherData && weatherData.error && <span className="mt-hint">{T.weatherUnavailable}</span>}
-                {weatherData && weatherData.data && weatherExpanded && (
+                {weatherData && weatherData.data && (
                   <span className="mt-weather-detail">{weatherMeta(weatherData.data.code)[lang]} · {Math.round(weatherData.data.min)}°–{Math.round(weatherData.data.max)}°C</span>
                 )}
               </div>
