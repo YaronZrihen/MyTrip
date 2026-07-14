@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "8.8.0";
+const APP_VERSION = "8.9.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -130,7 +130,7 @@ const T_DICT = {
     frameRangeContent: "טווח התאריכים חייב לכלול את כל הרשומות/תת-המסגרות שכבר קיימות במסגרת זו",
     frameRangeParent: "טווח התאריכים חייב להיות בתוך טווח המסגרת המכילה",
     rowOutOfFrame: "התאריך חייב להיות בתוך טווח המסגרת שאליה הרשומה משויכת",
-    routeTooltip: "פתח מסלול בגוגל מפות", dayRoute: "מסלול היום", noRoute: "אין מספיק נתוני מיקום",
+    routeTooltip: "פתח מסלול בגוגל מפות", dayRoute: "מסלול", addDayShort: "+ יום", noRoute: "אין מספיק נתוני מיקום",
     fetchFlightData: "משוך נתונים לפי מספר טיסה", flightApiMissing: "לצורך משיכה אוטומטית יש לחבר ספק נתוני טיסות (כגון AeroDataBox) עם מפתח API ופרוקסי בצד השרת. שדה זה מוכן לחיבור עתידי.",
     chronoWarning: "סדר הרשומות ביום זה אינו כרונולוגי לפי שעה", sortByTime: "מיין לפי שעה",
     addDayModalTitle: "הוספת יום חדש", addDayDate: "תאריך", confirmAdd: "הוסף",
@@ -187,7 +187,7 @@ const T_DICT = {
     frameRangeContent: "The date range must cover all records/sub-frames already inside this frame",
     frameRangeParent: "The date range must fit inside the containing frame's range",
     rowOutOfFrame: "The date must fall inside the frame this record belongs to",
-    routeTooltip: "Open route in Google Maps", dayRoute: "Day route", noRoute: "Not enough location data",
+    routeTooltip: "Open route in Google Maps", dayRoute: "Route", addDayShort: "+ Day", noRoute: "Not enough location data",
     fetchFlightData: "Fetch data by flight number", flightApiMissing: "Live lookup needs a flight-data provider (e.g. AeroDataBox) with an API key and a server-side proxy. This field is ready to be wired up later.",
     chronoWarning: "Records on this day are not in chronological time order", sortByTime: "Sort by time",
     addDayModalTitle: "Add a new day", addDayDate: "Date", confirmAdd: "Add",
@@ -886,7 +886,7 @@ function DayGroup({ g, fid, depth, ctx }) {
         <span className="mt-group-date">{fmtDate(g.date, lang)}</span>
         <span className="mt-group-day">{heDay(g.date, lang)}</span>
         <div className="mt-group-actions" onClick={(e) => e.stopPropagation()}>
-          <button className="mt-group-add" onClick={() => openAddDayModal(fid)}><Plus size={13} /> {T.addDay}</button>
+          <button className="mt-group-add" onClick={() => openAddDayModal(fid)}><Plus size={13} /> {T.addDayShort}</button>
           {dayRoute ? (
             <a className="mt-group-add" href={dayRoute} target="_blank" rel="noreferrer"><Waypoints size={13} /> {T.dayRoute}</a>
           ) : (
@@ -986,15 +986,21 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
   return (
     <div className="mt-frame-block" style={{ "--frame-color": color }}>
       <div className="mt-frame-header" onClick={() => toggleFrameCollapse(frame.id)}>
-        <span className="chev">{frame.collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}</span>
-        <span className="mt-frame-name">{frame.name}</span>
-        <FrameInlineDatePicker frame={frame} ctx={ctx} />
-        {convertedTotal > 0 && (
-          <span className="mt-frame-cost-inline">{displayCurrency} {convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-        )}
-        <span className="mt-frame-actions" onClick={(e) => e.stopPropagation()}>
-          <button ref={menuBtnRef} onClick={toggleMenu} title={T.moreOptions}><MoreVertical size={16} /></button>
-        </span>
+        <div className="mt-frame-header-top">
+          <span className="chev">{frame.collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}</span>
+          <span className="mt-frame-name">{frame.name}</span>
+          <span className="mt-frame-end-group">
+            {convertedTotal > 0 && (
+              <span className="mt-frame-cost-inline">{displayCurrency} {convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+            )}
+            <span className="mt-frame-actions" onClick={(e) => e.stopPropagation()}>
+              <button ref={menuBtnRef} onClick={toggleMenu} title={T.moreOptions}><MoreVertical size={16} /></button>
+            </span>
+          </span>
+        </div>
+        <div className="mt-frame-header-dates">
+          <FrameInlineDatePicker frame={frame} ctx={ctx} />
+        </div>
       </div>
       {isMenuOpen && (
         <>
@@ -1673,13 +1679,16 @@ export default function MyTripApp() {
         .mt-suggest svg { width:15px; height:15px; flex-shrink:0; }
         .mt-suggest .mt-btn { margin-inline-start:auto; }
         .mt-frame-block { border:1px solid var(--border); border-inline-start:4px solid var(--frame-color,var(--teal)); border-radius:12px; margin-top:16px; background:var(--surface); }
-        .mt-frame-header { display:flex; align-items:center; gap:9px; padding:10px 12px; cursor:pointer; user-select:none; flex-wrap:wrap; background:#FBFDFC; border-radius:11px 11px 0 0; }
+        .mt-frame-header { display:flex; flex-direction:column; padding:10px 12px; cursor:pointer; user-select:none; background:#FBFDFC; border-radius:11px 11px 0 0; }
+        .mt-frame-header-top { display:flex; align-items:center; gap:9px; }
+        .mt-frame-header-dates { margin-top:3px; }
         .mt-frame-name { font-weight:700; font-size:14px; font-family:'Frank Ruhl Libre',serif; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:24px; flex-shrink:1; }
-        .mt-frame-date-inline { font-size:12.5px; font-weight:700; color:var(--ink); white-space:nowrap; flex-shrink:0; font-variant-numeric:tabular-nums; }
+        .mt-frame-date-inline { font-size:12px; font-weight:700; color:var(--muted); white-space:nowrap; flex-shrink:0; font-variant-numeric:tabular-nums; }
         .mt-frame-date-btn { border:none; background:none; padding:0; cursor:pointer; }
         .mt-frame-date-btn:hover { text-decoration:underline; }
         .mt-frame-cost-inline { font-size:12.5px; font-weight:700; color:var(--amber); white-space:nowrap; flex-shrink:0; }
-        .mt-frame-actions { display:flex; gap:2px; margin-inline-start:auto; flex-shrink:0; }
+        .mt-frame-end-group { display:flex; align-items:center; gap:8px; margin-inline-start:auto; flex-shrink:0; }
+        .mt-frame-actions { display:flex; gap:2px; flex-shrink:0; }
         .mt-kebab-menu { min-width:180px; }
         .mt-daterange-btn { display:flex; align-items:center; gap:7px; width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:13px; background:#fff; color:var(--ink); }
         .mt-daterange-btn:hover { border-color:var(--teal); }
@@ -1704,7 +1713,7 @@ export default function MyTripApp() {
         .mt-group-header { display:flex; align-items:center; gap:7px; padding:6px 4px; cursor:pointer; user-select:none; flex-wrap:wrap; }
         .mt-group-date { font-weight:700; font-size:13.5px; }
         .mt-group-day { background:var(--teal-tint); color:var(--teal-dark); font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; }
-        .mt-group-actions { margin-inline-start:auto; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+        .mt-group-actions { margin-inline-start:auto; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
         .mt-group-add { font-size:12px; color:var(--teal); display:flex; align-items:center; gap:3px; background:none; border:none; font-weight:600; text-decoration:none; }
         .mt-group-add:hover { text-decoration:underline; }
         .mt-group-add.disabled { color:var(--border); cursor:default; }
