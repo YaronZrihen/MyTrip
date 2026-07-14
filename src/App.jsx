@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "8.3.1";
+const APP_VERSION = "8.4.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -560,6 +560,69 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
   );
 }
 
+function MobileCardMeta({ row, ctx }) {
+  const { T, lang, updateRow } = ctx;
+  const [weatherState, setWeatherState] = useState(null);
+  const [weatherOpen, setWeatherOpen] = useState(false);
+  const [distLoading, setDistLoading] = useState(false);
+  const routeUrl = rowOwnRouteUrl(row);
+
+  function handleWeatherClick(e) {
+    e.stopPropagation();
+    if (weatherState && weatherState.data) { setWeatherOpen((v) => !v); return; }
+    if (!row.date) return;
+    setWeatherState({ loading: true });
+    const dest = row.to || row.toAlias || "";
+    const p = (row.toLat != null && row.toLon != null) ? Promise.resolve({ lat: row.toLat, lon: row.toLon }) : geocodeText(dest);
+    p.then((coords) => {
+      if (!coords) { setWeatherState({ loading: false, error: true }); return; }
+      return fetchWeather(coords.lat, coords.lon, row.date).then((w) => setWeatherState({ loading: false, data: w, error: !w }));
+    }).catch(() => setWeatherState({ loading: false, error: true }));
+  }
+  function handleDistClick(e) {
+    e.stopPropagation();
+    if (row.routeDistanceKm != null || distLoading) return;
+    const origin = rowStartPoint(row), dest = rowEndPoint(row);
+    if (!origin || !dest) return;
+    setDistLoading(true);
+    const originP = (row.fromLat != null && row.fromLon != null) ? Promise.resolve({ lat: row.fromLat, lon: row.fromLon }) : geocodeText(origin);
+    const destP = (row.toLat != null && row.toLon != null) ? Promise.resolve({ lat: row.toLat, lon: row.toLon }) : geocodeText(dest);
+    Promise.all([originP, destP]).then(([a, b]) => {
+      if (!a || !b) { setDistLoading(false); return; }
+      return fetchDrivingRoute(a, b).then((info) => {
+        setDistLoading(false);
+        if (info) updateRow(row.id, { routeDistanceKm: info.distanceKm, routeDurationMin: info.durationMin, fromLat: a.lat, fromLon: a.lon, toLat: b.lat, toLon: b.lon });
+      });
+    }).catch(() => setDistLoading(false));
+  }
+  function weatherIconEl() {
+    if (weatherState && weatherState.loading) return <Cloud size={15} className="mt-weather-spin" />;
+    if (weatherState && weatherState.data) { const meta = weatherMeta(weatherState.data.code); const WI = WEATHER_ICONS[meta.icon] || Cloud; return <WI size={15} />; }
+    return <Cloud size={15} />;
+  }
+
+  return (
+    <span className="mt-card-icons" onClick={(e) => e.stopPropagation()}>
+      <button className="mt-link-icon" onClick={handleWeatherClick} title={T.weatherAtArrival}>{weatherIconEl()}</button>
+      {weatherState && weatherState.data && weatherOpen && (
+        <span className="mt-weather-detail">{weatherMeta(weatherState.data.code)[lang]} · {Math.round(weatherState.data.min)}°–{Math.round(weatherState.data.max)}°</span>
+      )}
+      {routeUrl && (
+        <span className="mt-route-mini">
+          <a className="mt-link-icon" href={routeUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} title={T.routeTooltip}><Route size={15} /></a>
+          {row.routeDistanceKm != null ? (
+            <span className="mt-route-km">{row.routeDistanceKm.toFixed(1)} {T.km}</span>
+          ) : (
+            <button className="mt-route-km-btn" onClick={handleDistClick}>{distLoading ? "…" : T.km + "?"}</button>
+          )}
+        </span>
+      )}
+      {row.link && <a className="mt-link-icon" href={row.link} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} title={row.link}><Link2 size={15} /></a>}
+      {row.notes && <span className="mt-link-icon has-note" title={row.notes}><StickyNote size={15} /></span>}
+    </span>
+  );
+}
+
 function DayGroup({ g, fid, depth, ctx }) {
   const { T, lang, effectiveMobile, collapsedGroups, setCollapsedGroups, collapsedParents, setCollapsedParents,
     addRow, openCard, types, visibleColumns, openAddDayModal, rows, sortDayByTime, getColWidth, startResize } = ctx;
@@ -595,7 +658,6 @@ function DayGroup({ g, fid, depth, ctx }) {
         <div className="mt-cards">
           {allRowsHere.map((r) => {
             const tm = typeMeta(r.typeId, types, T); const Icon = ICONS[tm.icon] || Tag;
-            const routeUrl = rowOwnRouteUrl(r);
             const fromLabel = r.fromAlias || r.from, toLabel = r.toAlias || r.to;
             return (
               <div className="mt-card" key={r.id} onClick={() => openCard(r)}>
@@ -614,11 +676,7 @@ function DayGroup({ g, fid, depth, ctx }) {
                   </div>
                 )}
                 <div className="mt-card-bottom">
-                  <span className="mt-card-icons" onClick={(e) => e.stopPropagation()}>
-                    {routeUrl && <a className="mt-link-icon" href={routeUrl} target="_blank" rel="noreferrer" title={T.routeTooltip}><Route size={15} /></a>}
-                    {r.link && <a className="mt-link-icon" href={r.link} target="_blank" rel="noreferrer" title={r.link}><Link2 size={15} /></a>}
-                    {r.notes && <span className="mt-link-icon has-note" title={r.notes}><StickyNote size={15} /></span>}
-                  </span>
+                  <MobileCardMeta row={r} ctx={ctx} />
                   {Number(r.costAmount) > 0 && <span className="mt-cost">{r.costCurrency}{r.costAmount}</span>}
                 </div>
               </div>
@@ -1416,29 +1474,29 @@ export default function MyTripApp() {
         .mt-modal.narrow { max-width:360px; }
         .mt-modal-header { display:flex; align-items:center; justify-content:space-between; padding:15px 18px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--surface); }
         .mt-modal-title { font-family:'Frank Ruhl Libre',serif; font-size:17px; font-weight:700; }
-        .mt-modal-body { padding:16px 18px; display:flex; flex-direction:column; gap:12px; }
+        .mt-modal-body { padding:14px 18px; display:flex; flex-direction:column; gap:9px; }
         .mt-field label { display:block; font-size:11.5px; font-weight:600; color:var(--muted); margin-bottom:4px; }
         .mt-field input, .mt-field select { width:100%; border:1px solid var(--border); border-radius:8px; padding:7px 9px; font-size:13px; font-family:inherit; background:#fff; color:var(--ink); }
         .mt-field input:focus, .mt-field select:focus { outline:none; border-color:var(--teal); }
         .mt-field-row { display:flex; gap:9px; }
         .mt-field-row > div { flex:1; }
-        .mt-field-inline { display:flex; gap:5px; align-items:flex-end; }
+        .mt-field-inline { display:flex; gap:3px; align-items:flex-end; }
         .mt-field-inline > div:first-child { flex:1; }
         .mt-checkbox-row { display:flex; align-items:center; gap:7px; font-size:12.5px; }
         .mt-error { display:flex; gap:6px; align-items:flex-start; background:#FBEAE8; color:var(--danger); font-size:11.5px; padding:7px 9px; border-radius:8px; }
         .mt-error svg { width:13px; height:13px; flex-shrink:0; margin-top:1px; }
         .mt-hint { font-size:11px; color:var(--muted); }
         .mt-weather-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-        .mt-weather-chip { display:flex; align-items:center; gap:6px; border:1px solid var(--border); background:#fff; border-radius:20px; padding:5px 12px; font-size:12px; font-weight:600; color:var(--ink); }
-        .mt-weather-chip:hover { background:var(--teal-tint); border-color:var(--teal); }
-        .mt-weather-chip svg { color:#3E7CB1; }
+        .mt-weather-icon-btn { border:1px solid var(--border); background:#fff; border-radius:8px; padding:5px; }
+        .mt-weather-icon-btn:hover { background:var(--teal-tint); border-color:var(--teal); }
+        .mt-weather-icon-btn svg { color:#3E7CB1; }
         .mt-weather-detail { font-size:12px; color:var(--muted); }
         .mt-weather-spin { animation:mt-spin 1.2s linear infinite; }
         @keyframes mt-spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
         .mt-verified-row { display:flex; align-items:center; gap:5px; font-size:11px; color:#3E8E5A; margin-top:3px; }
         .mt-modal-footer { display:flex; justify-content:flex-end; gap:7px; padding:13px 18px; border-top:1px solid var(--border); position:sticky; bottom:0; background:var(--surface); flex-wrap:wrap; }
         .mt-btn { border-radius:8px; padding:7px 14px; font-size:12.5px; font-weight:600; border:1px solid var(--border); background:#fff; display:inline-flex; align-items:center; gap:5px; }
-        .mt-btn-icon { padding:7px 8px; flex-shrink:0; }
+        .mt-btn-icon { padding:6px 6px; flex-shrink:0; }
         .mt-btn.primary { background:var(--teal); color:#fff; border-color:var(--teal); }
         .mt-btn.primary:disabled { opacity:.5; cursor:not-allowed; }
         .mt-btn:disabled { opacity:.4; cursor:not-allowed; }
@@ -1460,8 +1518,11 @@ export default function MyTripApp() {
         .mt-card-route { display:flex; align-items:center; gap:6px; font-size:13px; font-weight:600; flex-wrap:wrap; }
         .mt-card-arrow { color:var(--muted); font-weight:400; }
         .mt-card-bottom { display:flex; align-items:center; justify-content:space-between; margin-top:2px; }
-        .mt-card-icons { display:flex; align-items:center; gap:10px; }
+        .mt-card-icons { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
         .mt-card-icons .mt-link-icon { padding:4px; }
+        .mt-route-mini { display:flex; align-items:center; gap:2px; }
+        .mt-route-km { font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums; }
+        .mt-route-km-btn { border:none; background:none; color:var(--muted); font-size:10.5px; padding:0 2px; text-decoration:underline; }
         .mt-note { font-size:11px; color:var(--muted); margin-top:4px; }
 
         @media (max-width: 640px) {
@@ -1794,14 +1855,14 @@ export default function MyTripApp() {
               </div>
 
               <div className="mt-weather-row">
-                <button className="mt-weather-chip" onClick={checkWeatherManually} title={T.weatherAtArrival}>
+                <button className="mt-link-icon mt-weather-icon-btn" onClick={checkWeatherManually} title={T.weatherAtArrival}>
                   {(() => {
                     if (weatherData && weatherData.loading) return <Cloud size={17} className="mt-weather-spin" />;
                     if (weatherData && weatherData.data) { const meta = weatherMeta(weatherData.data.code); const WI = WEATHER_ICONS[meta.icon] || Cloud; return <WI size={17} />; }
                     return <Cloud size={17} />;
                   })()}
-                  <span>{T.weatherAtArrival}</span>
                 </button>
+                <span className="mt-hint">{T.weatherAtArrival}</span>
                 {weatherData && weatherData.loading && <span className="mt-hint">{T.weatherLoading}</span>}
                 {weatherData && weatherData.error && <span className="mt-hint">{T.weatherUnavailable}</span>}
                 {weatherData && weatherData.data && weatherExpanded && (
