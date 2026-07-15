@@ -9,7 +9,7 @@ import {
   Smartphone, Monitor, AlertTriangle, GripVertical, Check, FolderPlus, Sparkles,
   Route, Waypoints, Download, Upload, MapPin, Search, CircleCheck, Clock, ArrowDownUp, Copy, StickyNote, TrainFront,
   Bus, Motorbike, Bike, Scooter, Sailboat, ShipWheel, Anchor, Kayak, Helicopter, Caravan, Building2, Landmark, Home,
-  CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2, MoreVertical, Menu, Calendar as CalendarIcon, Undo2, Redo2
+  CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2, MoreVertical, Menu, Calendar as CalendarIcon, Undo2, Redo2, Info
 } from "lucide-react";
 
 /* ---------------------------------------------------------------------- */
@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "9.10.0";
+const APP_VERSION = "9.11.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -153,7 +153,7 @@ const T_DICT = {
     importRouteParse: "פענח", importRouteNoStops: "לא זוהו תחנות בקישור — ודא שזה קישור מסלול (Directions) עם כמה תחנות, לא קישור למקום בודד.",
     importRouteShortLink: "זה קישור מקוצר (maps.app.goo.gl) — שמות המקומות האמיתיים מוסתרים מאחוריו ואי אפשר לפענח אותם ישירות בדפדפן (חסימת גוגל, לא באג). פתרון: פתח את הקישור בדפדפן/באפליקציה, וכשהמסלול נפתח - העתק את הכתובת המלאה משורת הכתובת (תתחיל ב-google.com/maps/dir/...) והדבק אותה כאן במקום.",
     importRouteConfirm: "צור רשומות",
-    hotelInfo: "פרטי מלון", hotelPhotoDemo: "תמונה — דורש חיבור ל-Google Places API (בתשלום). זו הצגה בלבד.",
+    hotelInfo: "פרטי מלון", placeInfo: "פרטי מקום", hotelPhotoDemo: "תמונה — דורש חיבור ל-Google Places API (בתשלום). זו הצגה בלבד.",
     ratingDemo: "דירוג — הדגמה", viewOnMap: "הצג במפה", bookingLink: "קישור להזמנה",
     hotelInfoDemoNote: "כתובת ומפה — אמיתי (מהמיקום המאומת של הרשומה). תמונה ודירוג בפועל ידרשו חיבור ל-Google Places.",
     aiAssistant: "עוזר AI (הדגמה)", ok: "הבנתי",
@@ -214,7 +214,7 @@ const T_DICT = {
     importRouteParse: "Parse", importRouteNoStops: "No stops detected in this link — make sure it's a Directions link with several stops, not a link to a single place.",
     importRouteShortLink: "This is a shortened link (maps.app.goo.gl) — the real place names are hidden behind it and can't be read directly in the browser (a Google restriction, not a bug). Fix: open the link in your browser/app, and once the route loads, copy the full address from the address bar (starts with google.com/maps/dir/...) and paste that here instead.",
     importRouteConfirm: "Create records",
-    hotelInfo: "Hotel details", hotelPhotoDemo: "Photo — needs a Google Places API connection (paid). This is a preview only.",
+    hotelInfo: "Hotel details", placeInfo: "Place details", hotelPhotoDemo: "Photo — needs a Google Places API connection (paid). This is a preview only.",
     ratingDemo: "Rating — preview", viewOnMap: "View on map", bookingLink: "Booking link",
     hotelInfoDemoNote: "Address and map link — real (from the record's verified location). An actual photo and rating would need a Google Places connection.",
     aiAssistant: "AI Assistant (preview)", ok: "Got it",
@@ -614,9 +614,9 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
     switch (col.key) {
       case "date": return depth === 0 ? fmtDate(row.date, lang) : "";
       case "day": return depth === 0 ? heDay(row.date, lang) : "";
-      case "icon": return isAccommodationType(row.typeId) ? (
-        <button className="mt-type-icon mt-type-icon-btn" style={{ background: tm.color }} title={T.hotelInfo} onClick={() => openHotelInfo(row)}><Icon /></button>
-      ) : <span className="mt-type-icon" style={{ background: tm.color }}><Icon /></span>;
+      case "icon": return (
+        <button className="mt-type-icon mt-type-icon-btn" style={{ background: tm.color }} title={T.placeInfo} onClick={() => openHotelInfo(row)}><Icon /></button>
+      );
       case "type": return (
         <div className="mt-type-wrap">
           <button className="mt-type-btn" ref={typeBtnRef} title={tm.name} onClick={toggleTypeMenu}>
@@ -997,7 +997,7 @@ function MobileCardMeta({ row, ctx }) {
       )}
       {row.link && <a className="mt-link-icon" href={row.link} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} title={row.link}><Link2 size={15} /></a>}
       {row.notes && <button className="mt-link-icon has-note" title={row.notes} onClick={(e) => { e.stopPropagation(); openCard(row); }}><StickyNote size={15} /></button>}
-      {isAccommodationType(row.typeId) && <button className="mt-link-icon" title={T.hotelInfo} onClick={(e) => { e.stopPropagation(); openHotelInfo(row); }}><BedDouble size={15} /></button>}
+      <button className="mt-link-icon" title={T.placeInfo} onClick={(e) => { e.stopPropagation(); openHotelInfo(row); }}><Info size={15} /></button>
     </span>
   );
 }
@@ -2210,15 +2210,19 @@ export default function MyTripApp() {
         </div>
       )}
 
-      {hotelInfoRow && (
+      {hotelInfoRow && (() => {
+        const tm = typeMeta(hotelInfoRow.typeId, types, T, lang);
+        const TI = ICONS[tm.icon] || Tag;
+        return (
         <div className="mt-modal-backdrop" onClick={() => setHotelInfoRow(null)}>
           <div className="mt-modal" style={{ maxWidth: 340 }} onClick={(e) => e.stopPropagation()}>
-            <div className="mt-modal-header"><span className="mt-modal-title">{T.hotelInfo}</span><button className="mt-btn ghost" onClick={() => setHotelInfoRow(null)}><X size={16} /></button></div>
+            <div className="mt-modal-header"><span className="mt-modal-title">{T.placeInfo}</span><button className="mt-btn ghost" onClick={() => setHotelInfoRow(null)}><X size={16} /></button></div>
             <div className="mt-modal-body">
-              <div className="mt-hotel-photo-demo">
-                <BedDouble size={30} />
+              <div className="mt-hotel-photo-demo" style={{ background: `linear-gradient(135deg, ${tm.color}22, var(--bg))`, color: tm.color }}>
+                <TI size={30} />
                 <span>{T.hotelPhotoDemo}</span>
               </div>
+              <div className="mt-type-chip"><span className="mt-type-icon" style={{ background: tm.color, width: 20, height: 20 }}><TI size={11} /></span><strong style={{ fontSize: 12.5 }}>{tm.name}</strong></div>
               <div style={{ fontWeight: 700, fontSize: 15 }}>{hotelInfoRow.fromAlias || hotelInfoRow.from || hotelInfoRow.toAlias || hotelInfoRow.to || "—"}</div>
               {(hotelInfoRow.from || hotelInfoRow.to) && <div className="mt-hint">{hotelInfoRow.from || hotelInfoRow.to}</div>}
               <div className="mt-hotel-rating-demo">
@@ -2235,7 +2239,8 @@ export default function MyTripApp() {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {routeImportOpen && (
         <div className="mt-modal-backdrop" onClick={() => setRouteImportOpen(false)}>
