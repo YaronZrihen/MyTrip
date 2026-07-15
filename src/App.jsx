@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "9.2.0";
+const APP_VERSION = "9.3.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -160,6 +160,7 @@ const T_DICT = {
     confirmLocation: "אשר מיקום זה",
     locPickerTitle: "חיפוש מיקום", locSearch: "חפש", locSearching: "מחפש...", locNoResults: "לא נמצאו תוצאות",
     locError: "החיפוש נכשל (בעיית רשת/CORS מול שירות המיקומים). אפשר לפתוח חיפוש ידני בגוגל מפות במקום:",
+    technicalDetail: "פרט טכני",
     openInGoogleSearch: "פתח חיפוש בגוגל מפות",
     flightPlaceholder: "עיר (קוד שדה תעופה, למשל TLV)", tzNote: "התאמת שעון אוטומטית לפי אזורי זמן דורשת חיבור ל-API מסחרי (כגון Google Time Zone) עם מפתח — לא מיושמת בפרוטוטייפ. יש לוודא ידנית שהשעות מוזנות לפי השעון המקומי בכל מיקום.",
   },
@@ -217,6 +218,7 @@ const T_DICT = {
     confirmLocation: "Confirm this location",
     locPickerTitle: "Location search", locSearch: "Search", locSearching: "Searching...", locNoResults: "No results found",
     locError: "Search failed (network/CORS issue reaching the location service). You can open a manual Google Maps search instead:",
+    technicalDetail: "Technical detail",
     openInGoogleSearch: "Open Google Maps search",
     flightPlaceholder: "City (airport code, e.g. TLV)", tzNote: "Automatic time-zone adjustment needs a commercial API (e.g. Google Time Zone) with a key — not implemented in this prototype. Please double-check that times are entered in each location's local time.",
   }
@@ -1567,9 +1569,9 @@ export default function MyTripApp() {
         setWeatherData({ loading: true });
         const p = (row.toLat != null && row.toLon != null) ? Promise.resolve({ lat: row.toLat, lon: row.toLon }) : geocodeText(dest);
         p.then((coords) => {
-          if (!coords) { setWeatherData({ loading: false, error: true }); return; }
-          return fetchWeather(coords.lat, coords.lon, row.date).then((w) => setWeatherData({ loading: false, data: w, error: !w }));
-        }).catch(() => setWeatherData({ loading: false, error: true }));
+          if (!coords) { setWeatherData({ loading: false, error: "geocode-empty" }); return; }
+          return fetchWeather(coords.lat, coords.lon, row.date).then((w) => setWeatherData({ loading: false, data: w, error: w ? null : "weather-empty" }));
+        }).catch((err) => setWeatherData({ loading: false, error: (err && err.message) || "network" }));
       }
     }
   }
@@ -2198,7 +2200,10 @@ export default function MyTripApp() {
                 {!locPicker.loading && locPicker.error && (
                   <div className="mt-error">
                     <AlertTriangle />
-                    <span>{T.locError} <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locPicker.query)}`} target="_blank" rel="noreferrer">{T.openInGoogleSearch}</a></span>
+                    <span>
+                      {T.locError} <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locPicker.query)}`} target="_blank" rel="noreferrer">{T.openInGoogleSearch}</a>
+                      <br /><span style={{ fontSize: 10.5, opacity: .8 }}>{T.technicalDetail}: {String(locPicker.error)}</span>
+                    </span>
                   </div>
                 )}
                 {!locPicker.loading && !locPicker.error && locPicker.results.length === 0 && <div className="mt-hint">{T.locNoResults}</div>}
@@ -2310,7 +2315,7 @@ export default function MyTripApp() {
                 </span>
                 <span className="mt-hint">{T.weatherAtArrival}</span>
                 {weatherData && weatherData.loading && <span className="mt-hint">{T.weatherLoading}</span>}
-                {weatherData && weatherData.error && <span className="mt-hint">{T.weatherUnavailable}</span>}
+                {weatherData && weatherData.error && <span className="mt-hint">{T.weatherUnavailable} ({T.technicalDetail}: {String(weatherData.error)})</span>}
                 {weatherData && weatherData.data && (
                   <span className="mt-weather-detail">{weatherMeta(weatherData.data.code)[lang]} · {Math.round(weatherData.data.min)}°–{Math.round(weatherData.data.max)}°C</span>
                 )}
