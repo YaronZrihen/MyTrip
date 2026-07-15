@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "9.8.0";
+const APP_VERSION = "9.9.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -336,7 +336,7 @@ function geocodeTextDetailed(text) {
   if (__geocodeCache.has(key)) return __geocodeCache.get(key);
   const p = throttledCall(() => fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&extratags=1&limit=1&accept-language=he,en&q=${encodeURIComponent(text)}`, { headers: { Accept: "application/json" } })
     .then((r) => { if (!r.ok) throw new Error("http-" + r.status); return r.json(); })
-    .then((data) => (data && data[0] ? { lat: Number(data[0].lat), lon: Number(data[0].lon), address: data[0].address, extratags: data[0].extratags, display_name: data[0].display_name } : null)))
+    .then((data) => (data && data[0] ? { lat: Number(data[0].lat), lon: Number(data[0].lon), address: data[0].address, extratags: data[0].extratags, display_name: data[0].display_name, osmClass: data[0].class, osmType: data[0].type } : null)))
     .catch((err) => { __geocodeCache.delete(key); throw err; });
   __geocodeCache.set(key, p);
   return p;
@@ -344,12 +344,16 @@ function geocodeTextDetailed(text) {
 function geocodeText(text) {
   return geocodeTextDetailed(text).then((r) => (r ? { lat: r.lat, lon: r.lon } : null));
 }
-function deriveSmartAlias(result, isFlightRow) {
+function deriveSmartAlias(result, isFlightRow, lang) {
   if (!result) return null;
   const addr = result.address || {};
-  const cityName = addr.city || addr.town || addr.village || addr.suburb || addr.county || addr.state || (result.display_name || "").split(",")[0];
+  const specific = addr.suburb || addr.neighbourhood || addr.quarter || addr.hamlet || addr.city_district || addr.borough || addr.town || addr.village;
+  const cityName = specific || addr.city || addr.county || addr.state || (result.display_name || "").split(",")[0];
   const iata = result.extratags && (result.extratags.iata || result.extratags["iata"]);
-  return isFlightRow && iata ? `${cityName} (${iata.toUpperCase()})` : cityName;
+  if (isFlightRow && iata) return `${cityName} (${iata.toUpperCase()})`;
+  const isAirport = result.osmClass === "aeroway" || result.osmType === "aerodrome" || (result.extratags && result.extratags.aeroway) || iata;
+  if (isAirport) return lang === "en" ? `${cityName}, Airport` : `${cityName}, שדה תעופה`;
+  return cityName;
 }
 function fetchDrivingRoute(a, b) {
   return throttledCall(() => fetch(`https://router.project-osrm.org/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?overview=false`)
@@ -530,7 +534,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
       setFromVerifyLoading(false);
       if (!result) return;
       const patch = { fromLat: result.lat, fromLon: result.lon, fromVerifiedUrl: mapsSearchUrl(result.lat, result.lon), fromVerifiedText: row.from };
-      if (!row.fromAlias) { const alias = deriveSmartAlias(result, isFlightRow); if (alias) patch.fromAlias = alias; }
+      if (!row.fromAlias) { const alias = deriveSmartAlias(result, isFlightRow, lang); if (alias) patch.fromAlias = alias; }
       updateRow(row.id, patch);
     }).catch(() => setFromVerifyLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -551,7 +555,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
       setToVerifyLoading(false);
       if (!result) return;
       const patch = { toLat: result.lat, toLon: result.lon, toVerifiedUrl: mapsSearchUrl(result.lat, result.lon), toVerifiedText: row.to };
-      if (!row.toAlias) { const alias = deriveSmartAlias(result, isFlightRow); if (alias) patch.toAlias = alias; }
+      if (!row.toAlias) { const alias = deriveSmartAlias(result, isFlightRow, lang); if (alias) patch.toAlias = alias; }
       updateRow(row.id, patch);
     }).catch(() => setToVerifyLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -879,7 +883,7 @@ function DateRangeField({ startDate, endDate, onChange, lang, T }) {
 }
 
 function MobileCardMeta({ row, ctx }) {
-  const { T, updateRow, openCard } = ctx;
+  const { T, lang, updateRow, openCard } = ctx;
   const [distLoading, setDistLoading] = useState(false);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const routeUrl = rowOwnRouteUrl(row);
@@ -933,7 +937,7 @@ function MobileCardMeta({ row, ctx }) {
       setFromVerifyLoading(false);
       if (!result) return;
       const patch = { fromLat: result.lat, fromLon: result.lon, fromVerifiedUrl: mapsSearchUrl(result.lat, result.lon), fromVerifiedText: row.from };
-      if (!row.fromAlias) { const alias = deriveSmartAlias(result, isFlightRow); if (alias) patch.fromAlias = alias; }
+      if (!row.fromAlias) { const alias = deriveSmartAlias(result, isFlightRow, lang); if (alias) patch.fromAlias = alias; }
       updateRow(row.id, patch);
     }).catch(() => setFromVerifyLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -954,7 +958,7 @@ function MobileCardMeta({ row, ctx }) {
       setToVerifyLoading(false);
       if (!result) return;
       const patch = { toLat: result.lat, toLon: result.lon, toVerifiedUrl: mapsSearchUrl(result.lat, result.lon), toVerifiedText: row.to };
-      if (!row.toAlias) { const alias = deriveSmartAlias(result, isFlightRow); if (alias) patch.toAlias = alias; }
+      if (!row.toAlias) { const alias = deriveSmartAlias(result, isFlightRow, lang); if (alias) patch.toAlias = alias; }
       updateRow(row.id, patch);
     }).catch(() => setToVerifyLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1198,10 +1202,12 @@ function SplashIntro({ onFinish, lang }) {
             </g>
           </g>
           {pins.map((p, i) => (
-            <g key={i} className="mt-intro-pin" style={{ animationDelay: `${1.9 + i * 0.22}s` }} transform={`translate(${p.x},${p.y})`}>
-              <path d="M0,-11 C5,-11 9,-6.8 9,-1.5 C9,5 0,14 0,14 C0,14 -9,5 -9,-1.5 C-9,-6.8 -5,-11 0,-11 Z" />
-              <circle cx="0" cy="-1.5" r="5.2" className="mt-intro-pin-dot" />
-              <text x="0" y="1.5" textAnchor="middle">{p.n}</text>
+            <g key={i} transform={`translate(${p.x},${p.y})`}>
+              <g className="mt-intro-pin" style={{ animationDelay: `${1.9 + i * 0.22}s` }}>
+                <path d="M0,-11 C5,-11 9,-6.8 9,-1.5 C9,5 0,14 0,14 C0,14 -9,5 -9,-1.5 C-9,-6.8 -5,-11 0,-11 Z" />
+                <circle cx="0" cy="-1.5" r="5.2" className="mt-intro-pin-dot" />
+                <text x="0" y="1.5" textAnchor="middle">{p.n}</text>
+              </g>
             </g>
           ))}
         </svg>
