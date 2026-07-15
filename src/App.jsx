@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "9.4.0";
+const APP_VERSION = "9.5.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -324,15 +324,22 @@ function rowOwnRouteUrl(row) {
 }
 let __apiQueue = Promise.resolve();
 function throttledCall(fn) {
-  const run = __apiQueue.then(() => new Promise((resolve) => setTimeout(resolve, 350))).then(fn);
+  const run = __apiQueue.then(() => new Promise((resolve) => setTimeout(resolve, 1100))).then(fn);
   __apiQueue = run.then(() => {}, () => {});
   return run;
 }
 function mapsSearchUrl(lat, lon) { return `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`; }
+const __geocodeCache = new Map();
 function geocodeText(text) {
-  return throttledCall(() => fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=he,en&q=${encodeURIComponent(text)}`, { headers: { Accept: "application/json" } })
+  const key = (text || "").trim().toLowerCase();
+  if (!key) return Promise.resolve(null);
+  if (__geocodeCache.has(key)) return __geocodeCache.get(key);
+  const p = throttledCall(() => fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=he,en&q=${encodeURIComponent(text)}`, { headers: { Accept: "application/json" } })
     .then((r) => { if (!r.ok) throw new Error("http-" + r.status); return r.json(); })
-    .then((data) => (data && data[0] ? { lat: Number(data[0].lat), lon: Number(data[0].lon) } : null)));
+    .then((data) => (data && data[0] ? { lat: Number(data[0].lat), lon: Number(data[0].lon) } : null)))
+    .catch((err) => { __geocodeCache.delete(key); throw err; });
+  __geocodeCache.set(key, p);
+  return p;
 }
 function fetchDrivingRoute(a, b) {
   return throttledCall(() => fetch(`https://router.project-osrm.org/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?overview=false`)
@@ -1031,12 +1038,16 @@ function DayGroup({ g, fid, depth, ctx }) {
             <thead>
               <tr>
                 <th className="handle"></th>
-                {visibleColumns.map((c) => (
-                  <th key={c.key} className={c.key} title={lang === "he" ? c.label_he : c.label_en}>
-                    {lang === "he" ? c.label_he : c.label_en}
-                    <span className="mt-col-resizer" onMouseDown={(e) => startResize(e, c.key)} />
-                  </th>
-                ))}
+                {visibleColumns.map((c) => {
+                  const ICON_HEADER = { link: Link2, notes: StickyNote, weather: Cloud };
+                  const HIcon = ICON_HEADER[c.key];
+                  return (
+                    <th key={c.key} className={c.key} title={lang === "he" ? c.label_he : c.label_en}>
+                      {HIcon ? <HIcon size={13} style={{ display: "block", margin: "0 auto" }} /> : (lang === "he" ? c.label_he : c.label_en)}
+                      <span className="mt-col-resizer" onMouseDown={(e) => startResize(e, c.key)} />
+                    </th>
+                  );
+                })}
                 <th className="actions"></th>
               </tr>
             </thead>
@@ -1609,16 +1620,16 @@ export default function MyTripApp() {
     const q = (queryOverride !== undefined ? queryOverride : locPicker && locPicker.query) || "";
     if (!q.trim()) return;
     setLocPicker((p) => ({ ...p, loading: true, error: null }));
-    fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&extratags=1&limit=5&accept-language=he,en&q=${encodeURIComponent(q)}`, { headers: { Accept: "application/json" } })
-      .then((r) => { if (!r.ok) throw new Error("http-" + r.status); return r.json(); })
+    throttledCall(() => fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&extratags=1&limit=5&accept-language=he,en&q=${encodeURIComponent(q)}`, { headers: { Accept: "application/json" } })
+      .then((r) => { if (!r.ok) throw new Error("http-" + r.status); return r.json(); }))
       .then((data) => setLocPicker((p) => (p ? { ...p, loading: false, error: null, results: Array.isArray(data) ? data : [] } : p)))
       .catch((err) => setLocPicker((p) => (p ? { ...p, loading: false, results: [], error: (err && err.message) || "network" } : p)));
   }
   function setLocPickerMode(mode) { setLocPicker((p) => ({ ...p, mode })); }
   function handleMapPick(lat, lng) {
     setLocPicker((p) => ({ ...p, mapMarker: { lat, lng, label: null, loading: true, error: null }, mapCenter: [lat, lng] }));
-    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&addressdetails=1&extratags=1&lat=${lat}&lon=${lng}&accept-language=he,en`, { headers: { Accept: "application/json" } })
-      .then((r) => { if (!r.ok) throw new Error("http-" + r.status); return r.json(); })
+    throttledCall(() => fetch(`https://nominatim.openstreetmap.org/reverse?format=json&addressdetails=1&extratags=1&lat=${lat}&lon=${lng}&accept-language=he,en`, { headers: { Accept: "application/json" } })
+      .then((r) => { if (!r.ok) throw new Error("http-" + r.status); return r.json(); }))
       .then((data) => setLocPicker((p) => (p ? { ...p, mapMarker: { lat, lng, label: data.display_name || null, address: data.address, extratags: data.extratags, loading: false, error: data.display_name ? null : "no-name" } } : p)))
       .catch(() => setLocPicker((p) => (p ? { ...p, mapMarker: { lat, lng, label: null, loading: false, error: "network" } } : p)));
   }
@@ -1864,13 +1875,11 @@ export default function MyTripApp() {
         .mt-chrono-warning { display:flex; align-items:center; gap:7px; background:#FBEAE8; color:var(--danger); font-size:11.5px; padding:6px 10px; border-radius:8px; margin:0 4px 8px; }
         .mt-table-wrap { width:100%; overflow-x:auto; border-radius:10px; }
         table.mt-table { width:100%; table-layout:fixed; border-collapse:separate; border-spacing:0; background:var(--surface); border-radius:10px; overflow:hidden; border:1px solid var(--border); }
-        .mt-table thead th { text-align:start; font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); font-weight:600; padding:6px 7px; background:#FAFCFB; border-bottom:1px solid var(--border); border-inline-end:1px solid var(--border); white-space:nowrap; position:relative; overflow:hidden; text-overflow:ellipsis; }
-        .mt-table thead th:last-child, .mt-table thead th.actions { border-inline-end:none; }
+        .mt-table thead th { text-align:start; font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); font-weight:600; padding:6px 8px; background:#FAFCFB; border-bottom:1px solid var(--border); white-space:nowrap; position:relative; overflow:hidden; text-overflow:ellipsis; }
         .mt-table th.from, .mt-table th.to { padding-inline-start:10px; }
         .mt-col-resizer { position:absolute; top:2px; bottom:2px; inset-inline-end:-2px; width:3px; cursor:col-resize; user-select:none; z-index:5; background:rgba(37,109,100,.10); border-radius:2px; }
         .mt-col-resizer:hover, .mt-col-resizer:active { background:var(--teal); opacity:.5; }
-        .mt-table tbody td { padding:4px 7px; font-size:12.8px; border-bottom:1px solid var(--border); border-inline-end:1px solid var(--border); vertical-align:middle; position:relative; white-space:nowrap; }
-        .mt-table tbody td:last-child, .mt-table tbody td.actions { border-inline-end:none; }
+        .mt-table tbody td { padding:4px 7px; font-size:12.8px; border-bottom:1px solid var(--border); vertical-align:middle; position:relative; white-space:nowrap; }
         .mt-table tbody tr:last-child td { border-bottom:none; }
         .mt-table tbody tr:hover { background:#FBFDFC; }
         .mt-table th.handle, .mt-table td.handle { white-space:nowrap; }
