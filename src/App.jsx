@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "9.3.0";
+const APP_VERSION = "9.4.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -328,6 +328,7 @@ function throttledCall(fn) {
   __apiQueue = run.then(() => {}, () => {});
   return run;
 }
+function mapsSearchUrl(lat, lon) { return `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`; }
 function geocodeText(text) {
   return throttledCall(() => fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=he,en&q=${encodeURIComponent(text)}`, { headers: { Accept: "application/json" } })
     .then((r) => { if (!r.ok) throw new Error("http-" + r.status); return r.json(); })
@@ -358,9 +359,20 @@ const WMO_ICON_MAP = {
 };
 function weatherMeta(code) { return WMO_ICON_MAP[code] || { icon: "Cloud", he: "לא ידוע", en: "Unknown" }; }
 const WEATHER_ICONS = { Sun, CloudSun, Cloud, CloudFog, CloudRain, CloudSnow, CloudLightning };
+function fetchJsonWithRetry(url, options, attemptsLeft) {
+  attemptsLeft = attemptsLeft == null ? 2 : attemptsLeft;
+  return fetch(url, options).then((r) => {
+    if (!r.ok) {
+      if (attemptsLeft > 1 && (r.status === 503 || r.status === 502 || r.status === 429)) {
+        return new Promise((resolve) => setTimeout(resolve, 800)).then(() => fetchJsonWithRetry(url, options, attemptsLeft - 1));
+      }
+      throw new Error("http-" + r.status);
+    }
+    return r.json();
+  });
+}
 function fetchWeather(lat, lon, dateStr) {
-  return throttledCall(() => fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&start_date=${dateStr}&end_date=${dateStr}`)
-    .then((r) => { if (!r.ok) throw new Error("http-" + r.status); return r.json(); })
+  return throttledCall(() => fetchJsonWithRetry(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&start_date=${dateStr}&end_date=${dateStr}`)
     .then((data) => {
       if (!data || !data.daily || !data.daily.time || !data.daily.time.length) return null;
       const codeArr = data.daily.weather_code || data.daily.weathercode;
@@ -485,6 +497,42 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
     fetchRouteDistance();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [row.id, row.from, row.to, row.fromLat, row.fromLon, row.toLat, row.toLon]);
+
+  const [fromVerifyLoading, setFromVerifyLoading] = useState(false);
+  useEffect(() => {
+    if (!row.from) return;
+    if (row.fromVerifiedUrl && row.fromVerifiedText === row.from) return;
+    if (row.fromLat != null && row.fromLon != null) {
+      updateRow(row.id, { fromVerifiedUrl: mapsSearchUrl(row.fromLat, row.fromLon), fromVerifiedText: row.from });
+      return;
+    }
+    if (fromVerifyLoading) return;
+    setFromVerifyLoading(true);
+    geocodeText(row.from).then((coords) => {
+      setFromVerifyLoading(false);
+      if (!coords) return;
+      updateRow(row.id, { fromLat: coords.lat, fromLon: coords.lon, fromVerifiedUrl: mapsSearchUrl(coords.lat, coords.lon), fromVerifiedText: row.from });
+    }).catch(() => setFromVerifyLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [row.id, row.from, row.fromLat, row.fromLon]);
+
+  const [toVerifyLoading, setToVerifyLoading] = useState(false);
+  useEffect(() => {
+    if (!row.to) return;
+    if (row.toVerifiedUrl && row.toVerifiedText === row.to) return;
+    if (row.toLat != null && row.toLon != null) {
+      updateRow(row.id, { toVerifiedUrl: mapsSearchUrl(row.toLat, row.toLon), toVerifiedText: row.to });
+      return;
+    }
+    if (toVerifyLoading) return;
+    setToVerifyLoading(true);
+    geocodeText(row.to).then((coords) => {
+      setToVerifyLoading(false);
+      if (!coords) return;
+      updateRow(row.id, { toLat: coords.lat, toLon: coords.lon, toVerifiedUrl: mapsSearchUrl(coords.lat, coords.lon), toVerifiedText: row.to });
+    }).catch(() => setToVerifyLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [row.id, row.to, row.toLat, row.toLon]);
 
   const [weatherLoading, setWeatherLoading] = useState(false);
   const hasWeather = row.weatherCode != null && row.weatherForDate === row.date;
@@ -846,6 +894,42 @@ function MobileCardMeta({ row, ctx }) {
     }).catch(() => setDistLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [row.id, row.from, row.to, row.fromLat, row.fromLon, row.toLat, row.toLon]);
+
+  const [fromVerifyLoading, setFromVerifyLoading] = useState(false);
+  useEffect(() => {
+    if (!row.from) return;
+    if (row.fromVerifiedUrl && row.fromVerifiedText === row.from) return;
+    if (row.fromLat != null && row.fromLon != null) {
+      updateRow(row.id, { fromVerifiedUrl: mapsSearchUrl(row.fromLat, row.fromLon), fromVerifiedText: row.from });
+      return;
+    }
+    if (fromVerifyLoading) return;
+    setFromVerifyLoading(true);
+    geocodeText(row.from).then((coords) => {
+      setFromVerifyLoading(false);
+      if (!coords) return;
+      updateRow(row.id, { fromLat: coords.lat, fromLon: coords.lon, fromVerifiedUrl: mapsSearchUrl(coords.lat, coords.lon), fromVerifiedText: row.from });
+    }).catch(() => setFromVerifyLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [row.id, row.from, row.fromLat, row.fromLon]);
+
+  const [toVerifyLoading, setToVerifyLoading] = useState(false);
+  useEffect(() => {
+    if (!row.to) return;
+    if (row.toVerifiedUrl && row.toVerifiedText === row.to) return;
+    if (row.toLat != null && row.toLon != null) {
+      updateRow(row.id, { toVerifiedUrl: mapsSearchUrl(row.toLat, row.toLon), toVerifiedText: row.to });
+      return;
+    }
+    if (toVerifyLoading) return;
+    setToVerifyLoading(true);
+    geocodeText(row.to).then((coords) => {
+      setToVerifyLoading(false);
+      if (!coords) return;
+      updateRow(row.id, { toLat: coords.lat, toLon: coords.lon, toVerifiedUrl: mapsSearchUrl(coords.lat, coords.lon), toVerifiedText: row.to });
+    }).catch(() => setToVerifyLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [row.id, row.to, row.toLat, row.toLon]);
 
   function weatherIconEl() {
     if (weatherLoading) return <Cloud size={15} className="mt-weather-spin" />;
@@ -1780,11 +1864,13 @@ export default function MyTripApp() {
         .mt-chrono-warning { display:flex; align-items:center; gap:7px; background:#FBEAE8; color:var(--danger); font-size:11.5px; padding:6px 10px; border-radius:8px; margin:0 4px 8px; }
         .mt-table-wrap { width:100%; overflow-x:auto; border-radius:10px; }
         table.mt-table { width:100%; table-layout:fixed; border-collapse:separate; border-spacing:0; background:var(--surface); border-radius:10px; overflow:hidden; border:1px solid var(--border); }
-        .mt-table thead th { text-align:start; font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); font-weight:600; padding:6px 6px; background:#FAFCFB; border-bottom:1px solid var(--border); white-space:nowrap; position:relative; overflow:hidden; text-overflow:ellipsis; }
+        .mt-table thead th { text-align:start; font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); font-weight:600; padding:6px 7px; background:#FAFCFB; border-bottom:1px solid var(--border); border-inline-end:1px solid var(--border); white-space:nowrap; position:relative; overflow:hidden; text-overflow:ellipsis; }
+        .mt-table thead th:last-child, .mt-table thead th.actions { border-inline-end:none; }
         .mt-table th.from, .mt-table th.to { padding-inline-start:10px; }
         .mt-col-resizer { position:absolute; top:2px; bottom:2px; inset-inline-end:-2px; width:3px; cursor:col-resize; user-select:none; z-index:5; background:rgba(37,109,100,.10); border-radius:2px; }
         .mt-col-resizer:hover, .mt-col-resizer:active { background:var(--teal); opacity:.5; }
-        .mt-table tbody td { padding:4px 6px; font-size:12.8px; border-bottom:1px solid var(--border); vertical-align:middle; position:relative; white-space:nowrap; }
+        .mt-table tbody td { padding:4px 7px; font-size:12.8px; border-bottom:1px solid var(--border); border-inline-end:1px solid var(--border); vertical-align:middle; position:relative; white-space:nowrap; }
+        .mt-table tbody td:last-child, .mt-table tbody td.actions { border-inline-end:none; }
         .mt-table tbody tr:last-child td { border-bottom:none; }
         .mt-table tbody tr:hover { background:#FBFDFC; }
         .mt-table th.handle, .mt-table td.handle { white-space:nowrap; }
