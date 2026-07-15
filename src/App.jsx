@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "9.9.0";
+const APP_VERSION = "9.10.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -153,6 +153,9 @@ const T_DICT = {
     importRouteParse: "פענח", importRouteNoStops: "לא זוהו תחנות בקישור — ודא שזה קישור מסלול (Directions) עם כמה תחנות, לא קישור למקום בודד.",
     importRouteShortLink: "זה קישור מקוצר (maps.app.goo.gl) — שמות המקומות האמיתיים מוסתרים מאחוריו ואי אפשר לפענח אותם ישירות בדפדפן (חסימת גוגל, לא באג). פתרון: פתח את הקישור בדפדפן/באפליקציה, וכשהמסלול נפתח - העתק את הכתובת המלאה משורת הכתובת (תתחיל ב-google.com/maps/dir/...) והדבק אותה כאן במקום.",
     importRouteConfirm: "צור רשומות",
+    hotelInfo: "פרטי מלון", hotelPhotoDemo: "תמונה — דורש חיבור ל-Google Places API (בתשלום). זו הצגה בלבד.",
+    ratingDemo: "דירוג — הדגמה", viewOnMap: "הצג במפה", bookingLink: "קישור להזמנה",
+    hotelInfoDemoNote: "כתובת ומפה — אמיתי (מהמיקום המאומת של הרשומה). תמונה ודירוג בפועל ידרשו חיבור ל-Google Places.",
     aiAssistant: "עוזר AI (הדגמה)", ok: "הבנתי",
     locHint: "טיפ: אם החיפוש לא מוצא תוצאה בעברית, נסה לחפש בשם המקומי/אנגלי (למשל \"Fiumicino Airport\" ולא \"פיומיצ׳ינו\").",
     tabSearch: "חיפוש טקסט", tabMap: "בחירה במפה", mapPickHint: "לחץ במקום הרצוי על המפה כדי לסמן אותו",
@@ -211,6 +214,9 @@ const T_DICT = {
     importRouteParse: "Parse", importRouteNoStops: "No stops detected in this link — make sure it's a Directions link with several stops, not a link to a single place.",
     importRouteShortLink: "This is a shortened link (maps.app.goo.gl) — the real place names are hidden behind it and can't be read directly in the browser (a Google restriction, not a bug). Fix: open the link in your browser/app, and once the route loads, copy the full address from the address bar (starts with google.com/maps/dir/...) and paste that here instead.",
     importRouteConfirm: "Create records",
+    hotelInfo: "Hotel details", hotelPhotoDemo: "Photo — needs a Google Places API connection (paid). This is a preview only.",
+    ratingDemo: "Rating — preview", viewOnMap: "View on map", bookingLink: "Booking link",
+    hotelInfoDemoNote: "Address and map link — real (from the record's verified location). An actual photo and rating would need a Google Places connection.",
     aiAssistant: "AI Assistant (preview)", ok: "Got it",
     locHint: "Tip: if the search finds nothing in Hebrew, try the local/English name instead (e.g. \"Fiumicino Airport\").",
     tabSearch: "Text search", tabMap: "Pick on map", mapPickHint: "Click anywhere on the map to mark it",
@@ -253,6 +259,7 @@ function detectTextAlign(text) {
   return undefined;
 }
 function typeDisplayName(t, lang) { return t.name_he != null ? (lang === "en" ? t.name_en : t.name_he) : t.name; }
+function isAccommodationType(typeId) { return typeId === "hotel" || typeId === "hostel" || typeId === "apartment"; }
 function typeMeta(typeId, types, T, lang) {
   if (!typeId || typeId === "unset") return { id: "unset", name: (T && T.selectType) || "בחר...", icon: "Tag", color: "#C1443A" };
   const t = types.find((tt) => tt.id === typeId) || types[0];
@@ -486,7 +493,7 @@ function initialRows() {
 
 function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, ctx }) {
   const { T, lang, types, visibleColumns, updateRow, deleteRow, openCard, addRow,
-    dragId, setDragId, onDropRow, typeMenuOpen, setTypeMenuOpen, newTypeDraft, setNewTypeDraft, addCustomType } = ctx;
+    dragId, setDragId, onDropRow, typeMenuOpen, setTypeMenuOpen, newTypeDraft, setNewTypeDraft, addCustomType, openHotelInfo } = ctx;
   const tm = typeMeta(row.typeId, types, T, lang);
   const Icon = ICONS[tm.icon] || Tag;
   const dur = computeDuration(row.startTime, row.endTime, row.overnight);
@@ -607,7 +614,9 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
     switch (col.key) {
       case "date": return depth === 0 ? fmtDate(row.date, lang) : "";
       case "day": return depth === 0 ? heDay(row.date, lang) : "";
-      case "icon": return <span className="mt-type-icon" style={{ background: tm.color }}><Icon /></span>;
+      case "icon": return isAccommodationType(row.typeId) ? (
+        <button className="mt-type-icon mt-type-icon-btn" style={{ background: tm.color }} title={T.hotelInfo} onClick={() => openHotelInfo(row)}><Icon /></button>
+      ) : <span className="mt-type-icon" style={{ background: tm.color }}><Icon /></span>;
       case "type": return (
         <div className="mt-type-wrap">
           <button className="mt-type-btn" ref={typeBtnRef} title={tm.name} onClick={toggleTypeMenu}>
@@ -883,7 +892,7 @@ function DateRangeField({ startDate, endDate, onChange, lang, T }) {
 }
 
 function MobileCardMeta({ row, ctx }) {
-  const { T, lang, updateRow, openCard } = ctx;
+  const { T, lang, updateRow, openCard, openHotelInfo } = ctx;
   const [distLoading, setDistLoading] = useState(false);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const routeUrl = rowOwnRouteUrl(row);
@@ -988,6 +997,7 @@ function MobileCardMeta({ row, ctx }) {
       )}
       {row.link && <a className="mt-link-icon" href={row.link} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} title={row.link}><Link2 size={15} /></a>}
       {row.notes && <button className="mt-link-icon has-note" title={row.notes} onClick={(e) => { e.stopPropagation(); openCard(row); }}><StickyNote size={15} /></button>}
+      {isAccommodationType(row.typeId) && <button className="mt-link-icon" title={T.hotelInfo} onClick={(e) => { e.stopPropagation(); openHotelInfo(row); }}><BedDouble size={15} /></button>}
     </span>
   );
 }
@@ -1272,6 +1282,7 @@ export default function MyTripApp() {
   const [routeImportDate, setRouteImportDate] = useState("");
   const [routeImportStartTime, setRouteImportStartTime] = useState("09:00");
   const [routeImportShortLink, setRouteImportShortLink] = useState(false);
+  const [hotelInfoRow, setHotelInfoRow] = useState(null);
   const [frameMenuOpenId, setFrameMenuOpenId] = useState(null);
   const [frameMenuPos, setFrameMenuPos] = useState({ top: 0, left: 0 });
   const [frameDraft, setFrameDraft] = useState(null);
@@ -1392,6 +1403,7 @@ export default function MyTripApp() {
   }, [remindersOn, rows, firedReminders]);
 
   function showDemoNotice(msg) { setDemoNotice(msg); setActionsMenuOpen(false); }
+  function openHotelInfo(row) { setHotelInfoRow(row); }
   function handleAiSuggest() { setAiMessages((p) => [...p, { role: "assistant", text: T.aiSuggestDemoText }]); }
   function handleAiSend() {
     if (!aiInput.trim()) return;
@@ -1782,7 +1794,7 @@ export default function MyTripApp() {
     typeMenuOpen, setTypeMenuOpen, newTypeDraft, setNewTypeDraft, addCustomType,
     collapsedParents, setCollapsedParents, collapsedGroups, setCollapsedGroups,
     toggleFrameCollapse, openFrameModal, deleteFrame, updateFrameDates, nextDateInContext, lastDateInContext, frameTotals,
-    openAddDayModal, sortDayByTime, getColWidth, startResize, displayCurrency, convertAmount,
+    openAddDayModal, sortDayByTime, getColWidth, startResize, displayCurrency, convertAmount, openHotelInfo,
     frameMenuOpenId, setFrameMenuOpenId, frameMenuPos, setFrameMenuPos,
   };
 
@@ -1935,6 +1947,11 @@ export default function MyTripApp() {
         .mt-type-wrap { position:relative; }
         .mt-type-chip { display:flex; align-items:center; gap:6px; }
         .mt-type-icon { width:22px; height:22px; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .mt-type-icon-btn { border:none; cursor:pointer; }
+        .mt-type-icon-btn:hover { filter:brightness(1.1); box-shadow:0 0 0 2px var(--teal-tint); }
+        .mt-hotel-photo-demo { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; height:110px; border-radius:10px; background:linear-gradient(135deg,var(--teal-tint),var(--bg)); color:var(--teal); border:1.5px dashed var(--border); font-size:11px; text-align:center; padding:8px; }
+        .mt-hotel-rating-demo { display:flex; align-items:center; gap:2px; color:#D9A23D; }
+        .mt-hotel-rating-demo .mt-hint { margin-inline-start:6px; color:var(--muted); }
         .mt-type-icon svg { width:12px; height:12px; color:#fff; }
         .mt-type-btn { border:none; background:none; padding:0; display:flex; align-items:center; gap:5px; font-size:12.8px; font-weight:500; color:var(--ink); max-width:100%; }
         .mt-type-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -2188,6 +2205,33 @@ export default function MyTripApp() {
                 <div><input value={aiInput} placeholder={T.aiInputPlaceholder} onChange={(e) => setAiInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleAiSend()} /></div>
                 <button className="mt-btn primary" onClick={handleAiSend}><MessageCircle size={13} /></button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {hotelInfoRow && (
+        <div className="mt-modal-backdrop" onClick={() => setHotelInfoRow(null)}>
+          <div className="mt-modal" style={{ maxWidth: 340 }} onClick={(e) => e.stopPropagation()}>
+            <div className="mt-modal-header"><span className="mt-modal-title">{T.hotelInfo}</span><button className="mt-btn ghost" onClick={() => setHotelInfoRow(null)}><X size={16} /></button></div>
+            <div className="mt-modal-body">
+              <div className="mt-hotel-photo-demo">
+                <BedDouble size={30} />
+                <span>{T.hotelPhotoDemo}</span>
+              </div>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>{hotelInfoRow.fromAlias || hotelInfoRow.from || hotelInfoRow.toAlias || hotelInfoRow.to || "—"}</div>
+              {(hotelInfoRow.from || hotelInfoRow.to) && <div className="mt-hint">{hotelInfoRow.from || hotelInfoRow.to}</div>}
+              <div className="mt-hotel-rating-demo">
+                {[1, 2, 3, 4, 5].map((i) => <Star key={i} size={14} />)}
+                <span className="mt-hint">{T.ratingDemo}</span>
+              </div>
+              {(hotelInfoRow.fromVerifiedUrl || hotelInfoRow.toVerifiedUrl) && (
+                <a className="mt-btn ghost" style={{ width: "100%", justifyContent: "center" }} target="_blank" rel="noreferrer" href={hotelInfoRow.fromVerifiedUrl || hotelInfoRow.toVerifiedUrl}><MapPin size={13} /> {T.viewOnMap}</a>
+              )}
+              {hotelInfoRow.link && (
+                <a className="mt-btn ghost" style={{ width: "100%", justifyContent: "center" }} target="_blank" rel="noreferrer" href={hotelInfoRow.link}><Link2 size={13} /> {T.bookingLink}</a>
+              )}
+              <div className="mt-hint">{T.hotelInfoDemoNote}</div>
             </div>
           </div>
         </div>
