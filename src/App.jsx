@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "9.13.0";
+const APP_VERSION = "9.14.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -107,7 +107,7 @@ const DEFAULT_COLUMNS = [
 
 const T_DICT = {
   he: {
-    appName: "MyTrip", addRow: "הוסף רשומה", addDay: "הוסף יום", newFrame: "מסגרת חדשה",
+    appName: "MyTrip Builder", addRow: "הוסף רשומה", addDay: "הוסף יום", newFrame: "מסגרת חדשה",
     columns: "עמודות", addColumn: "הוסף עמודה", addType: "הוסף תיאור", resetColumnWidths: "איפוס רוחב עמודות (גרור את קצה כותרת העמודה לשינוי ידני)", actions: "פעולות", on: "פעיל", settings: "הגדרות", manageColumns: "ניהול עמודות", undo: "בטל פעולה אחרונה", redo: "חזור על פעולה", disableIntro: "בטל הצגת אנימציית פתיחה",
     exportFile: "שמור לקובץ", importFile: "ייבוא מקובץ", importSuccess: "הייבוא הצליח", importError: "הקובץ אינו תקין",
     login: "התחברות עם Google", logout: "יציאה",
@@ -168,7 +168,7 @@ const T_DICT = {
     flightPlaceholder: "עיר (קוד שדה תעופה, למשל TLV)", tzNote: "התאמת שעון אוטומטית לפי אזורי זמן דורשת חיבור ל-API מסחרי (כגון Google Time Zone) עם מפתח — לא מיושמת בפרוטוטייפ. יש לוודא ידנית שהשעות מוזנות לפי השעון המקומי בכל מיקום.",
   },
   en: {
-    appName: "MyTrip", addRow: "Add record", addDay: "Add day", newFrame: "New frame",
+    appName: "MyTrip Builder", addRow: "Add record", addDay: "Add day", newFrame: "New frame",
     columns: "Columns", addColumn: "Add column", addType: "Add description", resetColumnWidths: "Reset column widths (drag a header's edge to resize manually)", actions: "Actions", on: "On", settings: "Settings", manageColumns: "Manage columns", undo: "Undo last action", redo: "Redo action", disableIntro: "Disable the opening animation",
     exportFile: "Save to file", importFile: "Import from file", importSuccess: "Import successful", importError: "This file isn't valid",
     login: "Sign in with Google", logout: "Sign out",
@@ -1222,7 +1222,8 @@ function SplashIntro({ onFinish, lang }) {
           ))}
         </svg>
         <div className="mt-intro-brand">
-          <span className="mt-intro-logo">MyTrip</span>
+          <span className="mt-intro-logo">MyTrip Builder</span>
+          <span className="mt-intro-version">v{APP_VERSION}</span>
           <span className="mt-intro-tag">{lang === "he" ? "מתכננים את הטיול הבא שלך..." : "Planning your next trip..."}</span>
         </div>
       </div>
@@ -1466,9 +1467,9 @@ export default function MyTripApp() {
       });
       return out;
     }
-    return `<!DOCTYPE html><html dir="${dir}" lang="${lang}"><head><meta charset="utf-8"><title>MyTrip</title>
+    return `<!DOCTYPE html><html dir="${dir}" lang="${lang}"><head><meta charset="utf-8"><title>MyTrip Builder</title>
     <style>body{font-family:Arial,Helvetica,sans-serif;max-width:720px;margin:24px auto;padding:0 16px;color:#1E2A28;}
-    h1{font-family:Georgia,serif;}</style></head><body><h1>MyTrip</h1>${frameHtml(null)}</body></html>`;
+    h1{font-family:Georgia,serif;}</style></head><body><h1>MyTrip Builder</h1>${frameHtml(null)}</body></html>`;
   }
   function exportShareableHTML() {
     const html = buildShareHTML();
@@ -1916,7 +1917,7 @@ export default function MyTripApp() {
         .mt-cal-day.edge { background:var(--teal); color:#fff; font-weight:700; }
         .mt-frame-actions button { border:none; background:none; color:var(--muted); padding:4px; border-radius:5px; display:flex; }
         .mt-frame-actions button:hover { background:var(--teal-tint); color:var(--teal-dark); }
-        .mt-frame-body { padding:2px 12px 12px 12px; }
+        .mt-frame-body { padding:2px 8px 12px 8px; }
         .mt-frame-add-row { margin-top:10px; padding:6px 4px; }
         .mt-group { margin-top:14px; }
         .mt-group-header { display:flex; align-items:center; gap:7px; padding:6px 4px; cursor:pointer; user-select:none; flex-wrap:wrap; }
@@ -2094,9 +2095,10 @@ export default function MyTripApp() {
         .mt-intro-pin-dot { fill:#fff; }
         .mt-intro-pin text { fill:#C1443A; font-size:7.5px; font-weight:700; font-family:Heebo,sans-serif; }
         @keyframes mt-pin-drop { 0% { opacity:0; transform:translateY(-110px); } 65% { opacity:1; } 100% { opacity:1; transform:translateY(0); } }
-        .mt-intro-brand { display:flex; flex-direction:column; align-items:center; gap:5px; opacity:0; animation:mt-intro-fadein .8s ease forwards; animation-delay:.35s; }
-        .mt-intro-logo { font-family:'Frank Ruhl Libre',serif; font-size:28px; font-weight:700; color:#174C45; letter-spacing:.02em; }
-        .mt-intro-tag { font-size:12.5px; color:#6B7C76; }
+        .mt-intro-brand { display:flex; flex-direction:column; align-items:center; gap:4px; opacity:0; animation:mt-intro-fadein .8s ease forwards; animation-delay:.35s; }
+        .mt-intro-logo { font-family:'Frank Ruhl Libre',serif; font-size:24px; font-weight:700; color:#174C45; letter-spacing:.02em; }
+        .mt-intro-version { font-size:10.5px; color:#9AAAA5; font-variant-numeric:tabular-nums; }
+        .mt-intro-tag { font-size:12.5px; color:#6B7C76; margin-top:2px; }
 
         @media print {
           .mt-header, .mt-toolbar, .mt-suggest, .mt-row-actions, .mt-frame-actions, .mt-group-actions,
