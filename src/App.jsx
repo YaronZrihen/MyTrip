@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "9.19.0";
+const APP_VERSION = "10.0.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -145,6 +145,7 @@ const T_DICT = {
     shareWithUser: "שתף עם משתמש במערכת (בקרוב)", shareEditAccess: "שיתוף עריכה עם שותפי טיול (בקרוב)",
     demoNeedsAccounts: "התכונה הזו דורשת מערכת משתמשים והרשאות (חיבור ל-DB), עדיין לא קיימת בפרוטוטייפ. זו הצגה בלבד של איך זה ייראה.",
     tryGooglePlaces: "חפש עם Google Places (הדגמה)", demoNeedsGoogleKey: "תוצאות מדויקות ועשירות יותר (כולל עברית טובה בהרבה) אפשריות עם Google Places API — דורש מפתח API וחיוב בענן של גוגל. זו הצגה בלבד; החיפוש הפעיל כרגע משתמש ב-OpenStreetMap החינמי.",
+    tryGooglePlacesReal: "חפש עם Google Places", usingGooglePlaces: "✓ מחפש עם Google Places",
     uploadFile: "העלה קובץ (כרטיס טיסה, שובר הזמנה...) — הדגמה", demoNeedsStorage: "העלאת קבצים דורשת שירות אחסון (כמו Supabase Storage או S3), עדיין לא מחובר בפרוטוטייפ. זו הצגה בלבד.",
     aiDemoNotice: "זו הדגמת ממשק בלבד. חיבור אמיתי ל-Claude דורש שרת/פונקציה בצד השרת (לא ניתן לחשוף מפתח API בצד הלקוח).",
     aiSuggestItinerary: "הצע מסלול יומי אוטומטי", aiInputPlaceholder: "שאל שאלה על הטיול...",
@@ -207,6 +208,7 @@ const T_DICT = {
     shareWithUser: "Share with a system user (coming soon)", shareEditAccess: "Share edit access with trip partners (coming soon)",
     demoNeedsAccounts: "This feature needs a user/permission system (a database connection) that doesn't exist in the prototype yet. This is just a preview of how it will look.",
     tryGooglePlaces: "Search with Google Places (preview)", demoNeedsGoogleKey: "Richer, more accurate results (including much better Hebrew support) are possible with the Google Places API — needs an API key and billing on Google Cloud. This is a preview only; the active search currently uses free OpenStreetMap data.",
+    tryGooglePlacesReal: "Search with Google Places", usingGooglePlaces: "✓ Searching with Google Places",
     uploadFile: "Upload a file (boarding pass, booking voucher...) — preview", demoNeedsStorage: "File uploads need a storage service (like Supabase Storage or S3), not yet connected in the prototype. This is a preview only.",
     aiDemoNotice: "This is a UI preview only. A real Claude connection needs a server-side function (an API key can't be exposed client-side).",
     aiSuggestItinerary: "Suggest an automatic day plan", aiInputPlaceholder: "Ask a question about the trip...",
@@ -396,6 +398,32 @@ function throttledCall(fn) {
 }
 function mapsSearchUrl(lat, lon) { return `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`; }
 const __geocodeCache = new Map();
+const GOOGLE_PLACES_KEY = (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_GOOGLE_PLACES_KEY) || "";
+function hasGooglePlaces() { return !!GOOGLE_PLACES_KEY; }
+function googlePlacesAutocomplete(input, lang) {
+  if (!GOOGLE_PLACES_KEY || !input || !input.trim()) return Promise.resolve([]);
+  return fetch("https://places.googleapis.com/v1/places:autocomplete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Goog-Api-Key": GOOGLE_PLACES_KEY },
+    body: JSON.stringify({ input, languageCode: lang === "he" ? "he" : "en" }),
+  })
+    .then((r) => { if (!r.ok) throw new Error("http-" + r.status); return r.json(); })
+    .then((data) => (data.suggestions || [])
+      .map((s) => s.placePrediction)
+      .filter(Boolean)
+      .map((p) => ({ placeId: p.placeId, text: (p.text && p.text.text) || "" })));
+}
+function googlePlaceDetails(placeId, lang) {
+  if (!GOOGLE_PLACES_KEY || !placeId) return Promise.resolve(null);
+  const fieldMask = "displayName,formattedAddress,location,rating,userRatingCount,photos,regularOpeningHours,priceLevel,internationalPhoneNumber,websiteUri";
+  return fetch(`https://places.googleapis.com/v1/places/${placeId}?languageCode=${lang === "he" ? "he" : "en"}`, {
+    headers: { "X-Goog-Api-Key": GOOGLE_PLACES_KEY, "X-Goog-FieldMask": fieldMask },
+  }).then((r) => { if (!r.ok) throw new Error("http-" + r.status); return r.json(); });
+}
+function googlePlacePhotoUrl(photoName, maxWidth) {
+  if (!GOOGLE_PLACES_KEY || !photoName) return null;
+  return `https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=${maxWidth || 480}&key=${GOOGLE_PLACES_KEY}`;
+}
 function geocodeTextDetailed(text) {
   const key = (text || "").trim().toLowerCase();
   if (!key) return Promise.resolve(null);
@@ -977,6 +1005,62 @@ function DateRangeField({ startDate, endDate, onChange, lang, T }) {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function PlaceInfoModal({ row, onClose, types, lang, T }) {
+  const tm = typeMeta(row.typeId, types, T, lang);
+  const TI = ICONS[tm.icon] || Tag;
+  const placeId = row.fromPlaceId || row.toPlaceId;
+  const [googleData, setGoogleData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    if (!placeId || !hasGooglePlaces()) return;
+    setLoading(true);
+    googlePlaceDetails(placeId, lang).then((d) => { setLoading(false); setGoogleData(d); }).catch(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placeId, lang]);
+  const photoUrl = googleData && googleData.photos && googleData.photos[0] ? googlePlacePhotoUrl(googleData.photos[0].name, 480) : null;
+  const title = (googleData && googleData.displayName && googleData.displayName.text) || row.fromAlias || row.from || row.toAlias || row.to || "—";
+  const address = (googleData && googleData.formattedAddress) || row.from || row.to;
+  return (
+    <div className="mt-modal-backdrop" onClick={onClose}>
+      <div className="mt-modal" style={{ maxWidth: 340 }} onClick={(e) => e.stopPropagation()}>
+        <div className="mt-modal-header"><span className="mt-modal-title">{T.placeInfo}</span><button className="mt-btn ghost" onClick={onClose}><X size={16} /></button></div>
+        <div className="mt-modal-body">
+          {photoUrl ? (
+            <img src={photoUrl} alt="" className="mt-hotel-photo-real" />
+          ) : (
+            <div className="mt-hotel-photo-demo" style={{ background: `linear-gradient(135deg, ${tm.color}22, var(--bg))`, color: tm.color }}>
+              <TI size={30} />
+              <span>{loading ? T.locSearching : T.hotelPhotoDemo}</span>
+            </div>
+          )}
+          <div className="mt-type-chip"><span className="mt-type-icon" style={{ background: tm.color, width: 20, height: 20 }}><TI size={11} /></span><strong style={{ fontSize: 12.5 }}>{tm.name}</strong></div>
+          <div style={{ fontWeight: 700, fontSize: 15 }}>{title}</div>
+          {address && <div className="mt-hint">{address}</div>}
+          {googleData && googleData.rating ? (
+            <div className="mt-hotel-rating-demo">
+              {Array.from({ length: 5 }).map((_, i) => <Star key={i} size={14} fill={i < Math.round(googleData.rating) ? "currentColor" : "none"} />)}
+              <span className="mt-hint">{googleData.rating} ({googleData.userRatingCount || 0})</span>
+            </div>
+          ) : (
+            <div className="mt-hotel-rating-demo">
+              {[1, 2, 3, 4, 5].map((i) => <Star key={i} size={14} />)}
+              <span className="mt-hint">{T.ratingDemo}</span>
+            </div>
+          )}
+          {(row.fromVerifiedUrl || row.toVerifiedUrl) && (
+            <a className="mt-btn ghost" style={{ width: "100%", justifyContent: "center" }} target="_blank" rel="noreferrer" href={row.fromVerifiedUrl || row.toVerifiedUrl}><MapPin size={13} /> {T.viewOnMap}</a>
+          )}
+          {row.link && (
+            <a className="mt-btn ghost" style={{ width: "100%", justifyContent: "center" }} target="_blank" rel="noreferrer" href={row.link}><Link2 size={13} /> {T.bookingLink}</a>
+          )}
+          {getRowWarning(row, T).map((w, i) => <div key={i} className="mt-error"><AlertTriangle size={13} /> {w}</div>)}
+          {!placeId && <div className="mt-hint">{T.hotelInfoDemoNote}</div>}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1765,17 +1849,43 @@ export default function MyTripApp() {
   /* ---------- location verification (OpenStreetMap Nominatim — free, no API key) ---------- */
   function openLocationPicker(field) {
     const initialQuery = cardDraft ? (cardDraft[field] || "") : "";
-    setLocPicker({ field, mode: "search", query: initialQuery, results: [], loading: false, error: null, mapMarker: null, mapCenter: DEFAULT_MAP_CENTER });
+    setLocPicker({ field, mode: "search", query: initialQuery, results: [], loading: false, error: null, mapMarker: null, mapCenter: DEFAULT_MAP_CENTER, useGoogle: false });
     if (initialQuery.trim()) runLocationSearch(initialQuery);
   }
   function runLocationSearch(queryOverride) {
     const q = (queryOverride !== undefined ? queryOverride : locPicker && locPicker.query) || "";
     if (!q.trim()) return;
     setLocPicker((p) => ({ ...p, loading: true, error: null }));
+    if (locPicker.useGoogle) {
+      googlePlacesAutocomplete(q, lang)
+        .then((results) => setLocPicker((p) => (p ? { ...p, loading: false, error: null, results } : p)))
+        .catch((err) => setLocPicker((p) => (p ? { ...p, loading: false, results: [], error: (err && err.message) || "network" } : p)));
+      return;
+    }
     throttledCall(() => fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&extratags=1&limit=5&accept-language=he,en&q=${encodeURIComponent(q)}`, { headers: { Accept: "application/json" } })
       .then((r) => { if (!r.ok) throw new Error("http-" + r.status); return r.json(); }))
       .then((data) => setLocPicker((p) => (p ? { ...p, loading: false, error: null, results: Array.isArray(data) ? data : [] } : p)))
       .catch((err) => setLocPicker((p) => (p ? { ...p, loading: false, results: [], error: (err && err.message) || "network" } : p)));
+  }
+  function toggleGooglePlacesSearch() {
+    setLocPicker((p) => (p ? { ...p, useGoogle: !p.useGoogle, results: [], error: null } : p));
+  }
+  function pickGooglePlaceResult(prediction) {
+    setLocPicker((p) => ({ ...p, loading: true }));
+    googlePlaceDetails(prediction.placeId, lang).then((details) => {
+      if (!details || !details.location) { setLocPicker((p) => (p ? { ...p, loading: false, error: "no-details" } : p)); return; }
+      const label = details.formattedAddress || (details.displayName && details.displayName.text) || prediction.text;
+      const mapUrl = `https://www.google.com/maps/search/?api=1&query=${details.location.latitude},${details.location.longitude}&query_place_id=${prediction.placeId}`;
+      const isFlightRow = cardDraft && (cardDraft.typeId === "flight" || cardDraft.typeId === "domestic-flight");
+      const smartAlias = (details.displayName && details.displayName.text) || label.split(",")[0];
+      if (locPicker.field === "from") {
+        setCardDraft((d) => ({ ...d, from: label, fromVerifiedUrl: mapUrl, fromVerifiedText: label, fromLat: details.location.latitude, fromLon: details.location.longitude, fromPlaceId: prediction.placeId, ...((!d.fromAlias && smartAlias) ? { fromAlias: smartAlias } : {}) }));
+      } else if (locPicker.field === "to") {
+        setCardDraft((d) => ({ ...d, to: label, toVerifiedUrl: mapUrl, toVerifiedText: label, toLat: details.location.latitude, toLon: details.location.longitude, toPlaceId: prediction.placeId, ...((!d.toAlias && smartAlias) ? { toAlias: smartAlias } : {}) }));
+      } else if (locPicker.field === "fromAlias") setCardDraft((d) => ({ ...d, fromAlias: smartAlias }));
+      else if (locPicker.field === "toAlias") setCardDraft((d) => ({ ...d, toAlias: smartAlias }));
+      setLocPicker(null);
+    }).catch(() => setLocPicker((p) => (p ? { ...p, loading: false, error: "network" } : p)));
   }
   function setLocPickerMode(mode) { setLocPicker((p) => ({ ...p, mode })); }
   function handleMapPick(lat, lng) {
@@ -2050,6 +2160,7 @@ export default function MyTripApp() {
         .mt-type-icon.has-warning { box-shadow:0 0 0 2px var(--danger); }
         .mt-type-icon-btn:hover { filter:brightness(1.1); box-shadow:0 0 0 2px var(--teal-tint); }
         .mt-hotel-photo-demo { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; height:110px; border-radius:10px; background:linear-gradient(135deg,var(--teal-tint),var(--bg)); color:var(--teal); border:1.5px dashed var(--border); font-size:11px; text-align:center; padding:8px; }
+        .mt-hotel-photo-real { width:100%; height:150px; object-fit:cover; border-radius:10px; }
         .mt-hotel-rating-demo { display:flex; align-items:center; gap:2px; color:#D9A23D; }
         .mt-hotel-rating-demo .mt-hint { margin-inline-start:6px; color:var(--muted); }
         .mt-type-icon svg { width:12px; height:12px; color:#fff; }
@@ -2140,6 +2251,7 @@ export default function MyTripApp() {
         .mt-btn.primary:disabled { opacity:.5; cursor:not-allowed; }
         .mt-btn:disabled { opacity:.4; cursor:not-allowed; }
         .mt-btn.ghost { border-color:transparent; color:var(--muted); }
+        .mt-btn.ghost.active { background:var(--teal-tint); color:var(--teal-dark); border-color:var(--teal); }
         .mt-btn.danger { color:var(--danger); border-color:transparent; }
         .mt-loc-tabs { display:flex; gap:6px; padding:10px 18px 0; }
         .mt-loc-tab { flex:1; border:1px solid var(--border); background:#fff; color:var(--muted); border-radius:8px; padding:7px; font-size:12.5px; font-weight:600; }
@@ -2309,38 +2421,7 @@ export default function MyTripApp() {
         </div>
       )}
 
-      {hotelInfoRow && (() => {
-        const tm = typeMeta(hotelInfoRow.typeId, types, T, lang);
-        const TI = ICONS[tm.icon] || Tag;
-        return (
-        <div className="mt-modal-backdrop" onClick={() => setHotelInfoRow(null)}>
-          <div className="mt-modal" style={{ maxWidth: 340 }} onClick={(e) => e.stopPropagation()}>
-            <div className="mt-modal-header"><span className="mt-modal-title">{T.placeInfo}</span><button className="mt-btn ghost" onClick={() => setHotelInfoRow(null)}><X size={16} /></button></div>
-            <div className="mt-modal-body">
-              <div className="mt-hotel-photo-demo" style={{ background: `linear-gradient(135deg, ${tm.color}22, var(--bg))`, color: tm.color }}>
-                <TI size={30} />
-                <span>{T.hotelPhotoDemo}</span>
-              </div>
-              <div className="mt-type-chip"><span className="mt-type-icon" style={{ background: tm.color, width: 20, height: 20 }}><TI size={11} /></span><strong style={{ fontSize: 12.5 }}>{tm.name}</strong></div>
-              <div style={{ fontWeight: 700, fontSize: 15 }}>{hotelInfoRow.fromAlias || hotelInfoRow.from || hotelInfoRow.toAlias || hotelInfoRow.to || "—"}</div>
-              {(hotelInfoRow.from || hotelInfoRow.to) && <div className="mt-hint">{hotelInfoRow.from || hotelInfoRow.to}</div>}
-              <div className="mt-hotel-rating-demo">
-                {[1, 2, 3, 4, 5].map((i) => <Star key={i} size={14} />)}
-                <span className="mt-hint">{T.ratingDemo}</span>
-              </div>
-              {(hotelInfoRow.fromVerifiedUrl || hotelInfoRow.toVerifiedUrl) && (
-                <a className="mt-btn ghost" style={{ width: "100%", justifyContent: "center" }} target="_blank" rel="noreferrer" href={hotelInfoRow.fromVerifiedUrl || hotelInfoRow.toVerifiedUrl}><MapPin size={13} /> {T.viewOnMap}</a>
-              )}
-              {hotelInfoRow.link && (
-                <a className="mt-btn ghost" style={{ width: "100%", justifyContent: "center" }} target="_blank" rel="noreferrer" href={hotelInfoRow.link}><Link2 size={13} /> {T.bookingLink}</a>
-              )}
-              {getRowWarning(hotelInfoRow, T).map((w, i) => <div key={i} className="mt-error"><AlertTriangle size={13} /> {w}</div>)}
-              <div className="mt-hint">{T.hotelInfoDemoNote}</div>
-            </div>
-          </div>
-        </div>
-        );
-      })()}
+      {hotelInfoRow && <PlaceInfoModal row={hotelInfoRow} onClose={() => setHotelInfoRow(null)} types={types} lang={lang} T={T} />}
 
       {routeImportOpen && (
         <div className="mt-modal-backdrop" onClick={() => setRouteImportOpen(false)}>
@@ -2487,8 +2568,9 @@ export default function MyTripApp() {
                   <div><input value={locPicker.query} onChange={(e) => setLocPicker({ ...locPicker, query: e.target.value })} onKeyDown={(e) => e.key === "Enter" && runLocationSearch()} /></div>
                   <button className="mt-btn primary" onClick={() => runLocationSearch()}><Search size={13} /> {T.locSearch}</button>
                 </div>
-                <button className="mt-btn ghost" style={{ width: "100%", justifyContent: "center", marginTop: 4 }} onClick={() => showDemoNotice(T.demoNeedsGoogleKey)}>
-                  <Sparkles size={13} /> {T.tryGooglePlaces}
+                <button className={"mt-btn ghost" + (locPicker.useGoogle ? " active" : "")} style={{ width: "100%", justifyContent: "center", marginTop: 4 }}
+                  onClick={() => (hasGooglePlaces() ? toggleGooglePlacesSearch() : showDemoNotice(T.demoNeedsGoogleKey))}>
+                  <Sparkles size={13} /> {hasGooglePlaces() ? (locPicker.useGoogle ? T.usingGooglePlaces : T.tryGooglePlacesReal) : T.tryGooglePlaces}
                 </button>
                 <div className="mt-hint">{T.locHint}</div>
                 {locPicker.loading && <div className="mt-hint">{T.locSearching}</div>}
@@ -2504,7 +2586,7 @@ export default function MyTripApp() {
                 {!locPicker.loading && !locPicker.error && locPicker.results.length === 0 && <div className="mt-hint">{T.locNoResults}</div>}
                 <div className="mt-loc-results">
                   {locPicker.results.map((r, i) => (
-                    <button key={i} className="mt-loc-result" onClick={() => pickLocation(r)}>{r.display_name}</button>
+                    <button key={i} className="mt-loc-result" onClick={() => (locPicker.useGoogle ? pickGooglePlaceResult(r) : pickLocation(r))}>{locPicker.useGoogle ? r.text : r.display_name}</button>
                   ))}
                 </div>
               </div>
