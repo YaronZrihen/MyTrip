@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.0.2";
+const APP_VERSION = "10.1.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -146,6 +146,7 @@ const T_DICT = {
     demoNeedsAccounts: "התכונה הזו דורשת מערכת משתמשים והרשאות (חיבור ל-DB), עדיין לא קיימת בפרוטוטייפ. זו הצגה בלבד של איך זה ייראה.",
     tryGooglePlaces: "חפש עם Google Places (הדגמה)", demoNeedsGoogleKey: "תוצאות מדויקות ועשירות יותר (כולל עברית טובה בהרבה) אפשריות עם Google Places API — דורש מפתח API וחיוב בענן של גוגל. זו הצגה בלבד; החיפוש הפעיל כרגע משתמש ב-OpenStreetMap החינמי.",
     tryGooglePlacesReal: "חפש עם Google Places", usingGooglePlaces: "✓ מחפש עם Google Places",
+    noGoogleKeyConfigured: "חיפוש מיקום דורש מפתח Google Places API מוגדר (VITE_GOOGLE_PLACES_KEY). פנה למפתח האפליקציה.",
     uploadFile: "העלה קובץ (כרטיס טיסה, שובר הזמנה...) — הדגמה", demoNeedsStorage: "העלאת קבצים דורשת שירות אחסון (כמו Supabase Storage או S3), עדיין לא מחובר בפרוטוטייפ. זו הצגה בלבד.",
     aiDemoNotice: "זו הדגמת ממשק בלבד. חיבור אמיתי ל-Claude דורש שרת/פונקציה בצד השרת (לא ניתן לחשוף מפתח API בצד הלקוח).",
     aiSuggestItinerary: "הצע מסלול יומי אוטומטי", aiInputPlaceholder: "שאל שאלה על הטיול...",
@@ -209,6 +210,7 @@ const T_DICT = {
     demoNeedsAccounts: "This feature needs a user/permission system (a database connection) that doesn't exist in the prototype yet. This is just a preview of how it will look.",
     tryGooglePlaces: "Search with Google Places (preview)", demoNeedsGoogleKey: "Richer, more accurate results (including much better Hebrew support) are possible with the Google Places API — needs an API key and billing on Google Cloud. This is a preview only; the active search currently uses free OpenStreetMap data.",
     tryGooglePlacesReal: "Search with Google Places", usingGooglePlaces: "✓ Searching with Google Places",
+    noGoogleKeyConfigured: "Location search requires a configured Google Places API key (VITE_GOOGLE_PLACES_KEY). Contact the app developer.",
     uploadFile: "Upload a file (boarding pass, booking voucher...) — preview", demoNeedsStorage: "File uploads need a storage service (like Supabase Storage or S3), not yet connected in the prototype. This is a preview only.",
     aiDemoNotice: "This is a UI preview only. A real Claude connection needs a server-side function (an API key can't be exposed client-side).",
     aiSuggestItinerary: "Suggest an automatic day plan", aiInputPlaceholder: "Ask a question about the trip...",
@@ -1855,27 +1857,18 @@ export default function MyTripApp() {
   /* ---------- location verification (OpenStreetMap Nominatim — free, no API key) ---------- */
   function openLocationPicker(field) {
     const initialQuery = cardDraft ? (cardDraft[field] || "") : "";
-    setLocPicker({ field, mode: "search", query: initialQuery, results: [], loading: false, error: null, mapMarker: null, mapCenter: DEFAULT_MAP_CENTER, useGoogle: false });
+    setLocPicker({ field, mode: "search", query: initialQuery, results: [], loading: false, error: null, mapMarker: null, mapCenter: DEFAULT_MAP_CENTER });
     if (initialQuery.trim()) runLocationSearch(initialQuery);
   }
   function runLocationSearch(queryOverride) {
     if (!locPicker) return;
     const q = (queryOverride !== undefined ? queryOverride : locPicker.query) || "";
     if (!q.trim()) return;
+    if (!hasGooglePlaces()) { setLocPicker((p) => (p ? { ...p, error: "no-google-key" } : p)); return; }
     setLocPicker((p) => ({ ...p, loading: true, error: null }));
-    if (locPicker.useGoogle) {
-      googlePlacesAutocomplete(q, lang)
-        .then((results) => setLocPicker((p) => (p ? { ...p, loading: false, error: null, results } : p)))
-        .catch((err) => setLocPicker((p) => (p ? { ...p, loading: false, results: [], error: (err && err.message) || "network" } : p)));
-      return;
-    }
-    throttledCall(() => fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&extratags=1&limit=5&accept-language=he,en&q=${encodeURIComponent(q)}`, { headers: { Accept: "application/json" } })
-      .then((r) => { if (!r.ok) throw new Error("http-" + r.status); return r.json(); }))
-      .then((data) => setLocPicker((p) => (p ? { ...p, loading: false, error: null, results: Array.isArray(data) ? data : [] } : p)))
+    googlePlacesAutocomplete(q, lang)
+      .then((results) => setLocPicker((p) => (p ? { ...p, loading: false, error: null, results } : p)))
       .catch((err) => setLocPicker((p) => (p ? { ...p, loading: false, results: [], error: (err && err.message) || "network" } : p)));
-  }
-  function toggleGooglePlacesSearch() {
-    setLocPicker((p) => (p ? { ...p, useGoogle: !p.useGoogle, results: [], error: null } : p));
   }
   function pickGooglePlaceResult(prediction) {
     if (!locPicker) return;
@@ -2577,13 +2570,12 @@ export default function MyTripApp() {
                   <div><input value={locPicker.query} onChange={(e) => setLocPicker({ ...locPicker, query: e.target.value })} onKeyDown={(e) => e.key === "Enter" && runLocationSearch()} /></div>
                   <button className="mt-btn primary" onClick={() => runLocationSearch()}><Search size={13} /> {T.locSearch}</button>
                 </div>
-                <button className={"mt-btn ghost" + (locPicker.useGoogle ? " active" : "")} style={{ width: "100%", justifyContent: "center", marginTop: 4 }}
-                  onClick={() => (hasGooglePlaces() ? toggleGooglePlacesSearch() : showDemoNotice(T.demoNeedsGoogleKey))}>
-                  <Sparkles size={13} /> {hasGooglePlaces() ? (locPicker.useGoogle ? T.usingGooglePlaces : T.tryGooglePlacesReal) : T.tryGooglePlaces}
-                </button>
                 <div className="mt-hint">{T.locHint}</div>
                 {locPicker.loading && <div className="mt-hint">{T.locSearching}</div>}
-                {!locPicker.loading && locPicker.error && (
+                {!locPicker.loading && locPicker.error === "no-google-key" && (
+                  <div className="mt-error"><AlertTriangle /> <span>{T.noGoogleKeyConfigured}</span></div>
+                )}
+                {!locPicker.loading && locPicker.error && locPicker.error !== "no-google-key" && (
                   <div className="mt-error">
                     <AlertTriangle />
                     <span>
@@ -2595,7 +2587,7 @@ export default function MyTripApp() {
                 {!locPicker.loading && !locPicker.error && locPicker.results.length === 0 && <div className="mt-hint">{T.locNoResults}</div>}
                 <div className="mt-loc-results">
                   {locPicker.results.map((r, i) => (
-                    <button key={i} className="mt-loc-result" onClick={() => (locPicker.useGoogle ? pickGooglePlaceResult(r) : pickLocation(r))}>{locPicker.useGoogle ? r.text : r.display_name}</button>
+                    <button key={i} className="mt-loc-result" onClick={() => pickGooglePlaceResult(r)}>{r.text}</button>
                   ))}
                 </div>
               </div>
