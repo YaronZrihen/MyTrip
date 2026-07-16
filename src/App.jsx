@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.1.0";
+const APP_VERSION = "10.2.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -318,7 +318,7 @@ function checkOpeningHours(openingHours, dateStr, timeStr) {
 }
 function getRowWarning(row, T) {
   const issues = [];
-  const openState = checkOpeningHours(row.toOpeningHours, row.date, row.startTime);
+  const openState = row.toOpeningPeriods ? checkGoogleOpeningHours(row.toOpeningPeriods, row.date, row.startTime) : checkOpeningHours(row.toOpeningHours, row.date, row.startTime);
   if (openState === false) issues.push(T.warnClosed);
   if (row.toFee && String(row.toFee).toLowerCase() === "yes") issues.push(T.warnFeeRequired);
   return issues;
@@ -427,6 +427,74 @@ function googlePlaceDetails(placeId, lang) {
   return fetch(`https://places.googleapis.com/v1/places/${placeId}?languageCode=${lang === "he" ? "he" : "en"}`, {
     headers: { "X-Goog-Api-Key": GOOGLE_PLACES_KEY, "X-Goog-FieldMask": fieldMask },
   }).then((r) => { if (!r.ok) return extractGoogleApiError(r); return r.json(); });
+}
+function googlePlacesTextSearch(query, lang) {
+  if (!GOOGLE_PLACES_KEY || !query || !query.trim()) return Promise.resolve(null);
+  const fieldMask = "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.photos,places.regularOpeningHours";
+  return fetch("https://places.googleapis.com/v1/places:searchText", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Goog-Api-Key": GOOGLE_PLACES_KEY, "X-Goog-FieldMask": fieldMask },
+    body: JSON.stringify({ textQuery: query, languageCode: lang === "he" ? "he" : "en" }),
+  })
+    .then((r) => { if (!r.ok) return extractGoogleApiError(r); return r.json(); })
+    .then((data) => (data.places && data.places[0]) || null);
+}
+function checkGoogleOpeningHours(periods, dateStr, timeStr) {
+  if (!periods || !periods.length || !dateStr || !timeStr) return null;
+  const date = new Date(dateStr + "T00:00:00");
+  if (isNaN(date.getTime())) return null;
+  const dow = date.getDay();
+  const [h, m] = timeStr.split(":").map(Number);
+  if (isNaN(h) || isNaN(m)) return null;
+  const minutes = h * 60 + m;
+  let sawDay = false, open = false;
+  for (const period of periods) {
+    if (!period.open) continue;
+    const openDay = period.open.day, openMin = (period.open.hour || 0) * 60 + (period.open.minute || 0);
+    const close = period.close;
+    if (!close) { if (openDay === dow) { sawDay = true; open = true; } continue; }
+    const closeDay = close.day, closeMin = (close.hour || 0) * 60 + (close.minute || 0);
+    if (openDay === closeDay) {
+      if (dow === openDay) { sawDay = true; if (minutes >= openMin && minutes <= closeMin) open = true; }
+    } else {
+      if (dow === openDay) { sawDay = true; if (minutes >= openMin) open = true; }
+      if (dow === closeDay) { sawDay = true; if (minutes <= closeMin) open = true; }
+    }
+  }
+  return sawDay ? open : false;
+}
+function deriveGoogleAlias(place, isFlightRow, lang) {
+  const name = (place.displayName && place.displayName.text) || (place.formattedAddress || "").split(",")[0];
+  if (!name) return null;
+  if (isFlightRow) return name;
+  return transliterateWords(name, lang) || name;
+}
+function autoVerifyLocationField(row, field, lang) {
+  const text = row[field];
+  const isFlightRow = row.typeId === "flight" || row.typeId === "domestic-flight";
+  if (hasGooglePlaces()) {
+    return googlePlacesTextSearch(text, lang).then((place) => {
+      if (!place || !place.location) return null;
+      const patch = {
+        [field + "Lat"]: place.location.latitude, [field + "Lon"]: place.location.longitude,
+        [field + "VerifiedUrl"]: `https://www.google.com/maps/search/?api=1&query=${place.location.latitude},${place.location.longitude}&query_place_id=${place.id}`,
+        [field + "VerifiedText"]: text, [field + "PlaceId"]: place.id,
+      };
+      if (field === "to") patch.toOpeningPeriods = (place.regularOpeningHours && place.regularOpeningHours.periods) || null;
+      if (!row[field + "Alias"]) { const alias = deriveGoogleAlias(place, isFlightRow, lang); if (alias) patch[field + "Alias"] = alias; }
+      return patch;
+    });
+  }
+  return geocodeTextDetailed(text).then((result) => {
+    if (!result) return null;
+    const patch = {
+      [field + "Lat"]: result.lat, [field + "Lon"]: result.lon,
+      [field + "VerifiedUrl"]: mapsSearchUrl(result.lat, result.lon), [field + "VerifiedText"]: text,
+    };
+    if (field === "to") { patch.toOpeningHours = (result.extratags && result.extratags.opening_hours) || null; patch.toFee = (result.extratags && result.extratags.fee) || null; }
+    if (!row[field + "Alias"]) { const alias = deriveSmartAlias(result, isFlightRow, lang); if (alias) patch[field + "Alias"] = alias; }
+    return patch;
+  });
 }
 function googlePlacePhotoUrl(photoName, maxWidth) {
   if (!GOOGLE_PLACES_KEY || !photoName) return null;
@@ -648,45 +716,30 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
   const [fromVerifyLoading, setFromVerifyLoading] = useState(false);
   useEffect(() => {
     if (!row.from) return;
-    if (row.fromVerifiedUrl && row.fromVerifiedText === row.from) return;
-    if (row.fromLat != null && row.fromLon != null) {
-      updateRow(row.id, { fromVerifiedUrl: mapsSearchUrl(row.fromLat, row.fromLon), fromVerifiedText: row.from });
-      return;
-    }
+    const fullyVerified = hasGooglePlaces() ? (row.fromPlaceId && row.fromVerifiedText === row.from) : (row.fromVerifiedUrl && row.fromVerifiedText === row.from);
+    if (fullyVerified) return;
     if (fromVerifyLoading) return;
     setFromVerifyLoading(true);
-    const isFlightRow = row.typeId === "flight" || row.typeId === "domestic-flight";
-    geocodeTextDetailed(row.from).then((result) => {
+    autoVerifyLocationField(row, "from", lang).then((patch) => {
       setFromVerifyLoading(false);
-      if (!result) return;
-      const patch = { fromLat: result.lat, fromLon: result.lon, fromVerifiedUrl: mapsSearchUrl(result.lat, result.lon), fromVerifiedText: row.from };
-      if (!row.fromAlias) { const alias = deriveSmartAlias(result, isFlightRow, lang); if (alias) patch.fromAlias = alias; }
-      updateRow(row.id, patch);
+      if (patch) updateRow(row.id, patch);
     }).catch(() => setFromVerifyLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [row.id, row.from, row.fromLat, row.fromLon]);
+  }, [row.id, row.from, row.fromLat, row.fromLon, row.fromPlaceId]);
 
   const [toVerifyLoading, setToVerifyLoading] = useState(false);
   useEffect(() => {
     if (!row.to) return;
-    if (row.toVerifiedUrl && row.toVerifiedText === row.to) return;
-    if (row.toLat != null && row.toLon != null) {
-      updateRow(row.id, { toVerifiedUrl: mapsSearchUrl(row.toLat, row.toLon), toVerifiedText: row.to });
-      return;
-    }
+    const fullyVerified = hasGooglePlaces() ? (row.toPlaceId && row.toVerifiedText === row.to) : (row.toVerifiedUrl && row.toVerifiedText === row.to);
+    if (fullyVerified) return;
     if (toVerifyLoading) return;
     setToVerifyLoading(true);
-    const isFlightRow = row.typeId === "flight" || row.typeId === "domestic-flight";
-    geocodeTextDetailed(row.to).then((result) => {
+    autoVerifyLocationField(row, "to", lang).then((patch) => {
       setToVerifyLoading(false);
-      if (!result) return;
-      const patch = { toLat: result.lat, toLon: result.lon, toVerifiedUrl: mapsSearchUrl(result.lat, result.lon), toVerifiedText: row.to,
-        toOpeningHours: (result.extratags && result.extratags.opening_hours) || null, toFee: (result.extratags && result.extratags.fee) || null };
-      if (!row.toAlias) { const alias = deriveSmartAlias(result, isFlightRow, lang); if (alias) patch.toAlias = alias; }
-      updateRow(row.id, patch);
+      if (patch) updateRow(row.id, patch);
     }).catch(() => setToVerifyLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [row.id, row.to, row.toLat, row.toLon]);
+  }, [row.id, row.to, row.toLat, row.toLon, row.toPlaceId]);
 
   const [weatherLoading, setWeatherLoading] = useState(false);
   const hasWeather = row.weatherCode != null && row.weatherForDate === row.date;
@@ -736,10 +789,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
       case "day": return depth === 0 ? heDay(row.date, lang) : "";
       case "icon": {
         const warnings = getRowWarning(row, T);
-        return (
-          <button className={"mt-type-icon mt-type-icon-btn" + (warnings.length ? " has-warning" : "")} style={{ background: tm.color }}
-            title={warnings.length ? warnings.join(" · ") : T.placeInfo} onClick={() => openHotelInfo(row)}><Icon /></button>
-        );
+        return <PlaceIconWithPreview row={row} tm={tm} Icon={Icon} warnings={warnings} T={T} lang={lang} onOpenFull={() => openHotelInfo(row)} />;
       }
       case "type": return (
         <div className="mt-type-wrap">
@@ -1017,6 +1067,51 @@ function DateRangeField({ startDate, endDate, onChange, lang, T }) {
   );
 }
 
+function PlaceIconWithPreview({ row, tm, Icon, warnings, T, lang, onOpenFull }) {
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewPos, setPreviewPos] = useState({ top: 0, left: 0 });
+  const [previewData, setPreviewData] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const btnRef = useRef(null);
+  const hoverTimer = useRef(null);
+  const placeId = row.fromPlaceId || row.toPlaceId;
+
+  function handleEnter() {
+    if (!placeId || !hasGooglePlaces()) return;
+    hoverTimer.current = setTimeout(() => {
+      if (btnRef.current) { const r = btnRef.current.getBoundingClientRect(); setPreviewPos({ top: r.bottom + 6, left: r.left }); }
+      setShowPreview(true);
+      if (!previewData) {
+        setPreviewLoading(true);
+        googlePlaceDetails(placeId, lang).then((d) => { setPreviewLoading(false); setPreviewData(d); }).catch(() => setPreviewLoading(false));
+      }
+    }, 300);
+  }
+  function handleLeave() {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    setShowPreview(false);
+  }
+
+  return (
+    <span style={{ position: "relative", display: "inline-block" }} onMouseEnter={handleEnter} onMouseLeave={handleLeave} onFocus={handleEnter} onBlur={handleLeave}>
+      <button ref={btnRef} className={"mt-type-icon mt-type-icon-btn" + (warnings.length ? " has-warning" : "")} style={{ background: tm.color }}
+        title={warnings.length ? warnings.join(" · ") : T.placeInfo} onClick={onOpenFull}><Icon /></button>
+      {showPreview && (
+        <div className="mt-place-preview" style={{ top: previewPos.top, left: previewPos.left }}>
+          {previewLoading ? <span className="mt-hint">{T.locSearching}</span> : previewData ? (
+            <>
+              <strong>{(previewData.displayName && previewData.displayName.text) || "—"}</strong>
+              {previewData.rating ? (
+                <span className="mt-place-preview-rating"><Star size={11} fill="currentColor" /> {previewData.rating} ({previewData.userRatingCount || 0})</span>
+              ) : <span className="mt-hint">{T.ratingDemo}</span>}
+            </>
+          ) : <span className="mt-hint">{T.locNoResults}</span>}
+        </div>
+      )}
+    </span>
+  );
+}
+
 function PlaceInfoModal({ row, onClose, types, lang, T }) {
   const tm = typeMeta(row.typeId, types, T, lang);
   const TI = ICONS[tm.icon] || Tag;
@@ -1116,45 +1211,30 @@ function MobileCardMeta({ row, ctx }) {
   const [fromVerifyLoading, setFromVerifyLoading] = useState(false);
   useEffect(() => {
     if (!row.from) return;
-    if (row.fromVerifiedUrl && row.fromVerifiedText === row.from) return;
-    if (row.fromLat != null && row.fromLon != null) {
-      updateRow(row.id, { fromVerifiedUrl: mapsSearchUrl(row.fromLat, row.fromLon), fromVerifiedText: row.from });
-      return;
-    }
+    const fullyVerified = hasGooglePlaces() ? (row.fromPlaceId && row.fromVerifiedText === row.from) : (row.fromVerifiedUrl && row.fromVerifiedText === row.from);
+    if (fullyVerified) return;
     if (fromVerifyLoading) return;
     setFromVerifyLoading(true);
-    const isFlightRow = row.typeId === "flight" || row.typeId === "domestic-flight";
-    geocodeTextDetailed(row.from).then((result) => {
+    autoVerifyLocationField(row, "from", lang).then((patch) => {
       setFromVerifyLoading(false);
-      if (!result) return;
-      const patch = { fromLat: result.lat, fromLon: result.lon, fromVerifiedUrl: mapsSearchUrl(result.lat, result.lon), fromVerifiedText: row.from };
-      if (!row.fromAlias) { const alias = deriveSmartAlias(result, isFlightRow, lang); if (alias) patch.fromAlias = alias; }
-      updateRow(row.id, patch);
+      if (patch) updateRow(row.id, patch);
     }).catch(() => setFromVerifyLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [row.id, row.from, row.fromLat, row.fromLon]);
+  }, [row.id, row.from, row.fromLat, row.fromLon, row.fromPlaceId]);
 
   const [toVerifyLoading, setToVerifyLoading] = useState(false);
   useEffect(() => {
     if (!row.to) return;
-    if (row.toVerifiedUrl && row.toVerifiedText === row.to) return;
-    if (row.toLat != null && row.toLon != null) {
-      updateRow(row.id, { toVerifiedUrl: mapsSearchUrl(row.toLat, row.toLon), toVerifiedText: row.to });
-      return;
-    }
+    const fullyVerified = hasGooglePlaces() ? (row.toPlaceId && row.toVerifiedText === row.to) : (row.toVerifiedUrl && row.toVerifiedText === row.to);
+    if (fullyVerified) return;
     if (toVerifyLoading) return;
     setToVerifyLoading(true);
-    const isFlightRow = row.typeId === "flight" || row.typeId === "domestic-flight";
-    geocodeTextDetailed(row.to).then((result) => {
+    autoVerifyLocationField(row, "to", lang).then((patch) => {
       setToVerifyLoading(false);
-      if (!result) return;
-      const patch = { toLat: result.lat, toLon: result.lon, toVerifiedUrl: mapsSearchUrl(result.lat, result.lon), toVerifiedText: row.to,
-        toOpeningHours: (result.extratags && result.extratags.opening_hours) || null, toFee: (result.extratags && result.extratags.fee) || null };
-      if (!row.toAlias) { const alias = deriveSmartAlias(result, isFlightRow, lang); if (alias) patch.toAlias = alias; }
-      updateRow(row.id, patch);
+      if (patch) updateRow(row.id, patch);
     }).catch(() => setToVerifyLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [row.id, row.to, row.toLat, row.toLon]);
+  }, [row.id, row.to, row.toLat, row.toLon, row.toPlaceId]);
 
   function weatherIconEl() {
     if (weatherLoading) return <Cloud size={15} className="mt-weather-spin" />;
@@ -2163,6 +2243,9 @@ export default function MyTripApp() {
         .mt-type-icon-btn:hover { filter:brightness(1.1); box-shadow:0 0 0 2px var(--teal-tint); }
         .mt-hotel-photo-demo { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; height:110px; border-radius:10px; background:linear-gradient(135deg,var(--teal-tint),var(--bg)); color:var(--teal); border:1.5px dashed var(--border); font-size:11px; text-align:center; padding:8px; }
         .mt-hotel-photo-real { width:100%; height:150px; object-fit:cover; border-radius:10px; }
+        .mt-place-preview { position:fixed; z-index:250; background:var(--surface); border:1px solid var(--border); border-radius:8px; box-shadow:0 8px 24px rgba(20,40,35,.18); padding:8px 10px; font-size:12px; max-width:220px; display:flex; flex-direction:column; gap:3px; pointer-events:none; }
+        .mt-place-preview strong { font-size:12.5px; color:var(--ink); }
+        .mt-place-preview-rating { display:flex; align-items:center; gap:3px; color:#D9A23D; font-size:11.5px; }
         .mt-hotel-rating-demo { display:flex; align-items:center; gap:2px; color:#D9A23D; }
         .mt-hotel-rating-demo .mt-hint { margin-inline-start:6px; color:var(--muted); }
         .mt-type-icon svg { width:12px; height:12px; color:#fff; }
