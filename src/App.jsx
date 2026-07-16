@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "9.14.0";
+const APP_VERSION = "9.15.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -731,7 +731,9 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
       <td className="handle">
         <div className="mt-handle-wrap" style={{ paddingInlineStart: depth * 14 }}>
           <span className="mt-drag-handle" title={T.dragHint}><GripVertical size={13} /></span>
-          {hasChildren && <button onClick={toggleCollapse} style={{ border: "none", background: "none", display: "flex", color: "var(--muted)" }}>{collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}</button>}
+          {hasChildren ? (
+            <button onClick={toggleCollapse} style={{ border: "none", background: "none", display: "flex", color: "var(--muted)" }}>{collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}</button>
+          ) : <span className="mt-handle-chevron-spacer" />}
         </div>
       </td>
       {visibleColumns.map((col) => <td key={col.key} className={col.key}>{renderCell(col)}</td>)}
@@ -1186,7 +1188,7 @@ function SplashIntro({ onFinish, lang }) {
   const planePath = "M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z";
   const landD = "M217.9,174.2 C215.2,172.8 208.3,168.0 203.2,166.7 C198.0,165.4 191.5,169.2 189.4,167.0 C187.3,164.7 193.8,156.5 191.7,154.2 C189.5,152.0 180.3,151.0 177.4,154.2 C174.6,157.5 177.9,164.7 176.1,172.2 C174.2,179.7 169.9,189.2 167.3,196.0 C164.8,202.9 162.8,205.6 162.1,210.4 C161.3,215.1 161.1,220.1 163.2,222.3 C165.3,224.5 170.7,219.9 173.8,222.7 C176.9,225.4 178.7,232.3 180.4,237.5 C182.1,242.8 181.0,247.5 183.2,251.7 C185.3,256.0 188.9,259.0 192.4,261.0 C195.8,263.0 198.9,261.1 202.3,263.0 C205.6,264.9 210.2,268.7 210.8,271.4 C211.3,274.2 208.1,276.6 205.2,278.1 C202.4,279.7 196.8,281.2 194.7,280.0 C192.5,278.8 195.9,274.5 193.3,271.7 C190.7,268.9 182.9,265.4 180.0,264.6 C177.1,263.8 178.9,268.0 177.2,267.4 C175.6,266.8 172.4,263.8 170.8,261.3 C169.1,258.7 170.1,256.2 168.0,253.1 C166.0,250.0 162.3,247.0 159.3,244.0 C156.3,240.9 153.4,235.9 151.5,236.2 C149.6,236.5 149.8,245.6 148.7,245.7 C147.6,245.8 145.8,240.2 145.5,236.7 C145.3,233.3 146.1,231.2 147.3,226.6 C148.5,221.9 149.9,216.7 152.2,210.9 C154.4,205.1 157.0,199.9 160.0,194.2 C163.0,188.4 168.4,184.4 168.9,179.0 C169.4,173.6 163.8,168.2 162.7,164.2 C161.7,160.1 163.3,159.5 163.0,156.5 C162.7,153.5 163.4,151.4 161.1,147.4 C158.8,143.4 152.8,138.2 150.1,134.4 C147.4,130.6 145.9,128.3 146.2,126.2 C146.5,124.2 149.8,126.4 151.9,123.3 C154.0,120.2 158.0,113.6 157.9,109.1 C157.8,104.6 154.3,102.5 151.3,98.4 C148.2,94.3 144.2,91.2 140.9,86.5 C137.6,81.7 133.3,75.3 133.1,72.1 C132.9,69.0 137.2,72.9 139.8,69.2 C142.3,65.5 143.9,54.8 147.3,51.5 C150.8,48.2 155.1,52.2 158.8,50.8 C162.6,49.5 164.9,45.7 168.3,43.8 C171.6,41.8 174.7,39.8 177.7,40.0 C180.7,40.2 183.3,42.4 184.8,45.1 C186.2,47.8 183.6,53.0 185.7,54.9 C187.9,56.7 195.5,52.3 196.7,55.5 C198.0,58.8 193.3,67.1 192.6,72.8 C191.9,78.5 189.9,86.5 193.1,87.4 C196.3,88.3 206.3,78.9 210.3,77.6 C214.3,76.4 212.6,80.0 215.1,80.4 C217.7,80.9 222.2,81.1 224.5,80.0 C226.9,79.0 225.2,75.2 228.0,74.4 C230.8,73.6 235.7,72.9 240.2,75.5 C244.6,78.1 250.1,83.5 252.6,88.8 C255.0,94.0 251.2,99.4 253.7,104.8 C256.3,110.3 264.6,114.0 266.8,119.0 C269.1,124.1 267.2,129.0 266.1,132.8 C265.1,136.6 264.6,139.3 260.8,140.2 C257.1,141.1 252.0,137.6 245.5,137.8 C238.9,137.9 230.2,138.0 224.5,141.0 C218.9,144.0 215.2,148.5 214.0,154.5 C212.8,160.5 217.2,170.7 217.9,174.2 Z";
   return (
-    <div className={"mt-intro" + (exiting ? " exiting" : "")} onClick={skip}>
+    <div className={"mt-intro" + (exiting ? " exiting" : "")} onClick={skip} dir={lang === "he" ? "rtl" : "ltr"}>
       <div className="mt-intro-inner">
         <svg viewBox="0 0 400 320" className="mt-intro-svg">
           <defs>
@@ -1936,6 +1938,7 @@ export default function MyTripApp() {
         .mt-col-resizer { position:absolute; top:2px; bottom:2px; inset-inline-end:-2px; width:3px; cursor:col-resize; user-select:none; z-index:5; background:rgba(37,109,100,.10); border-radius:2px; }
         .mt-col-resizer:hover, .mt-col-resizer:active { background:var(--teal); opacity:.5; }
         .mt-table tbody td { padding:4px 10px; font-size:12.8px; border-bottom:1px solid var(--border); vertical-align:middle; position:relative; white-space:nowrap; }
+        .mt-table td.from, .mt-table td.to, .mt-table th.from, .mt-table th.to { padding-inline:6px; }
         .mt-table tbody tr:last-child td { border-bottom:none; }
         .mt-table tbody tr:hover { background:#FBFDFC; }
         .mt-table th.handle, .mt-table td.handle { white-space:nowrap; }
@@ -1944,7 +1947,8 @@ export default function MyTripApp() {
         .mt-table th.duration, .mt-table td.duration { white-space:nowrap; }
         .mt-table th.type, .mt-table td.type { overflow:visible; }
         .mt-table td.from, .mt-table td.to { overflow:hidden; text-overflow:ellipsis; }
-        .mt-handle-wrap { display:flex; align-items:center; justify-content:center; gap:2px; }
+        .mt-handle-wrap { display:flex; align-items:center; justify-content:flex-start; gap:2px; }
+        .mt-handle-chevron-spacer { display:inline-block; width:13px; height:13px; flex-shrink:0; }
         .mt-type-wrap { position:relative; }
         .mt-type-chip { display:flex; align-items:center; gap:6px; }
         .mt-type-icon { width:22px; height:22px; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
@@ -1956,12 +1960,10 @@ export default function MyTripApp() {
         .mt-type-icon svg { width:12px; height:12px; color:#fff; }
         .mt-type-btn { border:none; background:none; padding:0; display:flex; align-items:center; gap:5px; font-size:12.8px; font-weight:500; color:var(--ink); max-width:100%; }
         .mt-type-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .mt-loc-cell { display:flex; align-items:center; gap:3px; }
-        .mt-loc-cell .mt-editable { flex:1; max-width:20ch; }
-        .mt-loc-cell.has-badge { justify-content:flex-start; }
-        .mt-loc-cell.has-badge .mt-editable, .mt-loc-cell.has-badge .mt-alias-display { flex:0 1 auto; width:auto; max-width:100%; }
+        .mt-loc-cell { display:flex; align-items:center; gap:2px; }
+        .mt-loc-cell .mt-editable { flex:1; max-width:20ch; padding-inline:3px; }
         .mt-alias-display { flex:1; font-size:12.8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:3px 5px; max-width:20ch; cursor:default; }
-        .mt-loc-badge { color:#3E8E5A; display:flex; flex-shrink:0; }
+        .mt-loc-badge { color:#3E8E5A; display:flex; flex-shrink:0; padding-inline-end:2px; }
         .mt-editable { border:1px solid transparent; border-radius:6px; padding:3px 5px; font-size:12.8px; width:100%; background:transparent; font-family:inherit; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .mt-editable:hover { border-color:var(--border); }
         .mt-editable:focus { outline:none; border-color:var(--teal); background:#fff; }
