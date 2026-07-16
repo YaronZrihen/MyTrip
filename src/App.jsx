@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "9.18.0";
+const APP_VERSION = "9.19.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -157,6 +157,7 @@ const T_DICT = {
     hotelInfo: "פרטי מלון", placeInfo: "פרטי מקום", hotelPhotoDemo: "תמונה — דורש חיבור ל-Google Places API (בתשלום). זו הצגה בלבד.",
     ratingDemo: "דירוג — הדגמה", viewOnMap: "הצג במפה", bookingLink: "קישור להזמנה",
     hotelInfoDemoNote: "כתובת ומפה — אמיתי (מהמיקום המאומת של הרשומה). תמונה ודירוג בפועל ידרשו חיבור ל-Google Places.",
+    warnClosed: "סגור בשעה שנבחרה (לפי שעות פעילות OpenStreetMap)", warnFeeRequired: "דורש רכישת כרטיס כניסה (לפי OpenStreetMap)",
     aiAssistant: "עוזר AI (הדגמה)", ok: "הבנתי",
     locHint: "טיפ: אם החיפוש לא מוצא תוצאה בעברית, נסה לחפש בשם המקומי/אנגלי (למשל \"Fiumicino Airport\" ולא \"פיומיצ׳ינו\").",
     tabSearch: "חיפוש טקסט", tabMap: "בחירה במפה", mapPickHint: "לחץ במקום הרצוי על המפה כדי לסמן אותו",
@@ -218,6 +219,7 @@ const T_DICT = {
     hotelInfo: "Hotel details", placeInfo: "Place details", hotelPhotoDemo: "Photo — needs a Google Places API connection (paid). This is a preview only.",
     ratingDemo: "Rating — preview", viewOnMap: "View on map", bookingLink: "Booking link",
     hotelInfoDemoNote: "Address and map link — real (from the record's verified location). An actual photo and rating would need a Google Places connection.",
+    warnClosed: "Closed at the scheduled time (per OpenStreetMap opening hours)", warnFeeRequired: "Requires an entry ticket (per OpenStreetMap)",
     aiAssistant: "AI Assistant (preview)", ok: "Got it",
     locHint: "Tip: if the search finds nothing in Hebrew, try the local/English name instead (e.g. \"Fiumicino Airport\").",
     tabSearch: "Text search", tabMap: "Pick on map", mapPickHint: "Click anywhere on the map to mark it",
@@ -261,6 +263,62 @@ function detectTextAlign(text) {
 }
 function typeDisplayName(t, lang) { return t.name_he != null ? (lang === "en" ? t.name_en : t.name_he) : t.name; }
 function isAccommodationType(typeId) { return typeId === "hotel" || typeId === "hostel" || typeId === "apartment"; }
+
+/* Simplified OSM opening_hours check — handles common "Mo-Fr 09:00-18:00" style rules only.
+   Returns null (unknown/can't tell) for anything more complex (holidays, exceptions, etc.) — we never
+   want to show a false "closed" warning just because we couldn't parse the format. */
+function checkOpeningHours(openingHours, dateStr, timeStr) {
+  if (!openingHours || !dateStr || !timeStr) return null;
+  if (/^\s*24\/7\s*$/i.test(openingHours)) return true;
+  const dayMap = { Mo: 1, Tu: 2, We: 3, Th: 4, Fr: 5, Sa: 6, Su: 0 };
+  const dayNames = Object.keys(dayMap);
+  const date = new Date(dateStr + "T00:00:00");
+  if (isNaN(date.getTime())) return null;
+  const dow = date.getDay();
+  const [h, m] = timeStr.split(":").map(Number);
+  if (isNaN(h) || isNaN(m)) return null;
+  const minutes = h * 60 + m;
+  const rules = openingHours.split(";").map((s) => s.trim()).filter(Boolean);
+  let result = null;
+  for (const rule of rules) {
+    const dayPattern = "(?:" + dayNames.join("|") + ")";
+    const m2 = rule.match(new RegExp(`^(${dayPattern}(?:-${dayPattern})?(?:,${dayPattern}(?:-${dayPattern})?)*)\\s+(.+)$`));
+    if (!m2) continue;
+    const [, daysPart, timesPart] = m2;
+    const daysCovered = new Set();
+    let validDays = true;
+    daysPart.split(",").forEach((seg) => {
+      if (seg.includes("-")) {
+        const [a, b] = seg.split("-");
+        const start = dayMap[a], end = dayMap[b];
+        if (start == null || end == null) { validDays = false; return; }
+        let d = start;
+        for (let i = 0; i < 8; i++) { daysCovered.add(d); if (d === end) break; d = (d + 1) % 7; }
+      } else if (dayMap[seg] != null) daysCovered.add(dayMap[seg]);
+      else validDays = false;
+    });
+    if (!validDays || !daysCovered.has(dow)) continue;
+    if (/off|closed/i.test(timesPart)) { result = false; continue; }
+    const timeRanges = timesPart.split(",").map((s) => s.trim());
+    let anyMatch = false, anyParsed = false;
+    for (const tr of timeRanges) {
+      const tm = tr.match(/^(\d{2}):(\d{2})-(\d{2}):(\d{2})$/);
+      if (!tm) continue;
+      anyParsed = true;
+      const startMin = Number(tm[1]) * 60 + Number(tm[2]), endMin = Number(tm[3]) * 60 + Number(tm[4]);
+      if (minutes >= startMin && minutes <= endMin) anyMatch = true;
+    }
+    if (anyParsed) result = anyMatch;
+  }
+  return result;
+}
+function getRowWarning(row, T) {
+  const issues = [];
+  const openState = checkOpeningHours(row.toOpeningHours, row.date, row.startTime);
+  if (openState === false) issues.push(T.warnClosed);
+  if (row.toFee && String(row.toFee).toLowerCase() === "yes") issues.push(T.warnFeeRequired);
+  return issues;
+}
 function typeMeta(typeId, types, T, lang) {
   if (!typeId || typeId === "unset") return { id: "unset", name: (T && T.selectType) || "בחר...", icon: "Tag", color: "#C1443A" };
   const t = types.find((tt) => tt.id === typeId) || types[0];
@@ -586,7 +644,8 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
     geocodeTextDetailed(row.to).then((result) => {
       setToVerifyLoading(false);
       if (!result) return;
-      const patch = { toLat: result.lat, toLon: result.lon, toVerifiedUrl: mapsSearchUrl(result.lat, result.lon), toVerifiedText: row.to };
+      const patch = { toLat: result.lat, toLon: result.lon, toVerifiedUrl: mapsSearchUrl(result.lat, result.lon), toVerifiedText: row.to,
+        toOpeningHours: (result.extratags && result.extratags.opening_hours) || null, toFee: (result.extratags && result.extratags.fee) || null };
       if (!row.toAlias) { const alias = deriveSmartAlias(result, isFlightRow, lang); if (alias) patch.toAlias = alias; }
       updateRow(row.id, patch);
     }).catch(() => setToVerifyLoading(false));
@@ -639,9 +698,13 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
     switch (col.key) {
       case "date": return depth === 0 ? fmtDate(row.date, lang) : "";
       case "day": return depth === 0 ? heDay(row.date, lang) : "";
-      case "icon": return (
-        <button className="mt-type-icon mt-type-icon-btn" style={{ background: tm.color }} title={T.placeInfo} onClick={() => openHotelInfo(row)}><Icon /></button>
-      );
+      case "icon": {
+        const warnings = getRowWarning(row, T);
+        return (
+          <button className={"mt-type-icon mt-type-icon-btn" + (warnings.length ? " has-warning" : "")} style={{ background: tm.color }}
+            title={warnings.length ? warnings.join(" · ") : T.placeInfo} onClick={() => openHotelInfo(row)}><Icon /></button>
+        );
+      }
       case "type": return (
         <div className="mt-type-wrap">
           <button className="mt-type-btn" ref={typeBtnRef} title={tm.name} onClick={toggleTypeMenu}>
@@ -993,7 +1056,8 @@ function MobileCardMeta({ row, ctx }) {
     geocodeTextDetailed(row.to).then((result) => {
       setToVerifyLoading(false);
       if (!result) return;
-      const patch = { toLat: result.lat, toLon: result.lon, toVerifiedUrl: mapsSearchUrl(result.lat, result.lon), toVerifiedText: row.to };
+      const patch = { toLat: result.lat, toLon: result.lon, toVerifiedUrl: mapsSearchUrl(result.lat, result.lon), toVerifiedText: row.to,
+        toOpeningHours: (result.extratags && result.extratags.opening_hours) || null, toFee: (result.extratags && result.extratags.fee) || null };
       if (!row.toAlias) { const alias = deriveSmartAlias(result, isFlightRow, lang); if (alias) patch.toAlias = alias; }
       updateRow(row.id, patch);
     }).catch(() => setToVerifyLoading(false));
@@ -1065,11 +1129,12 @@ function DayGroup({ g, fid, depth, ctx }) {
           {allRowsHere.map((r) => {
             const tm = typeMeta(r.typeId, types, T, lang); const Icon = ICONS[tm.icon] || Tag;
             const fromLabel = r.fromAlias || r.from, toLabel = r.toAlias || r.to;
+            const cardWarnings = getRowWarning(r, T);
             return (
               <div className="mt-card" key={r.id} onClick={() => openCard(r)}>
                 <div className="mt-card-top">
                   <div className="mt-type-chip">
-                    <span className="mt-type-icon" style={{ background: tm.color }}><Icon /></span>
+                    <span className={"mt-type-icon" + (cardWarnings.length ? " has-warning" : "")} style={{ background: tm.color }} title={cardWarnings.join(" · ")}><Icon /></span>
                     <strong style={{ fontSize: 13.5 }}>{tm.name}</strong>
                   </div>
                   <span className="mt-card-times">{r.startTime || "—"}{r.endTime ? ` – ${r.endTime}` : ""}</span>
@@ -1328,6 +1393,7 @@ export default function MyTripApp() {
   const settingsBtnRef = useRef(null);
   const dir = lang === "he" ? "rtl" : "ltr";
   const T = T_DICT[lang];
+  useEffect(() => { document.title = "MyTrip Builder"; }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -1981,6 +2047,7 @@ export default function MyTripApp() {
         .mt-type-chip { display:flex; align-items:center; gap:6px; }
         .mt-type-icon { width:22px; height:22px; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
         .mt-type-icon-btn { border:none; cursor:pointer; }
+        .mt-type-icon.has-warning { box-shadow:0 0 0 2px var(--danger); }
         .mt-type-icon-btn:hover { filter:brightness(1.1); box-shadow:0 0 0 2px var(--teal-tint); }
         .mt-hotel-photo-demo { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; height:110px; border-radius:10px; background:linear-gradient(135deg,var(--teal-tint),var(--bg)); color:var(--teal); border:1.5px dashed var(--border); font-size:11px; text-align:center; padding:8px; }
         .mt-hotel-rating-demo { display:flex; align-items:center; gap:2px; color:#D9A23D; }
@@ -2267,6 +2334,7 @@ export default function MyTripApp() {
               {hotelInfoRow.link && (
                 <a className="mt-btn ghost" style={{ width: "100%", justifyContent: "center" }} target="_blank" rel="noreferrer" href={hotelInfoRow.link}><Link2 size={13} /> {T.bookingLink}</a>
               )}
+              {getRowWarning(hotelInfoRow, T).map((w, i) => <div key={i} className="mt-error"><AlertTriangle size={13} /> {w}</div>)}
               <div className="mt-hint">{T.hotelInfoDemoNote}</div>
             </div>
           </div>
