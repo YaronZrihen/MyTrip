@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "9.15.0";
+const APP_VERSION = "9.16.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -343,13 +343,32 @@ function geocodeTextDetailed(text) {
   if (__geocodeCache.has(key)) return __geocodeCache.get(key);
   const p = throttledCall(() => fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&extratags=1&limit=1&accept-language=he,en&q=${encodeURIComponent(text)}`, { headers: { Accept: "application/json" } })
     .then((r) => { if (!r.ok) throw new Error("http-" + r.status); return r.json(); })
-    .then((data) => (data && data[0] ? { lat: Number(data[0].lat), lon: Number(data[0].lon), address: data[0].address, extratags: data[0].extratags, display_name: data[0].display_name, osmClass: data[0].class, osmType: data[0].type } : null)))
+    .then((data) => (data && data[0] ? { lat: Number(data[0].lat), lon: Number(data[0].lon), address: data[0].address, extratags: data[0].extratags, display_name: data[0].display_name, name: data[0].name, osmClass: data[0].class, osmType: data[0].type } : null)))
     .catch((err) => { __geocodeCache.delete(key); throw err; });
   __geocodeCache.set(key, p);
   return p;
 }
 function geocodeText(text) {
   return geocodeTextDetailed(text).then((r) => (r ? { lat: r.lat, lon: r.lon } : null));
+}
+const HEBREW_TRANSLIT_WORDS = {
+  hilton: "הילטון", marriott: "מריוט", garden: "גארדן", inn: "אין", hyatt: "הייאט", sheraton: "שרתון",
+  hotel: "מלון", hostel: "אכסניה", resort: "ריזורט", airport: "שדה תעופה", suites: "סוויטות", suite: "סוויטה",
+  ibis: "איביס", novotel: "נובוטל", holiday: "הולידיי", express: "אקספרס", plaza: "פלאזה", the: "",
+  westin: "ווסטין", radisson: "רדיסון", best: "בסט", western: "וסטרן", double: "דאבל", tree: "טרי",
+  intercontinental: "אינטרקונטיננטל", crowne: "קראון", regency: "רג'נסי", grand: "גרנד", ramada: "רמדה",
+  palace: "פאלאס", park: "פארק", central: "מרכזי", international: "בינלאומי", rome: "רומא", roma: "רומא",
+  house: "האוס", boutique: "בוטיק", residence: "רזידנס", tower: "מגדל", towers: "מגדלים", view: "וויו",
+  royal: "רויאל", golden: "גולדן", star: "סטאר", bay: "מפרץ", beach: "חוף", city: "סיטי", station: "תחנת",
+};
+function transliterateWords(text, lang) {
+  if (lang !== "he" || !text) return text;
+  return text.split(" ").map((w) => {
+    const clean = w.toLowerCase().replace(/[^a-z]/g, "");
+    if (!clean) return w;
+    const t = HEBREW_TRANSLIT_WORDS[clean];
+    return t !== undefined ? t : w;
+  }).filter(Boolean).join(" ");
 }
 function deriveSmartAlias(result, isFlightRow, lang) {
   if (!result) return null;
@@ -360,6 +379,11 @@ function deriveSmartAlias(result, isFlightRow, lang) {
   if (isFlightRow && iata) return `${cityName} (${iata.toUpperCase()})`;
   const isAirport = result.osmClass === "aeroway" || result.osmType === "aerodrome" || (result.extratags && result.extratags.aeroway) || iata;
   if (isAirport) return lang === "en" ? `${cityName}, Airport` : `${cityName}, שדה תעופה`;
+  // Prefer the actual venue name (e.g. "Hilton Garden Inn Rome Airport") over the generic city/suburb name
+  const placeName = (result.name || (result.display_name || "").split(",")[0] || "").trim();
+  if (placeName && placeName.length <= 45 && !/^\d+$/.test(placeName) && isNaN(Number(placeName))) {
+    return transliterateWords(placeName, lang) || cityName;
+  }
   return cityName;
 }
 function fetchDrivingRoute(a, b) {
@@ -731,9 +755,9 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
       <td className="handle">
         <div className="mt-handle-wrap" style={{ paddingInlineStart: depth * 14 }}>
           <span className="mt-drag-handle" title={T.dragHint}><GripVertical size={13} /></span>
-          {hasChildren ? (
-            <button onClick={toggleCollapse} style={{ border: "none", background: "none", display: "flex", color: "var(--muted)" }}>{collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}</button>
-          ) : <span className="mt-handle-chevron-spacer" />}
+          <span className="mt-handle-chevron-slot">
+            {hasChildren && <button onClick={toggleCollapse} style={{ border: "none", background: "none", display: "flex", color: "var(--muted)" }}>{collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}</button>}
+          </span>
         </div>
       </td>
       {visibleColumns.map((col) => <td key={col.key} className={col.key}>{renderCell(col)}</td>)}
@@ -1947,8 +1971,8 @@ export default function MyTripApp() {
         .mt-table th.duration, .mt-table td.duration { white-space:nowrap; }
         .mt-table th.type, .mt-table td.type { overflow:visible; }
         .mt-table td.from, .mt-table td.to { overflow:hidden; text-overflow:ellipsis; }
-        .mt-handle-wrap { display:flex; align-items:center; justify-content:flex-start; gap:2px; }
-        .mt-handle-chevron-spacer { display:inline-block; width:13px; height:13px; flex-shrink:0; }
+        .mt-handle-wrap { display:flex; align-items:center; justify-content:flex-start; }
+        .mt-handle-chevron-slot { flex:1; display:flex; align-items:center; justify-content:center; min-width:13px; }
         .mt-type-wrap { position:relative; }
         .mt-type-chip { display:flex; align-items:center; gap:6px; }
         .mt-type-icon { width:22px; height:22px; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
