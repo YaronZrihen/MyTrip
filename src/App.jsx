@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "9.11.0";
+const APP_VERSION = "9.12.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -410,9 +410,9 @@ function fetchWeather(lat, lon, dateStr) {
 }
 
 const COL_WIDTHS = {
-  handle: 26, actions: 64,
-  date: 78, day: 48, icon: 30, type: 112, from: 138, to: 138,
-  startTime: 58, duration: 44, endTime: 58, route: 72, link: 30, cost: 84, notes: 30, weather: 34,
+  handle: 26, actions: 72,
+  date: 78, day: 48, icon: 40, type: 125, from: 165, to: 165,
+  startTime: 58, duration: 45, endTime: 58, route: 92, link: 39, cost: 58, notes: 32, weather: 42,
 };
 function colFixedWidth(key) {
   if (COL_WIDTHS[key] != null) return COL_WIDTHS[key];
@@ -1943,7 +1943,7 @@ export default function MyTripApp() {
         .mt-table th.duration, .mt-table td.duration { white-space:nowrap; }
         .mt-table th.type, .mt-table td.type { overflow:visible; }
         .mt-table td.from, .mt-table td.to { overflow:hidden; text-overflow:ellipsis; }
-        .mt-handle-wrap { display:flex; align-items:center; gap:2px; }
+        .mt-handle-wrap { display:flex; align-items:center; justify-content:center; gap:2px; }
         .mt-type-wrap { position:relative; }
         .mt-type-chip { display:flex; align-items:center; gap:6px; }
         .mt-type-icon { width:22px; height:22px; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
@@ -1956,17 +1956,17 @@ export default function MyTripApp() {
         .mt-type-btn { border:none; background:none; padding:0; display:flex; align-items:center; gap:5px; font-size:12.8px; font-weight:500; color:var(--ink); max-width:100%; }
         .mt-type-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .mt-loc-cell { display:flex; align-items:center; gap:3px; }
-        .mt-loc-cell .mt-editable { flex:1; max-width:15ch; }
+        .mt-loc-cell .mt-editable { flex:1; max-width:20ch; }
         .mt-loc-cell.has-badge { justify-content:flex-start; }
         .mt-loc-cell.has-badge .mt-editable, .mt-loc-cell.has-badge .mt-alias-display { flex:0 1 auto; width:auto; max-width:100%; }
-        .mt-alias-display { flex:1; font-size:12.8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:3px 5px; max-width:15ch; cursor:default; }
+        .mt-alias-display { flex:1; font-size:12.8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:3px 5px; max-width:20ch; cursor:default; }
         .mt-loc-badge { color:#3E8E5A; display:flex; flex-shrink:0; }
         .mt-editable { border:1px solid transparent; border-radius:6px; padding:3px 5px; font-size:12.8px; width:100%; background:transparent; font-family:inherit; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .mt-editable:hover { border-color:var(--border); }
         .mt-editable:focus { outline:none; border-color:var(--teal); background:#fff; }
         .mt-editable.mt-time:focus, .mt-editable[type=number]:focus { outline:none; border-color:var(--teal); background:#fff; }
-        .mt-editable.mt-time { min-width:76px; font-weight:700; color:var(--ink); }
-        .mt-editable.mt-time::-webkit-calendar-picker-indicator { padding:2px; width:11px; height:11px; opacity:.6; }
+        .mt-editable.mt-time { min-width:76px; font-weight:700; color:var(--ink); padding-inline-end:2px; }
+        .mt-editable.mt-time::-webkit-calendar-picker-indicator { padding:1px; margin-inline-start:1px; width:10px; height:10px; opacity:.6; }
         .mt-editable[type=number] { min-width:38px; padding-inline-start:1px; -moz-appearance:textfield; }
         .mt-editable[type=number]::-webkit-outer-spin-button, .mt-editable[type=number]::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
         .mt-cost { display:flex; align-items:center; gap:0; font-weight:600; color:var(--amber); }
