@@ -9,7 +9,7 @@ import {
   Smartphone, Monitor, AlertTriangle, GripVertical, Check, FolderPlus, Sparkles,
   Route, Waypoints, Download, Upload, MapPin, Search, CircleCheck, Clock, ArrowDownUp, Copy, StickyNote, TrainFront,
   Bus, Motorbike, Bike, Scooter, Sailboat, ShipWheel, Anchor, Kayak, Helicopter, Caravan, Building2, Landmark, Home,
-  CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2, MoreVertical, Menu, Calendar as CalendarIcon, Undo2, Redo2, Info
+  CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2, MoreVertical, Menu, Calendar as CalendarIcon, Undo2, Redo2, Info, ExternalLink, Phone, Save, FolderOpen
 } from "lucide-react";
 
 /* ---------------------------------------------------------------------- */
@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.2.0";
+const APP_VERSION = "10.3.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -158,6 +158,12 @@ const T_DICT = {
     importRouteConfirm: "צור רשומות",
     hotelInfo: "פרטי מלון", placeInfo: "פרטי מקום", hotelPhotoDemo: "תמונה — דורש חיבור ל-Google Places API (בתשלום). זו הצגה בלבד.",
     ratingDemo: "דירוג — הדגמה", viewOnMap: "הצג במפה", bookingLink: "קישור להזמנה",
+    placeOpenNow: "פתוח", placeClosedNow: "סגור", placeWebsite: "אתר", placeCall: "התקשר",
+    dragDayHint: "גרור להעברת היום למסגרת אחרת", dropDayToRoot: "שחרר כאן כדי להוציא את היום מהמסגרת",
+    saveTripByName: "שמור טיול בשם", loadSavedTrip: "טען טיול שמור", tripName: "שם הטיול",
+    saveTripNote: "כרגע נשמר בדפדפן הזה בלבד (לצורך בדיקות) — בעתיד יישמר לפי משתמש מחובר, נגיש מכל מכשיר.",
+    saveTripSuccess: "נשמר בהצלחה", saveTripError: "השמירה נכשלה — ייתכן שאין מספיק מקום אחסון בדפדפן.",
+    noSavedTrips: "אין עדיין טיולים שמורים.", load: "טען", confirmDeleteTrip: "למחוק את הטיול השמור הזה?",
     hotelInfoDemoNote: "כתובת ומפה — אמיתי (מהמיקום המאומת של הרשומה). תמונה ודירוג בפועל ידרשו חיבור ל-Google Places.",
     warnClosed: "סגור בשעה שנבחרה (לפי שעות פעילות OpenStreetMap)", warnFeeRequired: "דורש רכישת כרטיס כניסה (לפי OpenStreetMap)",
     aiAssistant: "עוזר AI (הדגמה)", ok: "הבנתי",
@@ -222,6 +228,12 @@ const T_DICT = {
     importRouteConfirm: "Create records",
     hotelInfo: "Hotel details", placeInfo: "Place details", hotelPhotoDemo: "Photo — needs a Google Places API connection (paid). This is a preview only.",
     ratingDemo: "Rating — preview", viewOnMap: "View on map", bookingLink: "Booking link",
+    placeOpenNow: "Open", placeClosedNow: "Closed", placeWebsite: "Website", placeCall: "Call",
+    dragDayHint: "Drag to move this day to another frame", dropDayToRoot: "Drop here to take this day out of its frame",
+    saveTripByName: "Save trip by name", loadSavedTrip: "Load saved trip", tripName: "Trip name",
+    saveTripNote: "Currently saved in this browser only (for testing) — in the future it will save per logged-in user, accessible from any device.",
+    saveTripSuccess: "Saved successfully", saveTripError: "Save failed — the browser may be out of storage space.",
+    noSavedTrips: "No saved trips yet.", load: "Load", confirmDeleteTrip: "Delete this saved trip?",
     hotelInfoDemoNote: "Address and map link — real (from the record's verified location). An actual photo and rating would need a Google Places connection.",
     warnClosed: "Closed at the scheduled time (per OpenStreetMap opening hours)", warnFeeRequired: "Requires an entry ticket (per OpenStreetMap)",
     aiAssistant: "AI Assistant (preview)", ok: "Got it",
@@ -427,6 +439,17 @@ function googlePlaceDetails(placeId, lang) {
   return fetch(`https://places.googleapis.com/v1/places/${placeId}?languageCode=${lang === "he" ? "he" : "en"}`, {
     headers: { "X-Goog-Api-Key": GOOGLE_PLACES_KEY, "X-Goog-FieldMask": fieldMask },
   }).then((r) => { if (!r.ok) return extractGoogleApiError(r); return r.json(); });
+}
+const PRICE_LEVEL_MAP = { PRICE_LEVEL_FREE: "0", PRICE_LEVEL_INEXPENSIVE: "₪", PRICE_LEVEL_MODERATE: "₪₪", PRICE_LEVEL_EXPENSIVE: "₪₪₪", PRICE_LEVEL_VERY_EXPENSIVE: "₪₪₪₪" };
+function priceLevelSymbol(level) { return PRICE_LEVEL_MAP[level] || null; }
+function todayClosingText(hours, lang) {
+  if (!hours || !hours.periods) return null;
+  const now = new Date();
+  const dow = now.getDay();
+  const period = hours.periods.find((pr) => pr.open && pr.open.day === dow);
+  if (!period || !period.close) return null;
+  const h = String(period.close.hour || 0).padStart(2, "0"), m = String(period.close.minute || 0).padStart(2, "0");
+  return lang === "he" ? `סגור ב-${h}:${m}` : `Closes ${h}:${m}`;
 }
 function googlePlacesTextSearch(query, lang) {
   if (!GOOGLE_PLACES_KEY || !query || !query.trim()) return Promise.resolve(null);
@@ -788,13 +811,14 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
       case "date": return depth === 0 ? fmtDate(row.date, lang) : "";
       case "day": return depth === 0 ? heDay(row.date, lang) : "";
       case "icon": {
-        const warnings = getRowWarning(row, T);
-        return <PlaceIconWithPreview row={row} tm={tm} Icon={Icon} warnings={warnings} T={T} lang={lang} onOpenFull={() => openHotelInfo(row)} />;
+        return <PlaceIconWithPreview row={row} tm={tm} Icon={Icon} warnings={[]} T={T} lang={lang} onOpenFull={() => openHotelInfo(row)} />;
       }
-      case "type": return (
+      case "type": {
+        const warnings = getRowWarning(row, T);
+        return (
         <div className="mt-type-wrap">
-          <button className="mt-type-btn" ref={typeBtnRef} title={tm.name} onClick={toggleTypeMenu}>
-            <span className="mt-type-text">{tm.name}</span> <ChevronDown size={12} />
+          <button className="mt-type-btn" ref={typeBtnRef} title={warnings.length ? warnings.join(" · ") : tm.name} onClick={toggleTypeMenu}>
+            <span className={"mt-type-text" + (warnings.length ? " has-warning" : "")}>{tm.name}</span> <ChevronDown size={12} />
           </button>
           {typeMenuOpen === row.id && (
             <>
@@ -841,24 +865,27 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
           )}
         </div>
       );
+      }
       case "from": return (
         <span className={"mt-loc-cell" + (fromVerified ? " has-badge" : "")}>
+          {lang === "he" && fromVerified && <a className="mt-loc-badge" href={row.fromVerifiedUrl} target="_blank" rel="noreferrer" title={T.openMap}><MapPin size={11} /></a>}
           {row.fromAlias ? (
             <input className="mt-editable" dir="auto" style={{ textAlign: detectTextAlign(row.fromAlias) }} title={row.from} value={row.fromAlias} onChange={(e) => updateRow(row.id, { fromAlias: e.target.value })} />
           ) : (
             <input className="mt-editable" dir="auto" style={{ textAlign: detectTextAlign(row.from) }} title={row.from} placeholder={getTypeHint(row.typeId, "from", lang)} value={row.from} onChange={(e) => updateRow(row.id, { from: e.target.value })} />
           )}
-          {fromVerified && <a className="mt-loc-badge" href={row.fromVerifiedUrl} target="_blank" rel="noreferrer" title={T.openMap}><MapPin size={11} /></a>}
+          {lang !== "he" && fromVerified && <a className="mt-loc-badge" href={row.fromVerifiedUrl} target="_blank" rel="noreferrer" title={T.openMap}><MapPin size={11} /></a>}
         </span>
       );
       case "to": return (
         <span className={"mt-loc-cell" + (toVerified ? " has-badge" : "")}>
+          {lang === "he" && toVerified && <a className="mt-loc-badge" href={row.toVerifiedUrl} target="_blank" rel="noreferrer" title={T.openMap}><MapPin size={11} /></a>}
           {row.toAlias ? (
             <input className="mt-editable" dir="auto" style={{ textAlign: detectTextAlign(row.toAlias) }} title={row.to} value={row.toAlias} onChange={(e) => updateRow(row.id, { toAlias: e.target.value })} />
           ) : (
             <input className="mt-editable" dir="auto" style={{ textAlign: detectTextAlign(row.to) }} title={row.to} placeholder={getTypeHint(row.typeId, "to", lang)} value={row.to} onChange={(e) => updateRow(row.id, { to: e.target.value })} />
           )}
-          {toVerified && <a className="mt-loc-badge" href={row.toVerifiedUrl} target="_blank" rel="noreferrer" title={T.openMap}><MapPin size={11} /></a>}
+          {lang !== "he" && toVerified && <a className="mt-loc-badge" href={row.toVerifiedUrl} target="_blank" rel="noreferrer" title={T.openMap}><MapPin size={11} /></a>}
         </span>
       );
       case "startTime": return <input className="mt-editable mt-time" type="time" value={row.startTime} onChange={(e) => updateRow(row.id, { startTime: e.target.value })} />;
@@ -1091,21 +1118,30 @@ function PlaceIconWithPreview({ row, tm, Icon, warnings, T, lang, onOpenFull }) 
     if (hoverTimer.current) clearTimeout(hoverTimer.current);
     setShowPreview(false);
   }
+  const photoUrl = previewData && previewData.photos && previewData.photos[0] ? googlePlacePhotoUrl(previewData.photos[0].name, 340) : null;
+  const price = previewData && priceLevelSymbol(previewData.priceLevel);
+  const openNow = previewData && previewData.regularOpeningHours ? previewData.regularOpeningHours.openNow : null;
+  const closingText = previewData ? todayClosingText(previewData.regularOpeningHours, lang) : null;
 
   return (
     <span style={{ position: "relative", display: "inline-block" }} onMouseEnter={handleEnter} onMouseLeave={handleLeave} onFocus={handleEnter} onBlur={handleLeave}>
-      <button ref={btnRef} className={"mt-type-icon mt-type-icon-btn" + (warnings.length ? " has-warning" : "")} style={{ background: tm.color }}
-        title={warnings.length ? warnings.join(" · ") : T.placeInfo} onClick={onOpenFull}><Icon /></button>
+      <button ref={btnRef} className="mt-type-icon mt-type-icon-btn" style={{ background: tm.color }} onClick={onOpenFull}><Icon /></button>
       {showPreview && (
         <div className="mt-place-preview" style={{ top: previewPos.top, left: previewPos.left }}>
-          {previewLoading ? <span className="mt-hint">{T.locSearching}</span> : previewData ? (
+          {previewLoading ? <span className="mt-hint" style={{ padding: "10px" }}>{T.locSearching}</span> : previewData ? (
             <>
+              {photoUrl && <img src={photoUrl} alt="" className="mt-place-preview-photo" />}
               <strong>{(previewData.displayName && previewData.displayName.text) || "—"}</strong>
               {previewData.rating ? (
                 <span className="mt-place-preview-rating"><Star size={11} fill="currentColor" /> {previewData.rating} ({previewData.userRatingCount || 0})</span>
               ) : <span className="mt-hint">{T.ratingDemo}</span>}
+              <span className="mt-place-preview-meta">
+                {price && <span>{price}</span>}
+                {openNow != null && <span className={openNow ? "mt-place-open" : "mt-place-closed"}>{openNow ? T.placeOpenNow : T.placeClosedNow}</span>}
+                {closingText && <span className="mt-hint">{closingText}</span>}
+              </span>
             </>
-          ) : <span className="mt-hint">{T.locNoResults}</span>}
+          ) : <span className="mt-hint" style={{ padding: "10px" }}>{T.locNoResults}</span>}
         </div>
       )}
     </span>
@@ -1154,8 +1190,25 @@ function PlaceInfoModal({ row, onClose, types, lang, T }) {
               <span className="mt-hint">{T.ratingDemo}</span>
             </div>
           )}
+          {googleData && (priceLevelSymbol(googleData.priceLevel) || googleData.regularOpeningHours) && (
+            <div className="mt-place-preview-meta" style={{ padding: 0 }}>
+              {priceLevelSymbol(googleData.priceLevel) && <span>{priceLevelSymbol(googleData.priceLevel)}</span>}
+              {googleData.regularOpeningHours && googleData.regularOpeningHours.openNow != null && (
+                <span className={googleData.regularOpeningHours.openNow ? "mt-place-open" : "mt-place-closed"}>
+                  {googleData.regularOpeningHours.openNow ? T.placeOpenNow : T.placeClosedNow}
+                </span>
+              )}
+              {todayClosingText(googleData.regularOpeningHours, lang) && <span className="mt-hint">{todayClosingText(googleData.regularOpeningHours, lang)}</span>}
+            </div>
+          )}
           {(row.fromVerifiedUrl || row.toVerifiedUrl) && (
             <a className="mt-btn ghost" style={{ width: "100%", justifyContent: "center" }} target="_blank" rel="noreferrer" href={row.fromVerifiedUrl || row.toVerifiedUrl}><MapPin size={13} /> {T.viewOnMap}</a>
+          )}
+          {googleData && googleData.websiteUri && (
+            <a className="mt-btn ghost" style={{ width: "100%", justifyContent: "center" }} target="_blank" rel="noreferrer" href={googleData.websiteUri}><ExternalLink size={13} /> {T.placeWebsite}</a>
+          )}
+          {googleData && googleData.internationalPhoneNumber && (
+            <a className="mt-btn ghost" style={{ width: "100%", justifyContent: "center" }} href={`tel:${googleData.internationalPhoneNumber}`}><Phone size={13} /> {googleData.internationalPhoneNumber}</a>
           )}
           {row.link && (
             <a className="mt-btn ghost" style={{ width: "100%", justifyContent: "center" }} target="_blank" rel="noreferrer" href={row.link}><Link2 size={13} /> {T.bookingLink}</a>
@@ -1267,7 +1320,7 @@ function MobileCardMeta({ row, ctx }) {
 
 function DayGroup({ g, fid, depth, ctx }) {
   const { T, lang, effectiveMobile, collapsedGroups, setCollapsedGroups, collapsedParents, setCollapsedParents,
-    addRow, openCard, types, visibleColumns, openAddDayModal, rows, sortDayByTime, getColWidth, startResize } = ctx;
+    addRow, openCard, types, visibleColumns, openAddDayModal, rows, sortDayByTime, getColWidth, startResize, dragDayKey, setDragDayKey } = ctx;
   const gk = (fid || "root") + "__" + g.date;
   const collapsed = !!collapsedGroups[gk];
   const childrenOf = (pid) => childrenOfPure(rows, pid);
@@ -1277,7 +1330,9 @@ function DayGroup({ g, fid, depth, ctx }) {
 
   return (
     <div className="mt-group">
-      <div className="mt-group-header" onClick={() => setCollapsedGroups((p) => ({ ...p, [gk]: !p[gk] }))}>
+      <div className={"mt-group-header" + (dragDayKey === gk ? " dragging" : "")} onClick={() => setCollapsedGroups((p) => ({ ...p, [gk]: !p[gk] }))}>
+        <span className="mt-day-drag-handle" title={T.dragDayHint} draggable onClick={(e) => e.stopPropagation()}
+          onDragStart={() => setDragDayKey(gk)} onDragEnd={() => setDragDayKey(null)}><GripVertical size={13} /></span>
         <span className="chev">{collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}</span>
         <span className="mt-group-date">{fmtDate(g.date, lang)}</span>
         <span className="mt-group-day">{heDay(g.date, lang)}</span>
@@ -1306,8 +1361,8 @@ function DayGroup({ g, fid, depth, ctx }) {
               <div className="mt-card" key={r.id} onClick={() => openCard(r)}>
                 <div className="mt-card-top">
                   <div className="mt-type-chip">
-                    <span className={"mt-type-icon" + (cardWarnings.length ? " has-warning" : "")} style={{ background: tm.color }} title={cardWarnings.join(" · ")}><Icon /></span>
-                    <strong style={{ fontSize: 13.5 }}>{tm.name}</strong>
+                    <span className="mt-type-icon" style={{ background: tm.color }}><Icon /></span>
+                    <strong className={cardWarnings.length ? "has-warning" : ""} style={{ fontSize: 13.5 }} title={cardWarnings.length ? cardWarnings.join(" · ") : undefined}>{tm.name}</strong>
                   </div>
                   <span className="mt-card-times">{r.startTime || "—"}{r.endTime ? ` – ${r.endTime}` : ""}</span>
                 </div>
@@ -1372,7 +1427,7 @@ function DayGroup({ g, fid, depth, ctx }) {
 }
 
 function FrameBlock({ frame, depth, ctx, renderContext }) {
-  const { T, lang, toggleFrameCollapse, openFrameModal, deleteFrame, openAddDayModal, addRow, lastDateInContext, frameTotals, displayCurrency, convertAmount, frameMenuOpenId, setFrameMenuOpenId, frameMenuPos, setFrameMenuPos } = ctx;
+  const { T, lang, toggleFrameCollapse, openFrameModal, deleteFrame, openAddDayModal, addRow, lastDateInContext, frameTotals, displayCurrency, convertAmount, frameMenuOpenId, setFrameMenuOpenId, frameMenuPos, setFrameMenuPos, onDropDay, dragDayKey } = ctx;
   const totals = frameTotals(frame.id);
   const convertedTotal = Object.entries(totals).reduce((sum, [cur, amt]) => sum + convertAmount(amt, cur, displayCurrency), 0);
   const color = FRAME_COLORS[depth % FRAME_COLORS.length];
@@ -1386,7 +1441,8 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
   }
   return (
     <div className="mt-frame-block" style={{ "--frame-color": color }}>
-      <div className="mt-frame-header" onClick={() => toggleFrameCollapse(frame.id)}>
+      <div className={"mt-frame-header" + (dragDayKey ? " droppable" : "")} onClick={() => toggleFrameCollapse(frame.id)}
+        onDragOver={(e) => dragDayKey && e.preventDefault()} onDrop={() => onDropDay(frame.id)}>
         <div className="mt-frame-header-top">
           <span className="chev">{frame.collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}</span>
           <span className="mt-frame-name">{frame.name}</span>
@@ -1549,6 +1605,11 @@ export default function MyTripApp() {
   const [routeImportStartTime, setRouteImportStartTime] = useState("09:00");
   const [routeImportShortLink, setRouteImportShortLink] = useState(false);
   const [hotelInfoRow, setHotelInfoRow] = useState(null);
+  const [dragDayKey, setDragDayKey] = useState(null);
+  const [saveTripOpen, setSaveTripOpen] = useState(false);
+  const [saveTripName, setSaveTripName] = useState("");
+  const [loadTripOpen, setLoadTripOpen] = useState(false);
+  const [saveTripMsg, setSaveTripMsg] = useState(null);
   const [frameMenuOpenId, setFrameMenuOpenId] = useState(null);
   const [frameMenuPos, setFrameMenuPos] = useState({ top: 0, left: 0 });
   const [frameDraft, setFrameDraft] = useState(null);
@@ -1671,6 +1732,36 @@ export default function MyTripApp() {
 
   function showDemoNotice(msg) { setDemoNotice(msg); setActionsMenuOpen(false); }
   function openHotelInfo(row) { setHotelInfoRow(row); }
+  const SAVED_TRIPS_KEY = "mytrip_saved_trips";
+  function listSavedTrips() {
+    try { return JSON.parse(localStorage.getItem(SAVED_TRIPS_KEY) || "{}"); } catch (e) { return {}; }
+  }
+  function openSaveTripModal() { setSaveTripName(""); setSaveTripMsg(null); setSaveTripOpen(true); setActionsMenuOpen(false); }
+  function confirmSaveTrip() {
+    if (!saveTripName.trim()) return;
+    try {
+      const all = listSavedTrips();
+      all[saveTripName.trim()] = { rows, frames, displayCurrency, savedAt: new Date().toISOString() };
+      localStorage.setItem(SAVED_TRIPS_KEY, JSON.stringify(all));
+      setSaveTripMsg({ ok: true });
+      setTimeout(() => setSaveTripOpen(false), 900);
+    } catch (e) { setSaveTripMsg({ ok: false }); }
+  }
+  function openLoadTripModal() { setLoadTripOpen(true); setActionsMenuOpen(false); }
+  function loadSavedTrip(name) {
+    const all = listSavedTrips();
+    const trip = all[name];
+    if (!trip) return;
+    setRows(trip.rows || []);
+    setFrames(trip.frames || []);
+    if (trip.displayCurrency) setDisplayCurrency(trip.displayCurrency);
+    setLoadTripOpen(false);
+  }
+  function deleteSavedTrip(name) {
+    const all = listSavedTrips();
+    delete all[name];
+    try { localStorage.setItem(SAVED_TRIPS_KEY, JSON.stringify(all)); } catch (e) {}
+  }
   function handleAiSuggest() { setAiMessages((p) => [...p, { role: "assistant", text: T.aiSuggestDemoText }]); }
   function handleAiSend() {
     if (!aiInput.trim()) return;
@@ -1878,11 +1969,29 @@ export default function MyTripApp() {
     if (!dragId || dragId === targetId) return;
     setRows((prev) => {
       const from = prev.find((r) => r.id === dragId), to = prev.find((r) => r.id === targetId);
-      if (!from || !to || from.date !== to.date || from.parentId !== to.parentId || (from.frameId || null) !== (to.frameId || null)) return prev;
-      const arr = [...prev]; const fi = arr.findIndex((r) => r.id === dragId); const [moved] = arr.splice(fi, 1);
-      const ti = arr.findIndex((r) => r.id === targetId); arr.splice(ti, 0, moved); return arr;
+      if (!from || !to) return prev;
+      const needsMove = from.date !== to.date || (from.frameId || null) !== (to.frameId || null) || from.parentId !== to.parentId;
+      let arr = prev.map((r) => {
+        if (r.id === dragId) return needsMove ? { ...r, date: to.date, frameId: to.frameId, parentId: to.parentId } : r;
+        if (needsMove && r.parentId === dragId) return { ...r, date: to.date, frameId: to.frameId };
+        return r;
+      });
+      const fi = arr.findIndex((r) => r.id === dragId);
+      const [moved] = arr.splice(fi, 1);
+      const ti = arr.findIndex((r) => r.id === targetId);
+      arr.splice(ti, 0, moved);
+      return arr;
     });
     setDragId(null);
+  }
+  function onDropDay(targetFid) {
+    if (!dragDayKey) return;
+    const sep = dragDayKey.indexOf("__");
+    const fidPart = dragDayKey.slice(0, sep), datePart = dragDayKey.slice(sep + 2);
+    const sourceFid = fidPart === "root" ? null : fidPart;
+    if ((sourceFid || null) === (targetFid || null)) { setDragDayKey(null); return; }
+    setRows((prev) => prev.map((r) => (((r.frameId || null) === (sourceFid || null)) && r.date === datePart) ? { ...r, frameId: targetFid } : r));
+    setDragDayKey(null);
   }
 
   /* ---------- add-day modal ---------- */
@@ -2079,7 +2188,7 @@ export default function MyTripApp() {
   /* ---------- recursive render ---------- */
   const ctx = {
     T, lang, types, visibleColumns, effectiveMobile, rows, frames,
-    updateRow, deleteRow, openCard, addRow, dragId, setDragId, onDropRow,
+    updateRow, deleteRow, openCard, addRow, dragId, setDragId, onDropRow, dragDayKey, setDragDayKey, onDropDay,
     typeMenuOpen, setTypeMenuOpen, newTypeDraft, setNewTypeDraft, addCustomType,
     collapsedParents, setCollapsedParents, collapsedGroups, setCollapsedGroups,
     toggleFrameCollapse, openFrameModal, deleteFrame, updateFrameDates, nextDateInContext, lastDateInContext, frameTotals,
@@ -2145,6 +2254,7 @@ export default function MyTripApp() {
         .mt-brand-text { display:flex; flex-direction:column; line-height:1.15; }
         .mt-brand-name { font-family:'Frank Ruhl Libre',serif; font-size:20px; font-weight:700; }
         .mt-brand-version { font-size:10px; color:var(--muted); font-weight:600; letter-spacing:.02em; }
+        .mt-brand-mark-col { display:flex; flex-direction:column; align-items:center; gap:2px; }
         .mt-header-actions { display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
         .mt-icon-btn { border:1px solid var(--border); background:var(--surface); color:var(--ink); border-radius:8px; padding:6px 9px; display:flex; align-items:center; gap:5px; font-size:12.5px; font-weight:500; }
         .mt-icon-btn:disabled { opacity:.35; cursor:not-allowed; }
@@ -2239,11 +2349,17 @@ export default function MyTripApp() {
         .mt-type-chip { display:flex; align-items:center; gap:6px; }
         .mt-type-icon { width:22px; height:22px; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
         .mt-type-icon-btn { border:none; cursor:pointer; }
-        .mt-type-icon.has-warning { box-shadow:0 0 0 2px var(--danger); }
+        .has-warning { color:var(--danger) !important; text-decoration:underline; text-decoration-style:wavy; text-underline-offset:2px; }
         .mt-type-icon-btn:hover { filter:brightness(1.1); box-shadow:0 0 0 2px var(--teal-tint); }
         .mt-hotel-photo-demo { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; height:110px; border-radius:10px; background:linear-gradient(135deg,var(--teal-tint),var(--bg)); color:var(--teal); border:1.5px dashed var(--border); font-size:11px; text-align:center; padding:8px; }
         .mt-hotel-photo-real { width:100%; height:150px; object-fit:cover; border-radius:10px; }
-        .mt-place-preview { position:fixed; z-index:250; background:var(--surface); border:1px solid var(--border); border-radius:8px; box-shadow:0 8px 24px rgba(20,40,35,.18); padding:8px 10px; font-size:12px; max-width:220px; display:flex; flex-direction:column; gap:3px; pointer-events:none; }
+        .mt-place-preview { position:fixed; z-index:250; background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 8px 24px rgba(20,40,35,.18); padding:0 0 9px; font-size:12px; width:220px; display:flex; flex-direction:column; gap:3px; pointer-events:none; overflow:hidden; }
+        .mt-place-preview strong, .mt-place-preview-rating, .mt-place-preview-meta, .mt-place-preview > .mt-hint { padding-inline:10px; }
+        .mt-place-preview-photo { width:100%; height:90px; object-fit:cover; }
+        .mt-place-preview strong { margin-top:8px; }
+        .mt-place-preview-meta { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+        .mt-place-open { color:#3E8E5A; font-weight:600; }
+        .mt-place-closed { color:var(--danger); font-weight:600; }
         .mt-place-preview strong { font-size:12.5px; color:var(--ink); }
         .mt-place-preview-rating { display:flex; align-items:center; gap:3px; color:#D9A23D; font-size:11.5px; }
         .mt-hotel-rating-demo { display:flex; align-items:center; gap:2px; color:#D9A23D; }
@@ -2274,6 +2390,10 @@ export default function MyTripApp() {
         .mt-row-actions button:hover { background:var(--teal-tint); color:var(--teal-dark); }
         .mt-row-actions svg { width:13px; height:13px; }
         .mt-drag-handle { cursor:grab; color:#9FB0AA; }
+        .mt-day-drag-handle { cursor:grab; color:#9FB0AA; display:flex; align-items:center; margin-inline-end:2px; }
+        .mt-group-header.dragging { opacity:.4; }
+        .mt-frame-header.droppable { outline:2px dashed var(--teal); outline-offset:-2px; }
+        .mt-root-drop-zone { border:2px dashed var(--teal); border-radius:10px; padding:14px; text-align:center; color:var(--teal-dark); font-size:12.5px; font-weight:600; background:var(--teal-tint); margin-bottom:10px; }
         .mt-drag-handle:hover { color:var(--teal-dark); }
         .mt-empty { padding:16px; text-align:center; color:var(--muted); font-size:12.5px; background:var(--surface); border:1px dashed var(--border); border-radius:12px; }
         .mt-summary { margin-top:20px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
@@ -2409,11 +2529,11 @@ export default function MyTripApp() {
 
       <div className="mt-header">
         <div className="mt-brand">
-          <div className="mt-brand-mark"><Plane /></div>
-          <div className="mt-brand-text">
-            <span className="mt-brand-name">{T.appName}</span>
+          <div className="mt-brand-mark-col">
+            <div className="mt-brand-mark"><Plane /></div>
             <span className="mt-brand-version">v{APP_VERSION}</span>
           </div>
+          <span className="mt-brand-name">{T.appName}</span>
         </div>
         <div className="mt-header-actions">
           <button className="mt-icon-btn" onClick={() => setLang(lang === "he" ? "en" : "he")}><Globe /> {T.lang}</button>
@@ -2461,6 +2581,8 @@ export default function MyTripApp() {
           <div className="mt-floating-backdrop" onClick={() => setActionsMenuOpen(false)} />
           <div className="mt-floating-menu mt-kebab-menu" style={{ top: actionsMenuPos.top, right: actionsMenuPos.right, minWidth: 220, maxWidth: "min(240px, 92vw)" }}>
             <button className="mt-share-opt" onClick={() => { openFrameModal(null, null); setActionsMenuOpen(false); }}><FolderPlus size={14} /> {T.newFrame}</button>
+            <button className="mt-share-opt" onClick={openSaveTripModal}><Save size={14} /> {T.saveTripByName}</button>
+            <button className="mt-share-opt" onClick={openLoadTripModal}><FolderOpen size={14} /> {T.loadSavedTrip}</button>
             <div className="divider" />
             <button className="mt-share-opt" onClick={() => { exportToFile(); setActionsMenuOpen(false); }}><Download size={14} /> {T.exportFile}</button>
             <button className="mt-share-opt" onClick={() => { importInputRef.current && importInputRef.current.click(); setActionsMenuOpen(false); }}><Upload size={14} /> {T.importFile}</button>
@@ -2507,6 +2629,48 @@ export default function MyTripApp() {
       )}
 
       {hotelInfoRow && <PlaceInfoModal row={hotelInfoRow} onClose={() => setHotelInfoRow(null)} types={types} lang={lang} T={T} />}
+
+      {saveTripOpen && (
+        <div className="mt-modal-backdrop" onClick={() => setSaveTripOpen(false)}>
+          <div className="mt-modal" style={{ maxWidth: 340 }} onClick={(e) => e.stopPropagation()}>
+            <div className="mt-modal-header"><span className="mt-modal-title">{T.saveTripByName}</span><button className="mt-btn ghost" onClick={() => setSaveTripOpen(false)}><X size={16} /></button></div>
+            <div className="mt-modal-body">
+              <div className="mt-field"><label>{T.tripName}</label><input autoFocus value={saveTripName} onChange={(e) => setSaveTripName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && confirmSaveTrip()} /></div>
+              <div className="mt-hint">{T.saveTripNote}</div>
+              {saveTripMsg && <div className={saveTripMsg.ok ? "mt-hint" : "mt-error"} style={saveTripMsg.ok ? { color: "#3E8E5A" } : {}}>{saveTripMsg.ok ? T.saveTripSuccess : T.saveTripError}</div>}
+            </div>
+            <div className="mt-modal-footer">
+              <button className="mt-btn ghost" onClick={() => setSaveTripOpen(false)}>{T.cancel}</button>
+              <button className="mt-btn primary" disabled={!saveTripName.trim()} onClick={confirmSaveTrip}><Save size={13} /> {T.save}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {loadTripOpen && (
+        <div className="mt-modal-backdrop" onClick={() => setLoadTripOpen(false)}>
+          <div className="mt-modal" style={{ maxWidth: 360 }} onClick={(e) => e.stopPropagation()}>
+            <div className="mt-modal-header"><span className="mt-modal-title">{T.loadSavedTrip}</span><button className="mt-btn ghost" onClick={() => setLoadTripOpen(false)}><X size={16} /></button></div>
+            <div className="mt-modal-body">
+              <div className="mt-hint">{T.saveTripNote}</div>
+              {Object.keys(listSavedTrips()).length === 0 ? (
+                <div className="mt-hint">{T.noSavedTrips}</div>
+              ) : Object.entries(listSavedTrips()).sort((a, b) => (b[1].savedAt || "").localeCompare(a[1].savedAt || "")).map(([name, trip]) => (
+                <div key={name} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 13 }}>{name}</div>
+                    <div className="mt-hint">{new Date(trip.savedAt).toLocaleString(lang === "he" ? "he-IL" : "en-US")}</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button className="mt-btn primary" onClick={() => loadSavedTrip(name)}>{T.load}</button>
+                    <button className="mt-btn ghost" onClick={() => { if (confirm(T.confirmDeleteTrip)) { deleteSavedTrip(name); setLoadTripOpen(false); setTimeout(() => setLoadTripOpen(true), 0); } }}><Trash2 size={14} /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {routeImportOpen && (
         <div className="mt-modal-backdrop" onClick={() => setRouteImportOpen(false)}>
@@ -2598,6 +2762,10 @@ export default function MyTripApp() {
             <button className="mt-btn primary" onClick={createFrameFromSuggestion}>{T.suggestBtn}</button>
             <button className="mt-btn ghost" onClick={() => setDismissedKey(suggestionKey)}>{T.suggestDismiss}</button>
           </div>
+        )}
+
+        {dragDayKey && dragDayKey.slice(0, dragDayKey.indexOf("__")) !== "root" && (
+          <div className="mt-root-drop-zone" onDragOver={(e) => e.preventDefault()} onDrop={() => onDropDay(null)}>{T.dropDayToRoot}</div>
         )}
 
         {renderContext(null, 0)}
