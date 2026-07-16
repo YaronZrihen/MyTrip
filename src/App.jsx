@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.0.0";
+const APP_VERSION = "10.0.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1853,7 +1853,8 @@ export default function MyTripApp() {
     if (initialQuery.trim()) runLocationSearch(initialQuery);
   }
   function runLocationSearch(queryOverride) {
-    const q = (queryOverride !== undefined ? queryOverride : locPicker && locPicker.query) || "";
+    if (!locPicker) return;
+    const q = (queryOverride !== undefined ? queryOverride : locPicker.query) || "";
     if (!q.trim()) return;
     setLocPicker((p) => ({ ...p, loading: true, error: null }));
     if (locPicker.useGoogle) {
@@ -1871,19 +1872,21 @@ export default function MyTripApp() {
     setLocPicker((p) => (p ? { ...p, useGoogle: !p.useGoogle, results: [], error: null } : p));
   }
   function pickGooglePlaceResult(prediction) {
-    setLocPicker((p) => ({ ...p, loading: true }));
+    if (!locPicker) return;
+    const field = locPicker.field;
+    setLocPicker((p) => (p ? { ...p, loading: true } : p));
     googlePlaceDetails(prediction.placeId, lang).then((details) => {
       if (!details || !details.location) { setLocPicker((p) => (p ? { ...p, loading: false, error: "no-details" } : p)); return; }
       const label = details.formattedAddress || (details.displayName && details.displayName.text) || prediction.text;
       const mapUrl = `https://www.google.com/maps/search/?api=1&query=${details.location.latitude},${details.location.longitude}&query_place_id=${prediction.placeId}`;
       const isFlightRow = cardDraft && (cardDraft.typeId === "flight" || cardDraft.typeId === "domestic-flight");
       const smartAlias = (details.displayName && details.displayName.text) || label.split(",")[0];
-      if (locPicker.field === "from") {
+      if (field === "from") {
         setCardDraft((d) => ({ ...d, from: label, fromVerifiedUrl: mapUrl, fromVerifiedText: label, fromLat: details.location.latitude, fromLon: details.location.longitude, fromPlaceId: prediction.placeId, ...((!d.fromAlias && smartAlias) ? { fromAlias: smartAlias } : {}) }));
-      } else if (locPicker.field === "to") {
+      } else if (field === "to") {
         setCardDraft((d) => ({ ...d, to: label, toVerifiedUrl: mapUrl, toVerifiedText: label, toLat: details.location.latitude, toLon: details.location.longitude, toPlaceId: prediction.placeId, ...((!d.toAlias && smartAlias) ? { toAlias: smartAlias } : {}) }));
-      } else if (locPicker.field === "fromAlias") setCardDraft((d) => ({ ...d, fromAlias: smartAlias }));
-      else if (locPicker.field === "toAlias") setCardDraft((d) => ({ ...d, toAlias: smartAlias }));
+      } else if (field === "fromAlias") setCardDraft((d) => ({ ...d, fromAlias: smartAlias }));
+      else if (field === "toAlias") setCardDraft((d) => ({ ...d, toAlias: smartAlias }));
       setLocPicker(null);
     }).catch(() => setLocPicker((p) => (p ? { ...p, loading: false, error: "network" } : p)));
   }
