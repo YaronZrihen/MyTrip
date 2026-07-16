@@ -4,12 +4,12 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import {
   Plane, PlaneTakeoff, Car, BedDouble, Footprints, Users, Sun, Ship, KeySquare,
-  Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music, ChevronDown, ChevronRight, ChevronLeft,
+  Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music, ChevronDown, ChevronRight, ChevronLeft, ChevronUp,
   Plus, X, Settings2, Pencil, Trash2, Link2, Globe, LogIn, User,
   Smartphone, Monitor, AlertTriangle, GripVertical, Check, FolderPlus, Sparkles,
   Route, Waypoints, Download, Upload, MapPin, Search, CircleCheck, Clock, ArrowDownUp, Copy, StickyNote, TrainFront,
   Bus, Motorbike, Bike, Scooter, Sailboat, ShipWheel, Anchor, Kayak, Helicopter, Caravan, Building2, Landmark, Home,
-  CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2, MoreVertical, Menu, Calendar as CalendarIcon, Undo2, Redo2, Info, ExternalLink, Phone, Save, FolderOpen
+  CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2, MoreVertical, Menu, Calendar as CalendarIcon, Undo2, Redo2, Info, ExternalLink, Phone, Save, FolderOpen, ImagePlus
 } from "lucide-react";
 
 /* ---------------------------------------------------------------------- */
@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.3.0";
+const APP_VERSION = "10.4.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -159,11 +159,15 @@ const T_DICT = {
     hotelInfo: "פרטי מלון", placeInfo: "פרטי מקום", hotelPhotoDemo: "תמונה — דורש חיבור ל-Google Places API (בתשלום). זו הצגה בלבד.",
     ratingDemo: "דירוג — הדגמה", viewOnMap: "הצג במפה", bookingLink: "קישור להזמנה",
     placeOpenNow: "פתוח", placeClosedNow: "סגור", placeWebsite: "אתר", placeCall: "התקשר",
-    dragDayHint: "גרור להעברת היום למסגרת אחרת", dropDayToRoot: "שחרר כאן כדי להוציא את היום מהמסגרת",
+    dragDayHint: "גרור להעברת היום למסגרת אחרת", dropDayToRoot: "שחרר כאן כדי להוציא את היום מהמסגרת", showOverallRoute: "הצג מסלול טיול כולל",
+    tripSummary: "סיכום הטיול", summaryFlights: "טיסות", summaryHotels: "מלונות", summaryPois: "נק׳ עניין", summaryRestaurants: "מסעדות", summaryAvgRating: "דירוג ממוצע",
     saveTripByName: "שמור טיול בשם", loadSavedTrip: "טען טיול שמור", tripName: "שם הטיול",
     saveTripNote: "כרגע נשמר בדפדפן הזה בלבד (לצורך בדיקות) — בעתיד יישמר לפי משתמש מחובר, נגיש מכל מכשיר.",
     saveTripSuccess: "נשמר בהצלחה", saveTripError: "השמירה נכשלה — ייתכן שאין מספיק מקום אחסון בדפדפן.",
     noSavedTrips: "אין עדיין טיולים שמורים.", load: "טען", confirmDeleteTrip: "למחוק את הטיול השמור הזה?",
+    locationSectionLabel: "מיקום וכינוי", copyFromOrigin: "העתק מהמוצא", notesHint: "ההערה תוצג גם בעמודה בטבלה הראשית.",
+    personalExperience: "חוויה אישית", personalExperienceHint: "רשמים, טיפים, זיכרונות... (לא מוצג בטבלה)",
+    personalRating: "דירוג אישי לרשומה", uploadPhotos: "העלה תמונות",
     hotelInfoDemoNote: "כתובת ומפה — אמיתי (מהמיקום המאומת של הרשומה). תמונה ודירוג בפועל ידרשו חיבור ל-Google Places.",
     warnClosed: "סגור בשעה שנבחרה (לפי שעות פעילות OpenStreetMap)", warnFeeRequired: "דורש רכישת כרטיס כניסה (לפי OpenStreetMap)",
     aiAssistant: "עוזר AI (הדגמה)", ok: "הבנתי",
@@ -229,11 +233,15 @@ const T_DICT = {
     hotelInfo: "Hotel details", placeInfo: "Place details", hotelPhotoDemo: "Photo — needs a Google Places API connection (paid). This is a preview only.",
     ratingDemo: "Rating — preview", viewOnMap: "View on map", bookingLink: "Booking link",
     placeOpenNow: "Open", placeClosedNow: "Closed", placeWebsite: "Website", placeCall: "Call",
-    dragDayHint: "Drag to move this day to another frame", dropDayToRoot: "Drop here to take this day out of its frame",
+    dragDayHint: "Drag to move this day to another frame", dropDayToRoot: "Drop here to take this day out of its frame", showOverallRoute: "Show overall trip route",
+    tripSummary: "Trip summary", summaryFlights: "Flights", summaryHotels: "Hotels", summaryPois: "Points of interest", summaryRestaurants: "Restaurants", summaryAvgRating: "Average rating",
     saveTripByName: "Save trip by name", loadSavedTrip: "Load saved trip", tripName: "Trip name",
     saveTripNote: "Currently saved in this browser only (for testing) — in the future it will save per logged-in user, accessible from any device.",
     saveTripSuccess: "Saved successfully", saveTripError: "Save failed — the browser may be out of storage space.",
     noSavedTrips: "No saved trips yet.", load: "Load", confirmDeleteTrip: "Delete this saved trip?",
+    locationSectionLabel: "Location & nickname", copyFromOrigin: "Copy from origin", notesHint: "The note is also shown in the main table column.",
+    personalExperience: "Personal experience", personalExperienceHint: "Impressions, tips, memories... (not shown in the table)",
+    personalRating: "Personal rating for this record", uploadPhotos: "Upload photos",
     hotelInfoDemoNote: "Address and map link — real (from the record's verified location). An actual photo and rating would need a Google Places connection.",
     warnClosed: "Closed at the scheduled time (per OpenStreetMap opening hours)", warnFeeRequired: "Requires an entry ticket (per OpenStreetMap)",
     aiAssistant: "AI Assistant (preview)", ok: "Got it",
@@ -627,6 +635,37 @@ const COL_WIDTHS = {
 function colFixedWidth(key) {
   if (COL_WIDTHS[key] != null) return COL_WIDTHS[key];
   return 110; // fallback for custom columns
+}
+function frameSummaryStats(rows, frames, fid) {
+  function collectFrameIds(id) {
+    let ids = [id];
+    frames.filter((f) => f.parentFrameId === id).forEach((f) => { ids = ids.concat(collectFrameIds(f.id)); });
+    return ids;
+  }
+  const frameIds = new Set(collectFrameIds(fid));
+  const relevant = rows.filter((r) => frameIds.has(r.frameId || null));
+  const totalKm = relevant.reduce((s, r) => s + (Number(r.routeDistanceKm) || 0), 0);
+  const countByType = (ids) => relevant.filter((r) => ids.includes(r.typeId)).length;
+  const ratings = relevant.filter((r) => r.personalRating).map((r) => r.personalRating);
+  return {
+    totalKm,
+    flights: countByType(["flight", "domestic-flight"]),
+    hotels: countByType(["hotel", "hostel", "apartment"]),
+    pois: countByType(["poi", "attraction"]),
+    restaurants: countByType(["restaurant"]),
+    avgRating: ratings.length ? ratings.reduce((a, b) => a + b, 0) / ratings.length : null,
+  };
+}
+function frameRouteUrl(rows, frames, fid) {
+  function collectFrameIds(id) {
+    let ids = [id];
+    frames.filter((f) => f.parentFrameId === id).forEach((f) => { ids = ids.concat(collectFrameIds(f.id)); });
+    return ids;
+  }
+  const frameIds = new Set(collectFrameIds(fid));
+  const relevant = rows.filter((r) => frameIds.has(r.frameId || null) && !r.parentId)
+    .sort((a, b) => (a.date + (a.startTime || "")).localeCompare(b.date + (b.startTime || "")));
+  return dayRouteUrl(relevant);
 }
 function dayRouteUrl(rowsInDay) {
   const points = [];
@@ -1148,6 +1187,28 @@ function PlaceIconWithPreview({ row, tm, Icon, warnings, T, lang, onOpenFull }) 
   );
 }
 
+function PopoverInfoIcon({ icon: IconComp, color, children }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+  const btnRef = useRef(null);
+  function toggle(e) {
+    e.stopPropagation();
+    if (!open && btnRef.current) { const r = btnRef.current.getBoundingClientRect(); setPos({ top: r.bottom + 4, left: r.left }); }
+    setOpen((v) => !v);
+  }
+  return (
+    <span style={{ display: "inline-flex", verticalAlign: "middle", marginInlineStart: 4 }}>
+      <button ref={btnRef} type="button" className="mt-info-icon-btn" style={color ? { color } : undefined} onClick={toggle}><IconComp size={13} /></button>
+      {open && (
+        <>
+          <div className="mt-floating-backdrop" onClick={(e) => { e.stopPropagation(); setOpen(false); }} />
+          <div className="mt-info-popup" style={{ top: pos.top, left: pos.left }} onClick={(e) => e.stopPropagation()}>{children}</div>
+        </>
+      )}
+    </span>
+  );
+}
+
 function PlaceInfoModal({ row, onClose, types, lang, T }) {
   const tm = typeMeta(row.typeId, types, T, lang);
   const TI = ICONS[tm.icon] || Tag;
@@ -1320,7 +1381,7 @@ function MobileCardMeta({ row, ctx }) {
 
 function DayGroup({ g, fid, depth, ctx }) {
   const { T, lang, effectiveMobile, collapsedGroups, setCollapsedGroups, collapsedParents, setCollapsedParents,
-    addRow, openCard, types, visibleColumns, openAddDayModal, rows, sortDayByTime, getColWidth, startResize, dragDayKey, setDragDayKey } = ctx;
+    addRow, openCard, types, visibleColumns, openAddDayModal, rows, sortDayByTime, getColWidth, startResize, dragDayKey, setDragDayKey, startDayPointerDrag, dragId, startRowPointerDrag } = ctx;
   const gk = (fid || "root") + "__" + g.date;
   const collapsed = !!collapsedGroups[gk];
   const childrenOf = (pid) => childrenOfPure(rows, pid);
@@ -1331,8 +1392,8 @@ function DayGroup({ g, fid, depth, ctx }) {
   return (
     <div className="mt-group">
       <div className={"mt-group-header" + (dragDayKey === gk ? " dragging" : "")} onClick={() => setCollapsedGroups((p) => ({ ...p, [gk]: !p[gk] }))}>
-        <span className="mt-day-drag-handle" title={T.dragDayHint} draggable onClick={(e) => e.stopPropagation()}
-          onDragStart={() => setDragDayKey(gk)} onDragEnd={() => setDragDayKey(null)}><GripVertical size={13} /></span>
+        <span className="mt-day-drag-handle" title={T.dragDayHint} onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => startDayPointerDrag(e, gk)}><GripVertical size={13} /></span>
         <span className="chev">{collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}</span>
         <span className="mt-group-date">{fmtDate(g.date, lang)}</span>
         <span className="mt-group-day">{heDay(g.date, lang)}</span>
@@ -1358,13 +1419,14 @@ function DayGroup({ g, fid, depth, ctx }) {
             const fromLabel = r.fromAlias || r.from, toLabel = r.toAlias || r.to;
             const cardWarnings = getRowWarning(r, T);
             return (
-              <div className="mt-card" key={r.id} onClick={() => openCard(r)}>
+              <div className="mt-card" key={r.id} data-row-drop={r.id} style={{ opacity: dragId === r.id ? 0.4 : 1 }} onClick={() => openCard(r)}>
                 <div className="mt-card-top">
                   <div className="mt-type-chip">
                     <span className="mt-type-icon" style={{ background: tm.color }}><Icon /></span>
                     <strong className={cardWarnings.length ? "has-warning" : ""} style={{ fontSize: 13.5 }} title={cardWarnings.length ? cardWarnings.join(" · ") : undefined}>{tm.name}</strong>
                   </div>
                   <span className="mt-card-times">{r.startTime || "—"}{r.endTime ? ` – ${r.endTime}` : ""}</span>
+                  <span className="mt-card-drag-handle" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => { e.stopPropagation(); startRowPointerDrag(e, r.id); }}><GripVertical size={15} /></span>
                 </div>
                 {(fromLabel || toLabel) && (
                   <div className="mt-card-route">
@@ -1426,8 +1488,37 @@ function DayGroup({ g, fid, depth, ctx }) {
   );
 }
 
+function FrameSummaryRow({ frame, ctx }) {
+  const { T, rows, frames, displayCurrency, convertAmount, frameTotals } = ctx;
+  const [expanded, setExpanded] = useState(false);
+  const totals = frameTotals(frame.id);
+  const convertedTotal = Object.entries(totals).reduce((sum, [cur, amt]) => sum + convertAmount(amt, cur, displayCurrency), 0);
+  const stats = frameSummaryStats(rows, frames, frame.id);
+  return (
+    <div className="mt-frame-summary">
+      <button className="mt-frame-summary-toggle" onClick={() => setExpanded((v) => !v)}>
+        <span>{T.tripSummary}</span>
+        {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+      </button>
+      <div className="mt-frame-summary-line">
+        {convertedTotal > 0 && <span>{displayCurrency} {convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>}
+        {stats.totalKm > 0 && <span>{stats.totalKm.toLocaleString(undefined, { maximumFractionDigits: 0 })} {T.km}</span>}
+      </div>
+      {expanded && (
+        <div className="mt-frame-summary-grid">
+          {stats.flights > 0 && <span><Plane size={13} /> {stats.flights} {T.summaryFlights}</span>}
+          {stats.hotels > 0 && <span><BedDouble size={13} /> {stats.hotels} {T.summaryHotels}</span>}
+          {stats.pois > 0 && <span><MapPin size={13} /> {stats.pois} {T.summaryPois}</span>}
+          {stats.restaurants > 0 && <span><Utensils size={13} /> {stats.restaurants} {T.summaryRestaurants}</span>}
+          {stats.avgRating != null && <span><Star size={13} fill="currentColor" /> {stats.avgRating.toFixed(1)} {T.summaryAvgRating}</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function FrameBlock({ frame, depth, ctx, renderContext }) {
-  const { T, lang, toggleFrameCollapse, openFrameModal, deleteFrame, openAddDayModal, addRow, lastDateInContext, frameTotals, displayCurrency, convertAmount, frameMenuOpenId, setFrameMenuOpenId, frameMenuPos, setFrameMenuPos, onDropDay, dragDayKey } = ctx;
+  const { T, lang, toggleFrameCollapse, openFrameModal, deleteFrame, openAddDayModal, addRow, lastDateInContext, frameTotals, displayCurrency, convertAmount, frameMenuOpenId, setFrameMenuOpenId, frameMenuPos, setFrameMenuPos, onDropDay, dragDayKey, rows, frames } = ctx;
   const totals = frameTotals(frame.id);
   const convertedTotal = Object.entries(totals).reduce((sum, [cur, amt]) => sum + convertAmount(amt, cur, displayCurrency), 0);
   const color = FRAME_COLORS[depth % FRAME_COLORS.length];
@@ -1441,7 +1532,7 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
   }
   return (
     <div className="mt-frame-block" style={{ "--frame-color": color }}>
-      <div className={"mt-frame-header" + (dragDayKey ? " droppable" : "")} onClick={() => toggleFrameCollapse(frame.id)}
+      <div className={"mt-frame-header" + (dragDayKey ? " droppable" : "")} data-frame-drop={frame.id} onClick={() => toggleFrameCollapse(frame.id)}
         onDragOver={(e) => dragDayKey && e.preventDefault()} onDrop={() => onDropDay(frame.id)}>
         <div className="mt-frame-header-top">
           <span className="chev">{frame.collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}</span>
@@ -1467,6 +1558,13 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
             <button className="mt-share-opt" onClick={() => { openFrameModal(null, frame.id); setFrameMenuOpenId(null); }}><FolderPlus size={14} /> {T.addSubFrame}</button>
             <button className="mt-share-opt" onClick={() => { openFrameModal(frame); setFrameMenuOpenId(null); }}><Pencil size={14} /> {T.editFrame}</button>
             <div className="divider" />
+            {(() => {
+              const overallRoute = frameRouteUrl(rows, frames, frame.id);
+              return overallRoute ? (
+                <a className="mt-share-opt" href={overallRoute} target="_blank" rel="noreferrer" onClick={() => setFrameMenuOpenId(null)}><Waypoints size={14} /> {T.showOverallRoute}</a>
+              ) : <span className="mt-share-opt disabled"><Waypoints size={14} /> {T.showOverallRoute}</span>;
+            })()}
+            <div className="divider" />
             <button className="mt-share-opt" style={{ color: "var(--danger)" }} onClick={() => { deleteFrame(frame.id); setFrameMenuOpenId(null); }}><Trash2 size={14} /> {T.delete}</button>
           </div>
         </>
@@ -1476,6 +1574,7 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
           {renderContext(frame.id, depth + 1)}
         </div>
       )}
+      {!frame.collapsed && <FrameSummaryRow frame={frame} ctx={ctx} />}
     </div>
   );
 }
@@ -1624,6 +1723,7 @@ export default function MyTripApp() {
   const actionsBtnRef = useRef(null);
   const addTypeBtnRef = useRef(null);
   const settingsBtnRef = useRef(null);
+  const pointerDragRef = useRef(null);
   const dir = lang === "he" ? "rtl" : "ltr";
   const T = T_DICT[lang];
   useEffect(() => { document.title = "MyTrip Builder"; }, []);
@@ -1994,6 +2094,43 @@ export default function MyTripApp() {
     setDragDayKey(null);
   }
 
+  function handlePointerDragEnd(e) {
+    window.removeEventListener("pointermove", handlePointerDragMove);
+    window.removeEventListener("pointerup", handlePointerDragEnd);
+    document.body.classList.remove("mt-dragging-active");
+    const info = pointerDragRef.current;
+    pointerDragRef.current = null;
+    if (!info) return;
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    if (!el) { setDragId(null); setDragDayKey(null); return; }
+    if (info.type === "row") {
+      const targetEl = el.closest("[data-row-drop]");
+      if (targetEl) onDropRow(targetEl.getAttribute("data-row-drop"));
+      else setDragId(null);
+    } else {
+      const targetEl = el.closest("[data-frame-drop]");
+      if (targetEl) { const v = targetEl.getAttribute("data-frame-drop"); onDropDay(v === "root" ? null : v); }
+      else setDragDayKey(null);
+    }
+  }
+  function handlePointerDragMove(e) { /* visual feedback intentionally minimal */ }
+  function startRowPointerDrag(e, rowId) {
+    e.preventDefault();
+    setDragId(rowId);
+    pointerDragRef.current = { type: "row" };
+    document.body.classList.add("mt-dragging-active");
+    window.addEventListener("pointermove", handlePointerDragMove);
+    window.addEventListener("pointerup", handlePointerDragEnd);
+  }
+  function startDayPointerDrag(e, dayKey) {
+    e.preventDefault();
+    setDragDayKey(dayKey);
+    pointerDragRef.current = { type: "day" };
+    document.body.classList.add("mt-dragging-active");
+    window.addEventListener("pointermove", handlePointerDragMove);
+    window.addEventListener("pointerup", handlePointerDragEnd);
+  }
+
   /* ---------- add-day modal ---------- */
   function openAddDayModal(fid) { setAddDayCtx({ fid, date: nextDateInContext(fid) }); }
   function closeAddDayModal() { setAddDayCtx(null); }
@@ -2188,7 +2325,7 @@ export default function MyTripApp() {
   /* ---------- recursive render ---------- */
   const ctx = {
     T, lang, types, visibleColumns, effectiveMobile, rows, frames,
-    updateRow, deleteRow, openCard, addRow, dragId, setDragId, onDropRow, dragDayKey, setDragDayKey, onDropDay,
+    updateRow, deleteRow, openCard, addRow, dragId, setDragId, onDropRow, dragDayKey, setDragDayKey, onDropDay, startRowPointerDrag, startDayPointerDrag,
     typeMenuOpen, setTypeMenuOpen, newTypeDraft, setNewTypeDraft, addCustomType,
     collapsedParents, setCollapsedParents, collapsedGroups, setCollapsedGroups,
     toggleFrameCollapse, openFrameModal, deleteFrame, updateFrameDates, nextDateInContext, lastDateInContext, frameTotals,
@@ -2390,7 +2527,10 @@ export default function MyTripApp() {
         .mt-row-actions button:hover { background:var(--teal-tint); color:var(--teal-dark); }
         .mt-row-actions svg { width:13px; height:13px; }
         .mt-drag-handle { cursor:grab; color:#9FB0AA; }
-        .mt-day-drag-handle { cursor:grab; color:#9FB0AA; display:flex; align-items:center; margin-inline-end:2px; }
+        .mt-day-drag-handle { cursor:grab; color:#9FB0AA; display:flex; align-items:center; margin-inline-end:2px; touch-action:none; }
+        .mt-card-drag-handle { cursor:grab; color:#9FB0AA; display:flex; align-items:center; margin-inline-start:6px; touch-action:none; }
+        body.mt-dragging-active { cursor:grabbing; user-select:none; -webkit-user-select:none; }
+        body.mt-dragging-active * { cursor:grabbing !important; }
         .mt-group-header.dragging { opacity:.4; }
         .mt-frame-header.droppable { outline:2px dashed var(--teal); outline-offset:-2px; }
         .mt-root-drop-zone { border:2px dashed var(--teal); border-radius:10px; padding:14px; text-align:center; color:var(--teal-dark); font-size:12.5px; font-weight:600; background:var(--teal-tint); margin-bottom:10px; }
@@ -2431,8 +2571,21 @@ export default function MyTripApp() {
         .mt-modal-title { font-family:'Frank Ruhl Libre',serif; font-size:17px; font-weight:700; }
         .mt-modal-body { padding:14px 18px; display:flex; flex-direction:column; gap:9px; }
         .mt-field label { display:block; font-size:11.5px; font-weight:600; color:var(--muted); margin-bottom:4px; }
-        .mt-field input, .mt-field select { width:100%; border:1px solid var(--border); border-radius:8px; padding:7px 9px; font-size:13px; font-family:inherit; background:#fff; color:var(--ink); }
-        .mt-field input:focus, .mt-field select:focus { outline:none; border-color:var(--teal); }
+        .mt-field input, .mt-field select, .mt-field textarea { width:100%; border:1px solid var(--border); border-radius:8px; padding:7px 9px; font-size:13px; font-family:inherit; background:#fff; color:var(--ink); }
+        .mt-field input:focus, .mt-field select:focus, .mt-field textarea:focus { outline:none; border-color:var(--teal); }
+        .mt-field textarea { resize:vertical; min-height:60px; }
+        .mt-section-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin-top:6px; }
+        .mt-info-icon-btn { border:none; background:none; color:var(--muted); display:inline-flex; padding:1px; vertical-align:middle; }
+        .mt-info-icon-btn:hover { color:var(--teal); }
+        .mt-info-popup { position:fixed; z-index:260; background:var(--surface); border:1px solid var(--border); border-radius:8px; box-shadow:0 8px 24px rgba(20,40,35,.18); padding:9px 11px; font-size:12px; max-width:230px; color:var(--ink); line-height:1.5; }
+        .mt-info-popup a { color:var(--teal); font-weight:600; }
+        .mt-star-picker { display:flex; gap:3px; }
+        .mt-star-picker button { border:none; background:none; color:#D9A23D; padding:2px; display:flex; }
+        .mt-frame-summary { border-top:1px solid var(--border); padding:8px 10px; background:#FAFCFB; }
+        .mt-frame-summary-toggle { display:flex; align-items:center; gap:5px; border:none; background:none; color:var(--muted); font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; padding:0; }
+        .mt-frame-summary-line { display:flex; gap:14px; margin-top:4px; font-size:13px; font-weight:700; color:var(--ink); flex-wrap:wrap; }
+        .mt-frame-summary-grid { display:flex; gap:14px; margin-top:8px; flex-wrap:wrap; font-size:12px; color:var(--muted); }
+        .mt-frame-summary-grid span { display:flex; align-items:center; gap:4px; }
         .mt-field-row { display:flex; gap:9px; }
         .mt-field-row > div { flex:1; }
         .mt-field-inline { display:flex; gap:3px; align-items:flex-end; }
@@ -2765,7 +2918,7 @@ export default function MyTripApp() {
         )}
 
         {dragDayKey && dragDayKey.slice(0, dragDayKey.indexOf("__")) !== "root" && (
-          <div className="mt-root-drop-zone" onDragOver={(e) => e.preventDefault()} onDrop={() => onDropDay(null)}>{T.dropDayToRoot}</div>
+          <div className="mt-root-drop-zone" data-frame-drop="root" onDragOver={(e) => e.preventDefault()} onDrop={() => onDropDay(null)}>{T.dropDayToRoot}</div>
         )}
 
         {renderContext(null, 0)}
@@ -2881,6 +3034,15 @@ export default function MyTripApp() {
           <div className="mt-modal" onClick={(e) => e.stopPropagation()}>
             <div className="mt-modal-header"><span className="mt-modal-title">{T.editRecord}</span><button className="mt-btn ghost" onClick={closeCard}><X size={16} /></button></div>
             <div className="mt-modal-body">
+              <div className="mt-field">
+                <label>{T.frame}</label>
+                <select value={cardDraft.frameId || ""} onChange={(e) => setCardDraft({ ...cardDraft, frameId: e.target.value || null })}>
+                  <option value="">{T.noFrame}</option>
+                  {frameOptionsList(null).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+                </select>
+              </div>
+              {cardFrameIssue && <div className="mt-error"><AlertTriangle /> {cardFrameIssue}</div>}
+
               <div className="mt-field-row">
                 <div className="mt-field">
                   <label>{T.type}</label>
@@ -2895,15 +3057,16 @@ export default function MyTripApp() {
                 </div>
                 <div className="mt-field"><label>תאריך</label><DateField value={cardDraft.date} onChange={(e) => setCardDraft({ ...cardDraft, date: e.target.value })} /></div>
               </div>
-              <div className="mt-field">
-                <label>{T.frame}</label>
-                <select value={cardDraft.frameId || ""} onChange={(e) => setCardDraft({ ...cardDraft, frameId: e.target.value || null })}>
-                  <option value="">{T.noFrame}</option>
-                  {frameOptionsList(null).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
-                </select>
-              </div>
-              {cardFrameIssue && <div className="mt-error"><AlertTriangle /> {cardFrameIssue}</div>}
 
+              <div className="mt-field-row">
+                <div className="mt-field"><label>{T.start}</label><input type="time" value={cardDraft.startTime} onChange={(e) => setCardDraft({ ...cardDraft, startTime: e.target.value })} /></div>
+                <div className="mt-field"><label>{T.end}</label><input type="time" value={cardDraft.endTime} onChange={(e) => setCardDraft({ ...cardDraft, endTime: e.target.value })} /></div>
+              </div>
+              <label className="mt-checkbox-row"><input type="checkbox" checked={!!cardDraft.overnight} onChange={(e) => setCardDraft({ ...cardDraft, overnight: e.target.checked })} />{T.overnight}</label>
+              {cardHasTimeError && <div className="mt-error"><AlertTriangle /> {T.timeError}</div>}
+              {showTzHint && <div className="mt-hint">{T.tzNote}</div>}
+
+              <div className="mt-section-label">{T.locationSectionLabel}</div>
               <div className="mt-field-row">
                 <div className="mt-field">
                   <label>{T.from}</label>
@@ -2911,12 +3074,11 @@ export default function MyTripApp() {
                     <div><input dir="auto" value={cardDraft.from} placeholder={getTypeHint(cardDraft.typeId, "from", lang)} onChange={(e) => setCardDraft({ ...cardDraft, from: e.target.value })} /></div>
                     <button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openLocationPicker("from")}><MapPin size={13} /></button>
                     <button className="mt-btn ghost mt-btn-icon" title={T.copyPrevDest} disabled={!prevRowForCard || !prevRowForCard.to} onClick={copyPrevDestinationToFrom}><Copy size={13} /></button>
+                    {fromVerifiedCard && <PopoverInfoIcon icon={CircleCheck} color="#3E8E5A"><div>{T.verified}</div><a href={cardDraft.fromVerifiedUrl} target="_blank" rel="noreferrer">{T.openMap}</a></PopoverInfoIcon>}
                   </div>
-                  {fromVerifiedCard && <div className="mt-verified-row"><CircleCheck size={12} /> {T.verified} — <a href={cardDraft.fromVerifiedUrl} target="_blank" rel="noreferrer">{T.openMap}</a></div>}
                   <div className="mt-field" style={{ marginTop: 6 }}>
-                    <label>{T.fromAlias}</label>
+                    <label>{T.fromAlias} <PopoverInfoIcon icon={Info}>{T.aliasHint}</PopoverInfoIcon></label>
                     <input dir="auto" value={cardDraft.fromAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "fromAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, fromAlias: e.target.value })} />
-                    <div className="mt-hint">{T.aliasHint}</div>
                   </div>
                 </div>
                 <div className="mt-field">
@@ -2924,12 +3086,12 @@ export default function MyTripApp() {
                   <div className="mt-field-inline">
                     <div><input dir="auto" value={cardDraft.to} placeholder={getTypeHint(cardDraft.typeId, "to", lang)} onChange={(e) => setCardDraft({ ...cardDraft, to: e.target.value })} /></div>
                     <button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openLocationPicker("to")}><MapPin size={13} /></button>
+                    <button className="mt-btn ghost mt-btn-icon" title={T.copyFromOrigin} disabled={!cardDraft.from} onClick={() => setCardDraft({ ...cardDraft, to: cardDraft.from })}><Copy size={13} /></button>
+                    {toVerifiedCard && <PopoverInfoIcon icon={CircleCheck} color="#3E8E5A"><div>{T.verified}</div><a href={cardDraft.toVerifiedUrl} target="_blank" rel="noreferrer">{T.openMap}</a></PopoverInfoIcon>}
                   </div>
-                  {toVerifiedCard && <div className="mt-verified-row"><CircleCheck size={12} /> {T.verified} — <a href={cardDraft.toVerifiedUrl} target="_blank" rel="noreferrer">{T.openMap}</a></div>}
                   <div className="mt-field" style={{ marginTop: 6 }}>
-                    <label>{T.toAlias}</label>
+                    <label>{T.toAlias} <PopoverInfoIcon icon={Info}>{T.aliasHint}</PopoverInfoIcon></label>
                     <input dir="auto" value={cardDraft.toAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "toAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, toAlias: e.target.value })} />
-                    <div className="mt-hint">{T.aliasHint}</div>
                   </div>
                 </div>
               </div>
@@ -2950,14 +3112,6 @@ export default function MyTripApp() {
                 )}
               </div>
 
-              <div className="mt-field-row">
-                <div className="mt-field"><label>{T.start}</label><input type="time" value={cardDraft.startTime} onChange={(e) => setCardDraft({ ...cardDraft, startTime: e.target.value })} /></div>
-                <div className="mt-field"><label>{T.end}</label><input type="time" value={cardDraft.endTime} onChange={(e) => setCardDraft({ ...cardDraft, endTime: e.target.value })} /></div>
-              </div>
-              <label className="mt-checkbox-row"><input type="checkbox" checked={!!cardDraft.overnight} onChange={(e) => setCardDraft({ ...cardDraft, overnight: e.target.checked })} />{T.overnight}</label>
-              {cardHasTimeError && <div className="mt-error"><AlertTriangle /> {T.timeError}</div>}
-              {showTzHint && <div className="mt-hint">{T.tzNote}</div>}
-
               {showFlightHint && (
                 <div className="mt-field">
                   <label>{T.flightNo}</label>
@@ -2969,9 +3123,6 @@ export default function MyTripApp() {
                 </div>
               )}
               <div className="mt-field"><label>{T.link}</label><input value={cardDraft.link} placeholder="https://..." onChange={(e) => setCardDraft({ ...cardDraft, link: e.target.value })} /></div>
-              {["hotel", "hostel", "apartment", "self-tour", "guided-tour", "day-tour", "attraction", "poi", "ferry", "car-rental", "yacht", "cruise"].includes(cardDraft.typeId) && (
-                <div className="mt-field"><label>{T.maplink}</label><input value={cardDraft.mapLink || ""} placeholder="https://maps.google.com/..." onChange={(e) => setCardDraft({ ...cardDraft, mapLink: e.target.value })} /></div>
-              )}
               <div className="mt-field-row">
                 <div className="mt-field"><label>{T.cost}</label><input type="number" value={cardDraft.costAmount} onChange={(e) => setCardDraft({ ...cardDraft, costAmount: e.target.value })} /></div>
                 <div className="mt-field"><label>{T.currency}</label>
@@ -2980,9 +3131,26 @@ export default function MyTripApp() {
                   </select>
                 </div>
               </div>
-              <div className="mt-field"><label>{T.notes}</label><input value={cardDraft.notes || ""} placeholder={getTypeHint(cardDraft.typeId, "notes", lang)} onChange={(e) => setCardDraft({ ...cardDraft, notes: e.target.value })} /></div>
+              <div className="mt-field"><label>{T.notes} <PopoverInfoIcon icon={Info}>{T.notesHint}</PopoverInfoIcon></label><input value={cardDraft.notes || ""} placeholder={getTypeHint(cardDraft.typeId, "notes", lang)} onChange={(e) => setCardDraft({ ...cardDraft, notes: e.target.value })} /></div>
+              <div className="mt-field">
+                <label>{T.personalExperience}</label>
+                <textarea rows={3} value={cardDraft.personalExperience || ""} onChange={(e) => setCardDraft({ ...cardDraft, personalExperience: e.target.value })} placeholder={T.personalExperienceHint} />
+              </div>
+              <div className="mt-field">
+                <label>{T.personalRating}</label>
+                <div className="mt-star-picker">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button key={n} type="button" onClick={() => setCardDraft({ ...cardDraft, personalRating: cardDraft.personalRating === n ? 0 : n })}>
+                      <Star size={19} fill={n <= (cardDraft.personalRating || 0) ? "currentColor" : "none"} />
+                    </button>
+                  ))}
+                </div>
+              </div>
               <button className="mt-file-demo" onClick={() => showDemoNotice(T.demoNeedsStorage)}>
                 <FileUp size={16} /> <span>{T.uploadFile}</span>
+              </button>
+              <button className="mt-file-demo" onClick={() => showDemoNotice(T.demoNeedsStorage)}>
+                <ImagePlus size={16} /> <span>{T.uploadPhotos}</span>
               </button>
               {columns.filter((c) => c.custom).map((c) => (
                 <div className="mt-field" key={c.key}>
