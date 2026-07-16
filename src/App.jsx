@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.0.1";
+const APP_VERSION = "10.0.2";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -400,6 +400,12 @@ function mapsSearchUrl(lat, lon) { return `https://www.google.com/maps/search/?a
 const __geocodeCache = new Map();
 const GOOGLE_PLACES_KEY = (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_GOOGLE_PLACES_KEY) || "";
 function hasGooglePlaces() { return !!GOOGLE_PLACES_KEY; }
+function extractGoogleApiError(r) {
+  return r.json().then(
+    (body) => { throw new Error("http-" + r.status + ((body && body.error && (body.error.message || body.error.status)) ? ": " + (body.error.message || body.error.status) : "")); },
+    () => { throw new Error("http-" + r.status); }
+  );
+}
 function googlePlacesAutocomplete(input, lang) {
   if (!GOOGLE_PLACES_KEY || !input || !input.trim()) return Promise.resolve([]);
   return fetch("https://places.googleapis.com/v1/places:autocomplete", {
@@ -407,7 +413,7 @@ function googlePlacesAutocomplete(input, lang) {
     headers: { "Content-Type": "application/json", "X-Goog-Api-Key": GOOGLE_PLACES_KEY },
     body: JSON.stringify({ input, languageCode: lang === "he" ? "he" : "en" }),
   })
-    .then((r) => { if (!r.ok) throw new Error("http-" + r.status); return r.json(); })
+    .then((r) => { if (!r.ok) return extractGoogleApiError(r); return r.json(); })
     .then((data) => (data.suggestions || [])
       .map((s) => s.placePrediction)
       .filter(Boolean)
@@ -418,7 +424,7 @@ function googlePlaceDetails(placeId, lang) {
   const fieldMask = "displayName,formattedAddress,location,rating,userRatingCount,photos,regularOpeningHours,priceLevel,internationalPhoneNumber,websiteUri";
   return fetch(`https://places.googleapis.com/v1/places/${placeId}?languageCode=${lang === "he" ? "he" : "en"}`, {
     headers: { "X-Goog-Api-Key": GOOGLE_PLACES_KEY, "X-Goog-FieldMask": fieldMask },
-  }).then((r) => { if (!r.ok) throw new Error("http-" + r.status); return r.json(); });
+  }).then((r) => { if (!r.ok) return extractGoogleApiError(r); return r.json(); });
 }
 function googlePlacePhotoUrl(photoName, maxWidth) {
   if (!GOOGLE_PLACES_KEY || !photoName) return null;
