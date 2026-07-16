@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "9.12.0";
+const APP_VERSION = "9.13.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -412,7 +412,7 @@ function fetchWeather(lat, lon, dateStr) {
 const COL_WIDTHS = {
   handle: 26, actions: 72,
   date: 78, day: 48, icon: 40, type: 125, from: 165, to: 165,
-  startTime: 58, duration: 45, endTime: 58, route: 92, link: 39, cost: 58, notes: 32, weather: 42,
+  startTime: 68, duration: 45, endTime: 68, route: 92, link: 39, cost: 58, notes: 32, weather: 42,
 };
 function colFixedWidth(key) {
   if (COL_WIDTHS[key] != null) return COL_WIDTHS[key];
@@ -1965,7 +1965,7 @@ export default function MyTripApp() {
         .mt-editable:hover { border-color:var(--border); }
         .mt-editable:focus { outline:none; border-color:var(--teal); background:#fff; }
         .mt-editable.mt-time:focus, .mt-editable[type=number]:focus { outline:none; border-color:var(--teal); background:#fff; }
-        .mt-editable.mt-time { min-width:76px; font-weight:700; color:var(--ink); padding-inline-end:2px; }
+        .mt-editable.mt-time { min-width:60px; font-weight:700; color:var(--ink); padding-inline-end:2px; }
         .mt-editable.mt-time::-webkit-calendar-picker-indicator { padding:1px; margin-inline-start:1px; width:10px; height:10px; opacity:.6; }
         .mt-editable[type=number] { min-width:38px; padding-inline-start:1px; -moz-appearance:textfield; }
         .mt-editable[type=number]::-webkit-outer-spin-button, .mt-editable[type=number]::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
