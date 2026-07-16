@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "9.16.0";
+const APP_VERSION = "9.18.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -29,7 +29,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 const DEFAULT_MAP_CENTER = [41.9, 12.49]; // Rome — reasonable default for this itinerary
-const ICONS = { Plane, PlaneTakeoff, Car, BedDouble, Footprints, Users, Sun, Ship, KeySquare, Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music, TrainFront, Bus, Motorbike, Bike, Scooter, Sailboat, ShipWheel, Anchor, Kayak, Helicopter, Caravan, Building2, Landmark, Home };
+const ICONS = { Plane, PlaneTakeoff, Car, BedDouble, Footprints, Users, Sun, Ship, KeySquare, Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music, TrainFront, Bus, Motorbike, Bike, Scooter, Sailboat, ShipWheel, Anchor, Kayak, Helicopter, Caravan, Building2, Landmark, Home, MapPin };
 const HE_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 const EN_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const FRAME_COLORS = ["#256D64", "#3E7CB1", "#8B6F47", "#7A5C9E", "#C1443A", "#5B8C5A"];
@@ -72,6 +72,7 @@ const DEFAULT_TYPES = [
   { id: "guided-tour", name_he: "טיול מודרך", name_en: "Guided tour", icon: "Users", color: CATEGORY_COLORS.activities, category: "activities" },
   { id: "day-tour", name_he: "טיול יומי", name_en: "Day tour", icon: "Sun", color: CATEGORY_COLORS.activities, category: "activities" },
   { id: "attraction", name_he: "אטרקציה", name_en: "Attraction", icon: "Landmark", color: CATEGORY_COLORS.activities, category: "activities" },
+  { id: "poi", name_he: "נקודת עניין", name_en: "Point of Interest", icon: "MapPin", color: CATEGORY_COLORS.activities, category: "activities" },
   { id: "restaurant", name_he: "מסעדה", name_en: "Restaurant", icon: "Utensils", color: CATEGORY_COLORS.activities, category: "activities" },
 ];
 const CATEGORY_ORDER = ["public-transport", "road-transport", "sea-transport", "air-transport", "accommodation", "activities", "other"];
@@ -1307,6 +1308,7 @@ export default function MyTripApp() {
   const [routeImportUrl, setRouteImportUrl] = useState("");
   const [routeImportStops, setRouteImportStops] = useState(null);
   const [routeImportDate, setRouteImportDate] = useState("");
+  const [routeImportFrameId, setRouteImportFrameId] = useState("");
   const [routeImportStartTime, setRouteImportStartTime] = useState("09:00");
   const [routeImportShortLink, setRouteImportShortLink] = useState(false);
   const [hotelInfoRow, setHotelInfoRow] = useState(null);
@@ -1439,7 +1441,8 @@ export default function MyTripApp() {
   }
 
   function openRouteImport() {
-    setRouteImportUrl(""); setRouteImportStops(null); setRouteImportDate(nextDateInContext(null)); setRouteImportShortLink(false);
+    setRouteImportUrl(""); setRouteImportStops(null); setRouteImportFrameId(""); setRouteImportShortLink(false);
+    setRouteImportDate(nextDateInContext(null));
     setRouteImportOpen(true); setActionsMenuOpen(false);
   }
   function parseRouteImport() {
@@ -1457,12 +1460,13 @@ export default function MyTripApp() {
   }
   function confirmRouteImport() {
     if (!routeImportStops || !routeImportStops.length || !routeImportDate) return;
+    const fid = routeImportFrameId || null;
     let [h, m] = routeImportStartTime.split(":").map(Number);
     routeImportStops.forEach((name) => {
       const startTime = `${String(h % 24).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
       h += 1;
-      const id = addRow(routeImportDate, null, null);
-      updateRow(id, { typeId: "attraction", from: name, to: name, startTime });
+      const id = addRow(routeImportDate, null, fid);
+      updateRow(id, { typeId: "poi", from: name, to: name, startTime });
     });
     setRouteImportOpen(false);
   }
@@ -2293,6 +2297,13 @@ export default function MyTripApp() {
                       </div>
                     ))}
                   </div>
+                  <div className="mt-field">
+                    <label>{T.frame}</label>
+                    <select value={routeImportFrameId} onChange={(e) => { const fid = e.target.value; setRouteImportFrameId(fid); setRouteImportDate(nextDateInContext(fid || null)); }}>
+                      <option value="">{T.noFrame}</option>
+                      {frameOptionsList(null).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+                    </select>
+                  </div>
                   <div className="mt-field-row">
                     <div className="mt-field"><label>{T.addDayDate}</label><DateField value={routeImportDate} onChange={(e) => setRouteImportDate(e.target.value)} /></div>
                     <div className="mt-field"><label>{T.start}</label><input type="time" value={routeImportStartTime} onChange={(e) => setRouteImportStartTime(e.target.value)} /></div>
@@ -2556,7 +2567,7 @@ export default function MyTripApp() {
                 </div>
               )}
               <div className="mt-field"><label>{T.link}</label><input value={cardDraft.link} placeholder="https://..." onChange={(e) => setCardDraft({ ...cardDraft, link: e.target.value })} /></div>
-              {["hotel", "hostel", "apartment", "self-tour", "guided-tour", "day-tour", "attraction", "ferry", "car-rental", "yacht", "cruise"].includes(cardDraft.typeId) && (
+              {["hotel", "hostel", "apartment", "self-tour", "guided-tour", "day-tour", "attraction", "poi", "ferry", "car-rental", "yacht", "cruise"].includes(cardDraft.typeId) && (
                 <div className="mt-field"><label>{T.maplink}</label><input value={cardDraft.mapLink || ""} placeholder="https://maps.google.com/..." onChange={(e) => setCardDraft({ ...cardDraft, mapLink: e.target.value })} /></div>
               )}
               <div className="mt-field-row">
