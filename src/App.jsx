@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.8.0";
+const APP_VERSION = "10.10.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -339,10 +339,15 @@ function checkOpeningHours(openingHours, dateStr, timeStr) {
 function getRowWarning(row, T) {
   const issues = [];
   const openState = row.toOpeningPeriods ? checkGoogleOpeningHours(row.toOpeningPeriods, row.date, row.startTime) : checkOpeningHours(row.toOpeningHours, row.date, row.startTime);
-  if (openState === false) issues.push(`${T.warnClosed} (${row.date} ${row.startTime || "—"})`);
-  if (row.toFee && String(row.toFee).toLowerCase() === "yes") issues.push(T.warnFeeRequired);
+  if (openState === false) issues.push({ type: "closed", text: `${T.warnClosed} (${row.date} ${row.startTime || "—"})` });
+  if (row.toFee && String(row.toFee).toLowerCase() === "yes") issues.push({ type: "fee", text: T.warnFeeRequired });
   return issues;
 }
+function warningClass(warnings) {
+  if (!warnings.length) return "";
+  return warnings.some((w) => w.type === "closed") ? "has-warning-closed" : "has-warning-fee";
+}
+function warningText(warnings) { return warnings.map((w) => w.text).join(" · "); }
 function typeMeta(typeId, types, T, lang) {
   if (!typeId || typeId === "unset") return { id: "unset", name: (T && T.selectType) || "בחר...", icon: "Tag", color: "#C1443A" };
   const t = types.find((tt) => tt.id === typeId) || types[0];
@@ -450,10 +455,11 @@ function googlePlaceDetails(placeId, lang) {
 }
 const PRICE_LEVEL_MAP = { PRICE_LEVEL_FREE: "0", PRICE_LEVEL_INEXPENSIVE: "₪", PRICE_LEVEL_MODERATE: "₪₪", PRICE_LEVEL_EXPENSIVE: "₪₪₪", PRICE_LEVEL_VERY_EXPENSIVE: "₪₪₪₪" };
 function priceLevelSymbol(level) { return PRICE_LEVEL_MAP[level] || null; }
-function todayClosingText(hours, lang) {
-  if (!hours || !hours.periods) return null;
-  const now = new Date();
-  const dow = now.getDay();
+function closingTimeForDate(hours, dateStr, lang) {
+  if (!hours || !hours.periods || !dateStr) return null;
+  const date = new Date(dateStr + "T00:00:00");
+  if (isNaN(date.getTime())) return null;
+  const dow = date.getDay();
   const period = hours.periods.find((pr) => pr.open && pr.open.day === dow);
   if (!period || !period.close) return null;
   const h = String(period.close.hour || 0).padStart(2, "0"), m = String(period.close.minute || 0).padStart(2, "0");
@@ -856,8 +862,8 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
         const warnings = getRowWarning(row, T);
         return (
         <div className="mt-type-wrap">
-          <button className="mt-type-btn" ref={typeBtnRef} title={warnings.length ? warnings.join(" · ") : tm.name} onClick={toggleTypeMenu}>
-            <span className={"mt-type-text" + (warnings.length ? " has-warning" : "")}>{tm.name}</span> <ChevronDown size={12} />
+          <button className="mt-type-btn" ref={typeBtnRef} title={warnings.length ? warningText(warnings) : tm.name} onClick={toggleTypeMenu}>
+            <span className={"mt-type-text " + warningClass(warnings)}>{tm.name}</span> <ChevronDown size={12} />
           </button>
           {typeMenuOpen === row.id && (
             <>
@@ -1159,8 +1165,8 @@ function PlaceIconWithPreview({ row, tm, Icon, warnings, T, lang, onOpenFull }) 
   }
   const photoUrl = previewData && previewData.photos && previewData.photos[0] ? googlePlacePhotoUrl(previewData.photos[0].name, 340) : null;
   const price = previewData && priceLevelSymbol(previewData.priceLevel);
-  const openNow = previewData && previewData.regularOpeningHours ? previewData.regularOpeningHours.openNow : null;
-  const closingText = previewData ? todayClosingText(previewData.regularOpeningHours, lang) : null;
+  const openState = previewData && previewData.regularOpeningHours ? checkGoogleOpeningHours(previewData.regularOpeningHours.periods, row.date, row.startTime) : null;
+  const closingText = previewData ? closingTimeForDate(previewData.regularOpeningHours, row.date, lang) : null;
 
   return (
     <span style={{ position: "relative", display: "inline-block" }} onMouseEnter={handleEnter} onMouseLeave={handleLeave} onFocus={handleEnter} onBlur={handleLeave}>
@@ -1176,7 +1182,7 @@ function PlaceIconWithPreview({ row, tm, Icon, warnings, T, lang, onOpenFull }) 
               ) : <span className="mt-hint">{T.ratingDemo}</span>}
               <span className="mt-place-preview-meta">
                 {price && <span>{price}</span>}
-                {openNow != null && <span className={openNow ? "mt-place-open" : "mt-place-closed"}>{openNow ? T.placeOpenNow : T.placeClosedNow}</span>}
+                {openState != null && <span className={openState ? "mt-place-open" : "mt-place-closed"}>{openState ? T.placeOpenNow : T.placeClosedNow}</span>}
                 {closingText && <span className="mt-hint">{closingText}</span>}
               </span>
             </>
@@ -1257,12 +1263,13 @@ function PlaceInfoModal({ row, onClose, types, lang, T }) {
           {googleData && (priceLevelSymbol(googleData.priceLevel) || googleData.regularOpeningHours) && (
             <div className="mt-place-preview-meta" style={{ padding: 0 }}>
               {priceLevelSymbol(googleData.priceLevel) && <span>{priceLevelSymbol(googleData.priceLevel)}</span>}
-              {googleData.regularOpeningHours && googleData.regularOpeningHours.openNow != null && (
-                <span className={googleData.regularOpeningHours.openNow ? "mt-place-open" : "mt-place-closed"}>
-                  {googleData.regularOpeningHours.openNow ? T.placeOpenNow : T.placeClosedNow}
-                </span>
-              )}
-              {todayClosingText(googleData.regularOpeningHours, lang) && <span className="mt-hint">{todayClosingText(googleData.regularOpeningHours, lang)}</span>}
+              {googleData.regularOpeningHours && (() => {
+                const openState = checkGoogleOpeningHours(googleData.regularOpeningHours.periods, row.date, row.startTime);
+                return openState != null ? (
+                  <span className={openState ? "mt-place-open" : "mt-place-closed"}>{openState ? T.placeOpenNow : T.placeClosedNow}</span>
+                ) : null;
+              })()}
+              {closingTimeForDate(googleData.regularOpeningHours, row.date, lang) && <span className="mt-hint">{closingTimeForDate(googleData.regularOpeningHours, row.date, lang)}</span>}
             </div>
           )}
           {(row.fromVerifiedUrl || row.toVerifiedUrl) && (
@@ -1277,7 +1284,9 @@ function PlaceInfoModal({ row, onClose, types, lang, T }) {
           {row.link && (
             <a className="mt-btn ghost" style={{ width: "100%", justifyContent: "center" }} target="_blank" rel="noreferrer" href={row.link}><Link2 size={13} /> {T.bookingLink}</a>
           )}
-          {getRowWarning(row, T).map((w, i) => <div key={i} className="mt-error"><AlertTriangle size={13} /> {w}</div>)}
+          {getRowWarning(row, T).map((w, i) => (
+            <div key={i} className="mt-error" style={w.type === "fee" ? { background: "#FBEEDD", color: "#B5651D" } : undefined}><AlertTriangle size={13} /> {w.text}</div>
+          ))}
           {!placeId && <div className="mt-hint">{T.hotelInfoDemoNote}</div>}
         </div>
       </div>
@@ -1426,7 +1435,7 @@ function DayGroup({ g, fid, depth, ctx }) {
                 <div className="mt-card-top">
                   <div className="mt-type-chip">
                     <span className="mt-type-icon" style={{ background: tm.color }}><Icon /></span>
-                    <strong className={cardWarnings.length ? "has-warning" : ""} style={{ fontSize: 13.5 }} title={cardWarnings.length ? cardWarnings.join(" · ") : undefined}>{tm.name}</strong>
+                    <strong className={warningClass(cardWarnings)} style={{ fontSize: 13.5 }} title={cardWarnings.length ? warningText(cardWarnings) : undefined}>{tm.name}</strong>
                   </div>
                   <span className="mt-card-times">{r.startTime || "—"}{r.endTime ? ` – ${r.endTime}` : ""}</span>
                   <span className="mt-card-drag-handle" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => { e.stopPropagation(); startRowPointerDrag(e, r.id); }}><GripVertical size={15} /></span>
@@ -2517,7 +2526,8 @@ export default function MyTripApp() {
         .mt-type-chip { display:flex; align-items:center; gap:6px; }
         .mt-type-icon { width:22px; height:22px; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
         .mt-type-icon-btn { border:none; cursor:pointer; }
-        .has-warning { color:var(--danger) !important; text-decoration:underline; text-decoration-style:wavy; text-underline-offset:2px; }
+        .has-warning-closed { color:var(--danger) !important; text-decoration:underline; text-decoration-style:wavy; text-underline-offset:2px; }
+        .has-warning-fee { color:#B5651D !important; text-decoration:underline; text-decoration-style:wavy; text-underline-offset:2px; }
         .mt-type-icon-btn:hover { filter:brightness(1.1); box-shadow:0 0 0 2px var(--teal-tint); }
         .mt-hotel-photo-demo { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; height:110px; border-radius:10px; background:linear-gradient(135deg,var(--teal-tint),var(--bg)); color:var(--teal); border:1.5px dashed var(--border); font-size:11px; text-align:center; padding:8px; }
         .mt-hotel-photo-real { width:100%; height:150px; object-fit:cover; border-radius:10px; }
