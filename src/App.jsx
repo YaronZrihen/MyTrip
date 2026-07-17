@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.5.0";
+const APP_VERSION = "10.6.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1187,21 +1187,24 @@ function PlaceIconWithPreview({ row, tm, Icon, warnings, T, lang, onOpenFull }) 
   );
 }
 
-function PopoverInfoIcon({ icon: IconComp, color, children }) {
+function PopoverInfoIcon({ icon: IconComp, color, trigger, children }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
   const btnRef = useRef(null);
+  function computePos() { if (btnRef.current) { const r = btnRef.current.getBoundingClientRect(); setPos({ top: r.bottom + 4, left: r.left }); } }
   function toggle(e) {
     e.stopPropagation();
-    if (!open && btnRef.current) { const r = btnRef.current.getBoundingClientRect(); setPos({ top: r.bottom + 4, left: r.left }); }
+    if (!open) computePos();
     setOpen((v) => !v);
   }
+  function handleEnter() { if (trigger === "hover") { computePos(); setOpen(true); } }
+  function handleLeave() { if (trigger === "hover") setOpen(false); }
   return (
-    <span style={{ display: "inline-flex", verticalAlign: "middle", marginInlineStart: 4 }}>
+    <span style={{ display: "inline-flex", verticalAlign: "middle", marginInlineStart: 4 }} onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
       <button ref={btnRef} type="button" className="mt-info-icon-btn" style={color ? { color } : undefined} onClick={toggle}><IconComp size={13} /></button>
       {open && (
         <>
-          <div className="mt-floating-backdrop" onClick={(e) => { e.stopPropagation(); setOpen(false); }} />
+          <div className="mt-floating-backdrop" onClick={(e) => { e.stopPropagation(); setOpen(false); }} style={trigger === "hover" ? { pointerEvents: "none" } : undefined} />
           <div className="mt-info-popup" style={{ top: pos.top, left: pos.left }} onClick={(e) => e.stopPropagation()}>{children}</div>
         </>
       )}
@@ -2575,10 +2578,11 @@ export default function MyTripApp() {
         .mt-field input:focus, .mt-field select:focus, .mt-field textarea:focus { outline:none; border-color:var(--teal); }
         .mt-field textarea { resize:vertical; min-height:60px; }
         .mt-section-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin-top:6px; }
-        .mt-loc-grid { display:grid; grid-template-columns:auto auto 1fr auto 1fr; align-items:center; gap:6px 8px; margin-top:4px; }
+        .mt-loc-grid { display:grid; grid-template-columns:auto auto 2fr auto 1fr; align-items:center; gap:6px 6px; margin-top:4px; }
         .mt-loc-col-header { font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; text-align:center; }
         .mt-loc-row-label { font-size:12px; font-weight:700; color:var(--ink); white-space:nowrap; }
-        .mt-loc-icons { display:flex; gap:2px; }
+        .mt-loc-icons { display:flex; gap:0; }
+        .mt-loc-icons .mt-btn-icon { padding:5px 5px; }
         .mt-loc-grid-input { width:100%; border:1px solid var(--border); border-radius:8px; padding:6px 8px; font-size:12.5px; font-family:inherit; background:#fff; color:var(--ink); }
         .mt-loc-grid-input:focus { outline:none; border-color:var(--teal); }
         .mt-loc-verified-slot { display:flex; justify-content:center; min-width:18px; }
@@ -3076,34 +3080,33 @@ export default function MyTripApp() {
               {cardHasTimeError && <div className="mt-error"><AlertTriangle /> {T.timeError}</div>}
               {showTzHint && <div className="mt-hint">{T.tzNote}</div>}
 
-              <div className="mt-section-label">{T.locationSectionLabel}</div>
               <div className="mt-loc-grid">
                 <span />
                 <span className="mt-loc-col-header" style={{ gridColumn: "2 / span 2" }}>{T.locationColHeader}</span>
-                <span className="mt-loc-col-header" style={{ gridColumn: "4 / span 2" }}>{T.aliasColHeader}</span>
+                <span />
 
                 <span className="mt-loc-row-label">{T.from}</span>
                 <span className="mt-loc-icons">
-                  <button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openLocationPicker("from")}><MapPin size={13} /></button>
                   <button className="mt-btn ghost mt-btn-icon" title={T.copyPrevDest} disabled={!prevRowForCard || !prevRowForCard.to} onClick={copyPrevDestinationToFrom}><Copy size={13} /></button>
+                  <button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openLocationPicker("from")}><MapPin size={13} /></button>
                 </span>
                 <input className="mt-loc-grid-input" dir="auto" value={cardDraft.from} placeholder={getTypeHint(cardDraft.typeId, "from", lang)} onChange={(e) => setCardDraft({ ...cardDraft, from: e.target.value })} />
                 <span className="mt-loc-verified-slot">{fromVerifiedCard && <PopoverInfoIcon icon={CircleCheck} color="#3E8E5A"><div>{T.verified}</div><a href={cardDraft.fromVerifiedUrl} target="_blank" rel="noreferrer">{T.openMap}</a></PopoverInfoIcon>}</span>
                 <span className="mt-loc-alias-cell">
                   <input dir="auto" value={cardDraft.fromAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "fromAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, fromAlias: e.target.value })} />
-                  <PopoverInfoIcon icon={Info}>{T.aliasHint}</PopoverInfoIcon>
+                  <PopoverInfoIcon icon={Info} trigger="hover">{T.aliasHint}</PopoverInfoIcon>
                 </span>
 
                 <span className="mt-loc-row-label">{T.to}</span>
                 <span className="mt-loc-icons">
-                  <button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openLocationPicker("to")}><MapPin size={13} /></button>
                   <button className="mt-btn ghost mt-btn-icon" title={T.copyFromOrigin} disabled={!cardDraft.from} onClick={() => setCardDraft({ ...cardDraft, to: cardDraft.from })}><Copy size={13} /></button>
+                  <button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openLocationPicker("to")}><MapPin size={13} /></button>
                 </span>
                 <input className="mt-loc-grid-input" dir="auto" value={cardDraft.to} placeholder={getTypeHint(cardDraft.typeId, "to", lang)} onChange={(e) => setCardDraft({ ...cardDraft, to: e.target.value })} />
                 <span className="mt-loc-verified-slot">{toVerifiedCard && <PopoverInfoIcon icon={CircleCheck} color="#3E8E5A"><div>{T.verified}</div><a href={cardDraft.toVerifiedUrl} target="_blank" rel="noreferrer">{T.openMap}</a></PopoverInfoIcon>}</span>
                 <span className="mt-loc-alias-cell">
                   <input dir="auto" value={cardDraft.toAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "toAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, toAlias: e.target.value })} />
-                  <PopoverInfoIcon icon={Info}>{T.aliasHint}</PopoverInfoIcon>
+                  <PopoverInfoIcon icon={Info} trigger="hover">{T.aliasHint}</PopoverInfoIcon>
                 </span>
               </div>
 
