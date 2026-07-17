@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.10.0";
+const APP_VERSION = "10.11.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -159,6 +159,8 @@ const T_DICT = {
     hotelInfo: "פרטי מלון", placeInfo: "פרטי מקום", hotelPhotoDemo: "תמונה — דורש חיבור ל-Google Places API (בתשלום). זו הצגה בלבד.",
     ratingDemo: "דירוג — הדגמה", viewOnMap: "הצג במפה", bookingLink: "קישור להזמנה",
     placeOpenNow: "פתוח", placeClosedNow: "סגור", placeWebsite: "אתר", placeCall: "התקשר",
+    googleUiKitError: "טעינת מידע Google נכשלה. ודא ש-Maps JavaScript API מופעל ומורשה במפתח.", notLinkedToGoogle: "הרשומה עדיין לא מאומתת מול Google — לחץ על סמל האימות בשדה המיקום.",
+    tripScheduleCheck: "בדיקת התאמה למועד הטיול",
     dragDayHint: "גרור להעברת היום למסגרת אחרת", dropDayToRoot: "שחרר כאן כדי להוציא את היום מהמסגרת", showOverallRoute: "הצג מסלול טיול כולל",
     tripSummary: "סיכום הטיול", summaryFlights: "טיסות", summaryHotels: "מלונות", summaryPois: "נק׳ עניין", summaryRestaurants: "מסעדות", summaryAvgRating: "דירוג ממוצע",
     saveTripByName: "שמור טיול בשם", loadSavedTrip: "טען טיול שמור", tripName: "שם הטיול",
@@ -233,6 +235,8 @@ const T_DICT = {
     hotelInfo: "Hotel details", placeInfo: "Place details", hotelPhotoDemo: "Photo — needs a Google Places API connection (paid). This is a preview only.",
     ratingDemo: "Rating — preview", viewOnMap: "View on map", bookingLink: "Booking link",
     placeOpenNow: "Open", placeClosedNow: "Closed", placeWebsite: "Website", placeCall: "Call",
+    googleUiKitError: "Failed to load Google info. Make sure the Maps JavaScript API is enabled and allowed on your key.", notLinkedToGoogle: "This record isn't verified against Google yet — click the verify icon on the location field.",
+    tripScheduleCheck: "Trip-schedule check",
     dragDayHint: "Drag to move this day to another frame", dropDayToRoot: "Drop here to take this day out of its frame", showOverallRoute: "Show overall trip route",
     tripSummary: "Trip summary", summaryFlights: "Flights", summaryHotels: "Hotels", summaryPois: "Points of interest", summaryRestaurants: "Restaurants", summaryAvgRating: "Average rating",
     saveTripByName: "Save trip by name", loadSavedTrip: "Load saved trip", tripName: "Trip name",
@@ -1142,8 +1146,6 @@ function DateRangeField({ startDate, endDate, onChange, lang, T }) {
 function PlaceIconWithPreview({ row, tm, Icon, warnings, T, lang, onOpenFull }) {
   const [showPreview, setShowPreview] = useState(false);
   const [previewPos, setPreviewPos] = useState({ top: 0, left: 0 });
-  const [previewData, setPreviewData] = useState(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
   const btnRef = useRef(null);
   const hoverTimer = useRef(null);
   const placeId = row.fromPlaceId || row.toPlaceId;
@@ -1153,43 +1155,84 @@ function PlaceIconWithPreview({ row, tm, Icon, warnings, T, lang, onOpenFull }) 
     hoverTimer.current = setTimeout(() => {
       if (btnRef.current) { const r = btnRef.current.getBoundingClientRect(); setPreviewPos({ top: r.bottom + 6, left: r.left }); }
       setShowPreview(true);
-      if (!previewData) {
-        setPreviewLoading(true);
-        googlePlaceDetails(placeId, lang).then((d) => { setPreviewLoading(false); setPreviewData(d); }).catch(() => setPreviewLoading(false));
-      }
     }, 300);
   }
   function handleLeave() {
     if (hoverTimer.current) clearTimeout(hoverTimer.current);
     setShowPreview(false);
   }
-  const photoUrl = previewData && previewData.photos && previewData.photos[0] ? googlePlacePhotoUrl(previewData.photos[0].name, 340) : null;
-  const price = previewData && priceLevelSymbol(previewData.priceLevel);
-  const openState = previewData && previewData.regularOpeningHours ? checkGoogleOpeningHours(previewData.regularOpeningHours.periods, row.date, row.startTime) : null;
-  const closingText = previewData ? closingTimeForDate(previewData.regularOpeningHours, row.date, lang) : null;
 
   return (
     <span style={{ position: "relative", display: "inline-block" }} onMouseEnter={handleEnter} onMouseLeave={handleLeave} onFocus={handleEnter} onBlur={handleLeave}>
       <button ref={btnRef} className="mt-type-icon mt-type-icon-btn" style={{ background: tm.color }} onClick={onOpenFull}><Icon /></button>
       {showPreview && (
-        <div className="mt-place-preview" style={{ top: previewPos.top, left: previewPos.left }}>
-          {previewLoading ? <span className="mt-hint" style={{ padding: "10px" }}>{T.locSearching}</span> : previewData ? (
-            <>
-              {photoUrl && <img src={photoUrl} alt="" className="mt-place-preview-photo" />}
-              <strong>{(previewData.displayName && previewData.displayName.text) || "—"}</strong>
-              {previewData.rating ? (
-                <span className="mt-place-preview-rating"><Star size={11} fill="currentColor" /> {previewData.rating} ({previewData.userRatingCount || 0})</span>
-              ) : <span className="mt-hint">{T.ratingDemo}</span>}
-              <span className="mt-place-preview-meta">
-                {price && <span>{price}</span>}
-                {openState != null && <span className={openState ? "mt-place-open" : "mt-place-closed"}>{openState ? T.placeOpenNow : T.placeClosedNow}</span>}
-                {closingText && <span className="mt-hint">{closingText}</span>}
-              </span>
-            </>
-          ) : <span className="mt-hint" style={{ padding: "10px" }}>{T.locNoResults}</span>}
+        <div className="mt-place-preview-wrap" style={{ top: previewPos.top, left: previewPos.left }}>
+          <GooglePlaceDetailsCompact placeId={placeId} T={T} />
         </div>
       )}
     </span>
+  );
+}
+
+let googleMapsLoadPromise = null;
+function loadGoogleMapsScript() {
+  if (!GOOGLE_PLACES_KEY) return Promise.reject(new Error("no-key"));
+  if (googleMapsLoadPromise) return googleMapsLoadPromise;
+  googleMapsLoadPromise = new Promise((resolve, reject) => {
+    if (window.customElements && window.customElements.get("gmp-place-details-compact")) { resolve(); return; }
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_PLACES_KEY}&libraries=places&v=beta&loading=async`;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => { googleMapsLoadPromise = null; reject(new Error("script-load-failed")); };
+    document.head.appendChild(script);
+  });
+  return googleMapsLoadPromise;
+}
+function useGoogleMapsReady() {
+  const [state, setState] = useState("loading");
+  useEffect(() => {
+    let cancelled = false;
+    loadGoogleMapsScript().then(() => { if (!cancelled) setState("ready"); }).catch(() => { if (!cancelled) setState("error"); });
+    return () => { cancelled = true; };
+  }, []);
+  return state;
+}
+function GooglePlaceContentConfig() {
+  return (
+    <gmp-place-content-config>
+      <gmp-place-media lightbox-preferred></gmp-place-media>
+      <gmp-place-rating></gmp-place-rating>
+      <gmp-place-type></gmp-place-type>
+      <gmp-place-price></gmp-place-price>
+      <gmp-place-accessible-entrance-icon></gmp-place-accessible-entrance-icon>
+      <gmp-place-open-now-status></gmp-place-open-now-status>
+      <gmp-place-attribution light-scheme-color="gray" dark-scheme-color="white"></gmp-place-attribution>
+    </gmp-place-content-config>
+  );
+}
+function GooglePlaceDetailsCompact({ placeId, T }) {
+  const state = useGoogleMapsReady();
+  if (!placeId) return null;
+  if (state === "error") return <div className="mt-hint" style={{ padding: 10 }}>{T.googleUiKitError}</div>;
+  if (state === "loading") return <div className="mt-hint" style={{ padding: 10 }}>{T.locSearching}</div>;
+  return (
+    <gmp-place-details-compact orientation="vertical" truncation-preferred style={{ width: "240px", border: "none", padding: 0, margin: 0 }}>
+      <gmp-place-details-place-request place={placeId}></gmp-place-details-place-request>
+      <GooglePlaceContentConfig />
+    </gmp-place-details-compact>
+  );
+}
+function GooglePlaceDetailsFull({ placeId, T }) {
+  const state = useGoogleMapsReady();
+  if (!placeId) return <div className="mt-hint">{T.notLinkedToGoogle}</div>;
+  if (state === "error") return <div className="mt-hint" style={{ padding: 10 }}>{T.googleUiKitError}</div>;
+  if (state === "loading") return <div className="mt-hint" style={{ padding: 10 }}>{T.locSearching}</div>;
+  return (
+    <gmp-place-details style={{ width: "100%", border: "none", padding: 0, margin: 0 }}>
+      <gmp-place-details-place-request place={placeId}></gmp-place-details-place-request>
+      <GooglePlaceContentConfig />
+    </gmp-place-details>
   );
 }
 
@@ -1218,76 +1261,29 @@ function PopoverInfoIcon({ icon: IconComp, color, trigger, children }) {
   );
 }
 
-function PlaceInfoModal({ row, onClose, types, lang, T }) {
-  const tm = typeMeta(row.typeId, types, T, lang);
-  const TI = ICONS[tm.icon] || Tag;
+function PlaceInfoModal({ row, onClose, T }) {
   const placeId = row.fromPlaceId || row.toPlaceId;
-  const [googleData, setGoogleData] = useState(null);
-  const [loading, setLoading] = useState(false);
-  useEffect(() => {
-    if (!placeId || !hasGooglePlaces()) return;
-    setLoading(true);
-    googlePlaceDetails(placeId, lang).then((d) => { setLoading(false); setGoogleData(d); }).catch(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [placeId, lang]);
-  const photoUrl = googleData && googleData.photos && googleData.photos[0] ? googlePlacePhotoUrl(googleData.photos[0].name, 480) : null;
-  const title = (googleData && googleData.displayName && googleData.displayName.text) || row.fromAlias || row.from || row.toAlias || row.to || "—";
-  const address = (googleData && googleData.formattedAddress) || row.from || row.to;
+  const warnings = getRowWarning(row, T);
   return (
     <div className="mt-modal-backdrop" onClick={onClose}>
-      <div className="mt-modal" style={{ maxWidth: 340 }} onClick={(e) => e.stopPropagation()}>
+      <div className="mt-modal" style={{ maxWidth: 360 }} onClick={(e) => e.stopPropagation()}>
         <div className="mt-modal-header"><span className="mt-modal-title">{T.placeInfo}</span><button className="mt-btn ghost" onClick={onClose}><X size={16} /></button></div>
-        <div className="mt-modal-body">
-          {photoUrl ? (
-            <img src={photoUrl} alt="" className="mt-hotel-photo-real" />
-          ) : (
-            <div className="mt-hotel-photo-demo" style={{ background: `linear-gradient(135deg, ${tm.color}22, var(--bg))`, color: tm.color }}>
-              <TI size={30} />
-              <span>{loading ? T.locSearching : T.hotelPhotoDemo}</span>
+        <div className="mt-modal-body" style={{ padding: placeId ? 0 : undefined }}>
+          <GooglePlaceDetailsFull placeId={placeId} T={T} />
+          {(warnings.length > 0 || row.link || row.fromVerifiedUrl || row.toVerifiedUrl) && (
+            <div className="mt-trip-check-section">
+              {(row.fromVerifiedUrl || row.toVerifiedUrl) && (
+                <a className="mt-btn ghost" style={{ width: "100%", justifyContent: "center" }} target="_blank" rel="noreferrer" href={row.fromVerifiedUrl || row.toVerifiedUrl}><MapPin size={13} /> {T.viewOnMap}</a>
+              )}
+              {row.link && (
+                <a className="mt-btn ghost" style={{ width: "100%", justifyContent: "center" }} target="_blank" rel="noreferrer" href={row.link}><Link2 size={13} /> {T.bookingLink}</a>
+              )}
+              {warnings.length > 0 && <div className="mt-section-label">{T.tripScheduleCheck}</div>}
+              {warnings.map((w, i) => (
+                <div key={i} className="mt-error" style={w.type === "fee" ? { background: "#FBEEDD", color: "#B5651D" } : undefined}><AlertTriangle size={13} /> {w.text}</div>
+              ))}
             </div>
           )}
-          <div className="mt-type-chip"><span className="mt-type-icon" style={{ background: tm.color, width: 20, height: 20 }}><TI size={11} /></span><strong style={{ fontSize: 12.5 }}>{tm.name}</strong></div>
-          <div style={{ fontWeight: 700, fontSize: 15 }}>{title}</div>
-          {address && <div className="mt-hint">{address}</div>}
-          {googleData && googleData.rating ? (
-            <div className="mt-hotel-rating-demo">
-              {Array.from({ length: 5 }).map((_, i) => <Star key={i} size={14} fill={i < Math.round(googleData.rating) ? "currentColor" : "none"} />)}
-              <span className="mt-hint">{googleData.rating} ({googleData.userRatingCount || 0})</span>
-            </div>
-          ) : (
-            <div className="mt-hotel-rating-demo">
-              {[1, 2, 3, 4, 5].map((i) => <Star key={i} size={14} />)}
-              <span className="mt-hint">{T.ratingDemo}</span>
-            </div>
-          )}
-          {googleData && (priceLevelSymbol(googleData.priceLevel) || googleData.regularOpeningHours) && (
-            <div className="mt-place-preview-meta" style={{ padding: 0 }}>
-              {priceLevelSymbol(googleData.priceLevel) && <span>{priceLevelSymbol(googleData.priceLevel)}</span>}
-              {googleData.regularOpeningHours && (() => {
-                const openState = checkGoogleOpeningHours(googleData.regularOpeningHours.periods, row.date, row.startTime);
-                return openState != null ? (
-                  <span className={openState ? "mt-place-open" : "mt-place-closed"}>{openState ? T.placeOpenNow : T.placeClosedNow}</span>
-                ) : null;
-              })()}
-              {closingTimeForDate(googleData.regularOpeningHours, row.date, lang) && <span className="mt-hint">{closingTimeForDate(googleData.regularOpeningHours, row.date, lang)}</span>}
-            </div>
-          )}
-          {(row.fromVerifiedUrl || row.toVerifiedUrl) && (
-            <a className="mt-btn ghost" style={{ width: "100%", justifyContent: "center" }} target="_blank" rel="noreferrer" href={row.fromVerifiedUrl || row.toVerifiedUrl}><MapPin size={13} /> {T.viewOnMap}</a>
-          )}
-          {googleData && googleData.websiteUri && (
-            <a className="mt-btn ghost" style={{ width: "100%", justifyContent: "center" }} target="_blank" rel="noreferrer" href={googleData.websiteUri}><ExternalLink size={13} /> {T.placeWebsite}</a>
-          )}
-          {googleData && googleData.internationalPhoneNumber && (
-            <a className="mt-btn ghost" style={{ width: "100%", justifyContent: "center" }} href={`tel:${googleData.internationalPhoneNumber}`}><Phone size={13} /> {googleData.internationalPhoneNumber}</a>
-          )}
-          {row.link && (
-            <a className="mt-btn ghost" style={{ width: "100%", justifyContent: "center" }} target="_blank" rel="noreferrer" href={row.link}><Link2 size={13} /> {T.bookingLink}</a>
-          )}
-          {getRowWarning(row, T).map((w, i) => (
-            <div key={i} className="mt-error" style={w.type === "fee" ? { background: "#FBEEDD", color: "#B5651D" } : undefined}><AlertTriangle size={13} /> {w.text}</div>
-          ))}
-          {!placeId && <div className="mt-hint">{T.hotelInfoDemoNote}</div>}
         </div>
       </div>
     </div>
@@ -2531,15 +2527,7 @@ export default function MyTripApp() {
         .mt-type-icon-btn:hover { filter:brightness(1.1); box-shadow:0 0 0 2px var(--teal-tint); }
         .mt-hotel-photo-demo { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; height:110px; border-radius:10px; background:linear-gradient(135deg,var(--teal-tint),var(--bg)); color:var(--teal); border:1.5px dashed var(--border); font-size:11px; text-align:center; padding:8px; }
         .mt-hotel-photo-real { width:100%; height:150px; object-fit:cover; border-radius:10px; }
-        .mt-place-preview { position:fixed; z-index:250; background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 8px 24px rgba(20,40,35,.18); padding:0 0 9px; font-size:12px; width:220px; display:flex; flex-direction:column; gap:3px; pointer-events:none; overflow:hidden; }
-        .mt-place-preview strong, .mt-place-preview-rating, .mt-place-preview-meta, .mt-place-preview > .mt-hint { padding-inline:10px; }
-        .mt-place-preview-photo { width:100%; height:90px; object-fit:cover; }
-        .mt-place-preview strong { margin-top:8px; }
-        .mt-place-preview-meta { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
-        .mt-place-open { color:#3E8E5A; font-weight:600; }
-        .mt-place-closed { color:var(--danger); font-weight:600; }
-        .mt-place-preview strong { font-size:12.5px; color:var(--ink); }
-        .mt-place-preview-rating { display:flex; align-items:center; gap:3px; color:#D9A23D; font-size:11.5px; }
+        .mt-place-preview-wrap { position:fixed; z-index:250; box-shadow:0 8px 24px rgba(20,40,35,.18); border-radius:10px; overflow:hidden; pointer-events:none; }
         .mt-hotel-rating-demo { display:flex; align-items:center; gap:2px; color:#D9A23D; }
         .mt-hotel-rating-demo .mt-hint { margin-inline-start:6px; color:var(--muted); }
         .mt-type-icon svg { width:12px; height:12px; color:#fff; }
@@ -2616,6 +2604,7 @@ export default function MyTripApp() {
         .mt-field input:focus, .mt-field select:focus, .mt-field textarea:focus { outline:none; border-color:var(--teal); }
         .mt-field textarea { resize:vertical; min-height:60px; }
         .mt-section-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin-top:6px; }
+        .mt-trip-check-section { padding:12px; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:6px; }
         .mt-loc-grid { display:grid; grid-template-columns:auto auto 2fr auto 1fr; align-items:center; gap:6px 6px; margin-top:4px; }
         .mt-loc-col-header { font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; text-align:start; }
         .mt-loc-row-label { font-size:12px; font-weight:700; color:var(--ink); white-space:nowrap; }
@@ -2833,7 +2822,7 @@ export default function MyTripApp() {
         </div>
       )}
 
-      {hotelInfoRow && <PlaceInfoModal row={hotelInfoRow} onClose={() => setHotelInfoRow(null)} types={types} lang={lang} T={T} />}
+      {hotelInfoRow && <PlaceInfoModal row={hotelInfoRow} onClose={() => setHotelInfoRow(null)} T={T} />}
 
       {saveTripOpen && (
         <div className="mt-modal-backdrop" onClick={() => setSaveTripOpen(false)}>
