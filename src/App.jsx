@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.6.0";
+const APP_VERSION = "10.8.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -165,7 +165,7 @@ const T_DICT = {
     saveTripNote: "כרגע נשמר בדפדפן הזה בלבד (לצורך בדיקות) — בעתיד יישמר לפי משתמש מחובר, נגיש מכל מכשיר.",
     saveTripSuccess: "נשמר בהצלחה", saveTripError: "השמירה נכשלה — ייתכן שאין מספיק מקום אחסון בדפדפן.",
     noSavedTrips: "אין עדיין טיולים שמורים.", load: "טען", confirmDeleteTrip: "למחוק את הטיול השמור הזה?",
-    locationSectionLabel: "מיקום וכינוי", copyFromOrigin: "העתק מהמוצא", locationColHeader: "מיקום", aliasColHeader: "כינוי + סמל מידע", notesHint: "ההערה תוצג גם בעמודה בטבלה הראשית.",
+    locationSectionLabel: "מיקום וכינוי", copyFromOrigin: "העתק מהמוצא", locationColHeader: "מיקום", aliasColHeader: "כינוי", notesHint: "ההערה תוצג גם בעמודה בטבלה הראשית.",
     personalExperience: "חוויה אישית", personalExperienceHint: "רשמים, טיפים, זיכרונות... (לא מוצג בטבלה)",
     personalRating: "דירוג אישי לרשומה", uploadPhotos: "העלה תמונות",
     hotelInfoDemoNote: "כתובת ומפה — אמיתי (מהמיקום המאומת של הרשומה). תמונה ודירוג בפועל ידרשו חיבור ל-Google Places.",
@@ -239,7 +239,7 @@ const T_DICT = {
     saveTripNote: "Currently saved in this browser only (for testing) — in the future it will save per logged-in user, accessible from any device.",
     saveTripSuccess: "Saved successfully", saveTripError: "Save failed — the browser may be out of storage space.",
     noSavedTrips: "No saved trips yet.", load: "Load", confirmDeleteTrip: "Delete this saved trip?",
-    locationSectionLabel: "Location & nickname", copyFromOrigin: "Copy from origin", locationColHeader: "Location", aliasColHeader: "Nickname + info", notesHint: "The note is also shown in the main table column.",
+    locationSectionLabel: "Location & nickname", copyFromOrigin: "Copy from origin", locationColHeader: "Location", aliasColHeader: "Nickname", notesHint: "The note is also shown in the main table column.",
     personalExperience: "Personal experience", personalExperienceHint: "Impressions, tips, memories... (not shown in the table)",
     personalRating: "Personal rating for this record", uploadPhotos: "Upload photos",
     hotelInfoDemoNote: "Address and map link — real (from the record's verified location). An actual photo and rating would need a Google Places connection.",
@@ -339,7 +339,7 @@ function checkOpeningHours(openingHours, dateStr, timeStr) {
 function getRowWarning(row, T) {
   const issues = [];
   const openState = row.toOpeningPeriods ? checkGoogleOpeningHours(row.toOpeningPeriods, row.date, row.startTime) : checkOpeningHours(row.toOpeningHours, row.date, row.startTime);
-  if (openState === false) issues.push(T.warnClosed);
+  if (openState === false) issues.push(`${T.warnClosed} (${row.date} ${row.startTime || "—"})`);
   if (row.toFee && String(row.toFee).toLowerCase() === "yes") issues.push(T.warnFeeRequired);
   return issues;
 }
@@ -2139,9 +2139,37 @@ export default function MyTripApp() {
   function closeAddDayModal() { setAddDayCtx(null); }
   const addDayFrame = addDayCtx && addDayCtx.fid ? frames.find((f) => f.id === addDayCtx.fid) : null;
   const addDayIssue = addDayCtx && addDayFrame && (addDayCtx.date < addDayFrame.startDate || addDayCtx.date > addDayFrame.endDate) ? T.rowOutOfFrame : null;
+  function findLastHotelInfo(beforeDate) {
+    const hotelRows = rows.filter((r) => r.typeId === "hotel" && r.date && r.date < beforeDate)
+      .sort((a, b) => (a.date + (a.startTime || "")).localeCompare(b.date + (b.startTime || "")));
+    if (!hotelRows.length) return null;
+    const last = hotelRows[hotelRows.length - 1];
+    return {
+      name: last.to || last.from || "", alias: last.toAlias || last.fromAlias || "",
+      lat: last.toLat != null ? last.toLat : last.fromLat, lon: last.toLon != null ? last.toLon : last.fromLon,
+      verifiedUrl: last.toVerifiedUrl || last.fromVerifiedUrl || "", verifiedText: last.toVerifiedText || last.fromVerifiedText || "",
+      placeId: last.toPlaceId || last.fromPlaceId || null,
+    };
+  }
   function confirmAddDay() {
     if (!addDayCtx || !addDayCtx.date || addDayIssue) return;
-    addRow(addDayCtx.date, null, addDayCtx.fid);
+    const prevHotel = findLastHotelInfo(addDayCtx.date);
+    const id1 = addRow(addDayCtx.date, null, addDayCtx.fid);
+    updateRow(id1, {
+      typeId: "hotel", startTime: "08:00",
+      from: prevHotel ? prevHotel.name : "", fromAlias: prevHotel ? prevHotel.alias : "",
+      fromLat: prevHotel ? prevHotel.lat : null, fromLon: prevHotel ? prevHotel.lon : null,
+      fromVerifiedUrl: prevHotel ? prevHotel.verifiedUrl : "", fromVerifiedText: prevHotel ? prevHotel.verifiedText : "",
+      fromPlaceId: prevHotel ? prevHotel.placeId : null,
+    });
+    const id2 = addRow(addDayCtx.date, null, addDayCtx.fid);
+    updateRow(id2, {
+      typeId: "hotel", startTime: "22:00",
+      to: prevHotel ? prevHotel.name : "", toAlias: prevHotel ? prevHotel.alias : "",
+      toLat: prevHotel ? prevHotel.lat : null, toLon: prevHotel ? prevHotel.lon : null,
+      toVerifiedUrl: prevHotel ? prevHotel.verifiedUrl : "", toVerifiedText: prevHotel ? prevHotel.verifiedText : "",
+      toPlaceId: prevHotel ? prevHotel.placeId : null,
+    });
     closeAddDayModal();
   }
 
@@ -2579,7 +2607,7 @@ export default function MyTripApp() {
         .mt-field textarea { resize:vertical; min-height:60px; }
         .mt-section-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin-top:6px; }
         .mt-loc-grid { display:grid; grid-template-columns:auto auto 2fr auto 1fr; align-items:center; gap:6px 6px; margin-top:4px; }
-        .mt-loc-col-header { font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; text-align:center; }
+        .mt-loc-col-header { font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; text-align:start; }
         .mt-loc-row-label { font-size:12px; font-weight:700; color:var(--ink); white-space:nowrap; }
         .mt-loc-icons { display:flex; gap:0; }
         .mt-loc-icons .mt-btn-icon { padding:5px 5px; }
@@ -3083,7 +3111,7 @@ export default function MyTripApp() {
               <div className="mt-loc-grid">
                 <span />
                 <span className="mt-loc-col-header" style={{ gridColumn: "2 / span 2" }}>{T.locationColHeader}</span>
-                <span />
+                <span className="mt-loc-col-header" style={{ gridColumn: "4 / span 2" }}>{T.aliasColHeader}</span>
 
                 <span className="mt-loc-row-label">{T.from}</span>
                 <span className="mt-loc-icons">
