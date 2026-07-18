@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.13.0";
+const APP_VERSION = "10.14.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -2426,8 +2426,8 @@ export default function MyTripApp() {
         .mytrip-app input[type=date], .mytrip-app input[type=time] { appearance:auto; -webkit-appearance:auto; color-scheme:light; }
         .mytrip-app input[type=date]::-webkit-calendar-picker-indicator, .mytrip-app input[type=time]::-webkit-calendar-picker-indicator { opacity:1; cursor:pointer; }
         .mt-sticky-top { position:sticky; top:0; z-index:30; background:var(--surface); border-bottom:1px solid var(--border); }
-        .mt-header-row1 { display:flex; align-items:center; justify-content:flex-start; gap:8px; padding:8px 14px 4px; }
-        .mt-header-right { display:flex; flex-direction:column; align-items:flex-end; gap:2px; }
+        .mt-header-row1 { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 14px 4px; }
+        .mt-header-brand-group { display:flex; align-items:center; gap:6px; }
         .mt-brand-mark { width:30px; height:30px; border-radius:8px; background:var(--teal); display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; }
         .mt-brand-mark::after { content:''; position:absolute; width:44px; height:44px; border:2px solid rgba(255,255,255,.35); border-radius:50%; top:-14px; inset-inline-start:-8px; }
         .mt-brand-mark svg { color:#fff; width:16px; height:16px; z-index:1; }
@@ -2729,11 +2729,11 @@ export default function MyTripApp() {
 
       <div className="mt-sticky-top">
       <div className="mt-header-row1">
-        <div className="mt-header-right">
+        <span className="mt-brand-version">v{APP_VERSION}</span>
+        <div className="mt-header-brand-group">
+          <span className="mt-brand-name">{T.appName}</span>
           <div className="mt-brand-mark"><Plane /></div>
-          <span className="mt-brand-version">v{APP_VERSION}</span>
         </div>
-        <span className="mt-brand-name">{T.appName}</span>
       </div>
       <div className="mt-header-actions">
         <button className="mt-icon-btn" onClick={() => setLang(lang === "he" ? "en" : "he")}><Globe /> {T.lang}</button>
