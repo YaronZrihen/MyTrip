@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.15.0";
+const APP_VERSION = "10.16.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -161,6 +161,24 @@ const T_DICT = {
     placeOpenNow: "פתוח", placeClosedNow: "סגור", placeWebsite: "אתר", placeCall: "התקשר",
     googleUiKitError: "טעינת מידע Google נכשלה. ודא ש-Maps JavaScript API מופעל ומורשה במפתח.", notLinkedToGoogle: "הרשומה עדיין לא מאומתת מול Google — לחץ על סמל האימות בשדה המיקום.",
     tripScheduleCheck: "בדיקת התאמה למועד הטיול",
+    newFrameWizard: "מסגרת חדשה עם שאלון",
+    wizardTitle: "שאלון תכנון טיול", wizardStepOf: "שלב {n} מתוך {total}",
+    wizardTripName: "שם הטיול", wizardTripNameHint: "לדוגמה: הטיול המשפחתי לאיטליה",
+    wizardDestination: "יעד", wizardDestinationHint: "לדוגמה: רומא, איטליה",
+    wizardOutboundHint: "פרטי טיסת ההלוך — קובעים את תאריך תחילת הטיול.",
+    wizardReturnHint: "פרטי טיסת החזור — קובעים את תאריך סיום הטיול.",
+    wizardFlightDate: "תאריך", wizardFlightTime: "שעת המראה", wizardDateRequired: "יש להזין תאריך תקין (תאריך החזור לא יכול להיות לפני תאריך ההלוך).",
+    wizardTravelers: "מספר מטיילים",
+    wizardTravelers_solo: "יחיד/ה", wizardTravelers_couple: "זוג", wizardTravelers_family: "משפחה", wizardTravelers_group: "קבוצה",
+    wizardBudget: "רמת תקציב", wizardBudget_low: "חסכוני", wizardBudget_mid: "בינוני", wizardBudget_high: "יוקרתי",
+    wizardInterests: "תחומי עניין (ניתן לבחור כמה)",
+    wizardInterest_history: "היסטוריה", wizardInterest_food: "אוכל", wizardInterest_nature: "טבע", wizardInterest_nightlife: "חיי לילה",
+    wizardInterest_shopping: "שופינג", wizardInterest_art: "אמנות", wizardInterest_adventure: "הרפתקאות",
+    wizardPace: "קצב הטיול", wizardPace_relaxed: "רגוע", wizardPace_balanced: "מאוזן", wizardPace_packed: "עמוס",
+    wizardNotes: "הערות נוספות", wizardNotesHint: "מגבלות, בקשות מיוחדות, כל דבר שחשוב שנדע...",
+    wizardWillCreate: "מה ייווצר", wizardWillCreateDesc: "מסגרת טיול עם תאריכי הטיסות שהזנת, שתי רשומות טיסה (הלוך וחזור), ושלד מלון מוכן למילוי לכל יום ביניים.",
+    wizardAiNote: "תחומי העניין, התקציב והקצב שבחרת נשמרים במסגרת — הצעות פעילויות בפועל שמבוססות עליהם ידרשו חיבור לשרת AI בעתיד.",
+    wizardBack: "הקודם", wizardNext: "הבא", wizardCreate: "צור טיול",
     dragDayHint: "גרור להעברת היום למסגרת אחרת", dropDayToRoot: "שחרר כאן כדי להוציא את היום מהמסגרת", showOverallRoute: "הצג מסלול טיול כולל",
     tripSummary: "סיכום הטיול", summaryFlights: "טיסות", summaryHotels: "מלונות", summaryPois: "נק׳ עניין", summaryRestaurants: "מסעדות", summaryAvgRating: "דירוג ממוצע",
     saveTripByName: "שמור טיול בשם", loadSavedTrip: "טען טיול שמור", tripName: "שם הטיול",
@@ -237,6 +255,24 @@ const T_DICT = {
     placeOpenNow: "Open", placeClosedNow: "Closed", placeWebsite: "Website", placeCall: "Call",
     googleUiKitError: "Failed to load Google info. Make sure the Maps JavaScript API is enabled and allowed on your key.", notLinkedToGoogle: "This record isn't verified against Google yet — click the verify icon on the location field.",
     tripScheduleCheck: "Trip-schedule check",
+    newFrameWizard: "New frame via questionnaire",
+    wizardTitle: "Trip planning questionnaire", wizardStepOf: "Step {n} of {total}",
+    wizardTripName: "Trip name", wizardTripNameHint: "e.g. Our family trip to Italy",
+    wizardDestination: "Destination", wizardDestinationHint: "e.g. Rome, Italy",
+    wizardOutboundHint: "Outbound flight details — sets the trip's start date.",
+    wizardReturnHint: "Return flight details — sets the trip's end date.",
+    wizardFlightDate: "Date", wizardFlightTime: "Departure time", wizardDateRequired: "Please enter a valid date (return date can't be before the outbound date).",
+    wizardTravelers: "Number of travelers",
+    wizardTravelers_solo: "Solo", wizardTravelers_couple: "Couple", wizardTravelers_family: "Family", wizardTravelers_group: "Group",
+    wizardBudget: "Budget level", wizardBudget_low: "Budget-friendly", wizardBudget_mid: "Moderate", wizardBudget_high: "Luxury",
+    wizardInterests: "Interests (pick any)",
+    wizardInterest_history: "History", wizardInterest_food: "Food", wizardInterest_nature: "Nature", wizardInterest_nightlife: "Nightlife",
+    wizardInterest_shopping: "Shopping", wizardInterest_art: "Art", wizardInterest_adventure: "Adventure",
+    wizardPace: "Trip pace", wizardPace_relaxed: "Relaxed", wizardPace_balanced: "Balanced", wizardPace_packed: "Packed",
+    wizardNotes: "Anything else?", wizardNotesHint: "Constraints, special requests, anything worth knowing...",
+    wizardWillCreate: "What will be created", wizardWillCreateDesc: "A trip frame spanning your flight dates, two flight records (outbound and return), and a fill-in-ready hotel skeleton for each day in between.",
+    wizardAiNote: "Your interests, budget, and pace are saved on the frame — actual activity suggestions based on them will need a future AI server connection.",
+    wizardBack: "Back", wizardNext: "Next", wizardCreate: "Create trip",
     dragDayHint: "Drag to move this day to another frame", dropDayToRoot: "Drop here to take this day out of its frame", showOverallRoute: "Show overall trip route",
     tripSummary: "Trip summary", summaryFlights: "Flights", summaryHotels: "Hotels", summaryPois: "Points of interest", summaryRestaurants: "Restaurants", summaryAvgRating: "Average rating",
     saveTripByName: "Save trip by name", loadSavedTrip: "Load saved trip", tripName: "Trip name",
@@ -1717,6 +1753,11 @@ export default function MyTripApp() {
   const [saveTripName, setSaveTripName] = useState("");
   const [loadTripOpen, setLoadTripOpen] = useState(false);
   const [saveTripMsg, setSaveTripMsg] = useState(null);
+  const AI_WIZARD_DEFAULTS = { tripName: "", destination: "", outboundDate: "", outboundTime: "", returnDate: "", returnTime: "", travelerType: "", budget: "", interests: [], pace: "", notes: "" };
+  const [aiWizardOpen, setAiWizardOpen] = useState(false);
+  const [aiWizardStep, setAiWizardStep] = useState(0);
+  const [aiWizardAnswers, setAiWizardAnswers] = useState(AI_WIZARD_DEFAULTS);
+  const [aiWizardError, setAiWizardError] = useState(false);
   const [frameMenuOpenId, setFrameMenuOpenId] = useState(null);
   const [frameMenuPos, setFrameMenuPos] = useState({ top: 0, left: 0 });
   const [frameDraft, setFrameDraft] = useState(null);
@@ -1869,6 +1910,56 @@ export default function MyTripApp() {
     const all = listSavedTrips();
     delete all[name];
     try { localStorage.setItem(SAVED_TRIPS_KEY, JSON.stringify(all)); } catch (e) {}
+  }
+  const AI_WIZARD_STEPS = 6;
+  function openAiWizard() {
+    setAiWizardAnswers(AI_WIZARD_DEFAULTS);
+    setAiWizardStep(0);
+    setAiWizardError(false);
+    setAiWizardOpen(true);
+    setActionsMenuOpen(false);
+  }
+  function toggleWizardInterest(key) {
+    setAiWizardAnswers((a) => ({ ...a, interests: a.interests.includes(key) ? a.interests.filter((k) => k !== key) : [...a.interests, key] }));
+  }
+  function aiWizardNext() {
+    if (aiWizardStep === 1 && !aiWizardAnswers.outboundDate) { setAiWizardError(true); return; }
+    if (aiWizardStep === 2 && !aiWizardAnswers.returnDate) { setAiWizardError(true); return; }
+    if (aiWizardStep === 2 && aiWizardAnswers.returnDate < aiWizardAnswers.outboundDate) { setAiWizardError(true); return; }
+    setAiWizardError(false);
+    setAiWizardStep((s) => Math.min(s + 1, AI_WIZARD_STEPS - 1));
+  }
+  function aiWizardBack() { setAiWizardError(false); setAiWizardStep((s) => Math.max(s - 1, 0)); }
+  function confirmAiWizard() {
+    const a = aiWizardAnswers;
+    if (!a.outboundDate || !a.returnDate || a.returnDate < a.outboundDate) { setAiWizardError(true); return; }
+    const nf = {
+      id: uid(), name: a.tripName || (lang === "he" ? "טיול חדש" : "New trip"),
+      startDate: a.outboundDate, endDate: a.returnDate, parentFrameId: null, collapsed: false,
+      travelerType: a.travelerType, budgetLevel: a.budget, interests: a.interests, pace: a.pace, planningNotes: a.notes,
+    };
+    setFrames((prev) => [...prev, nf]);
+
+    const id1 = addRow(a.outboundDate, null, nf.id);
+    updateRow(id1, { typeId: "flight", startTime: a.outboundTime || "", to: a.destination || "" });
+    const id2 = addRow(a.returnDate, null, nf.id);
+    updateRow(id2, { typeId: "flight", startTime: a.returnTime || "", from: a.destination || "" });
+
+    let d = new Date(a.outboundDate + "T00:00:00");
+    const endD = new Date(a.returnDate + "T00:00:00");
+    d.setDate(d.getDate() + 1);
+    while (d < endD) {
+      const dateStr = d.toISOString().slice(0, 10);
+      const h1 = addRow(dateStr, null, nf.id);
+      updateRow(h1, { typeId: "hotel", startTime: "08:00", to: a.destination || "" });
+      const h2 = addRow(dateStr, null, nf.id);
+      updateRow(h2, { typeId: "hotel", startTime: "22:00", to: a.destination || "" });
+      d.setDate(d.getDate() + 1);
+    }
+
+    setAiWizardOpen(false);
+    setAiWizardStep(0);
+    setAiWizardAnswers(AI_WIZARD_DEFAULTS);
   }
   function handleAiSuggest() { setAiMessages((p) => [...p, { role: "assistant", text: T.aiSuggestDemoText }]); }
   function handleAiSend() {
@@ -2610,6 +2701,12 @@ export default function MyTripApp() {
         .mt-field textarea { resize:vertical; min-height:60px; }
         .mt-section-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin-top:6px; }
         .mt-trip-check-section { padding:12px; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:6px; }
+        .mt-wizard-progress { height:4px; background:var(--border); margin:0 18px; border-radius:2px; overflow:hidden; }
+        .mt-wizard-progress-bar { height:100%; background:var(--teal); transition:width .25s ease; }
+        .mt-wizard-choices { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
+        .mt-wizard-choice { border:1.5px solid var(--border); background:var(--surface); color:var(--ink); border-radius:20px; padding:6px 14px; font-size:12.5px; font-weight:500; cursor:pointer; }
+        .mt-wizard-choice.selected { background:var(--teal); border-color:var(--teal); color:#fff; }
+        .mt-wizard-summary { margin-top:10px; padding:10px; background:var(--teal-tint); border-radius:8px; }
         .mt-loc-grid { display:grid; grid-template-columns:auto auto 2fr auto 1fr; align-items:center; gap:6px 6px; margin-top:4px; }
         .mt-loc-col-header { font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; text-align:start; }
         .mt-loc-row-label { font-size:12px; font-weight:700; color:var(--ink); white-space:nowrap; }
@@ -2787,6 +2884,7 @@ export default function MyTripApp() {
           <div className="mt-floating-backdrop" onClick={() => setActionsMenuOpen(false)} />
           <div className="mt-floating-menu mt-kebab-menu" style={{ top: actionsMenuPos.top, right: actionsMenuPos.right, minWidth: 220, maxWidth: "min(240px, 92vw)" }}>
             <button className="mt-share-opt" onClick={() => { openFrameModal(null, null); setActionsMenuOpen(false); }}><FolderPlus size={14} /> {T.newFrame}</button>
+            <button className="mt-share-opt" onClick={openAiWizard}><Wand2 size={14} /> {T.newFrameWizard}</button>
             <button className="mt-share-opt" onClick={openSaveTripModal}><Save size={14} /> {T.saveTripByName}</button>
             <button className="mt-share-opt" onClick={openLoadTripModal}><FolderOpen size={14} /> {T.loadSavedTrip}</button>
             <div className="divider" />
@@ -2873,6 +2971,106 @@ export default function MyTripApp() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {aiWizardOpen && (
+        <div className="mt-modal-backdrop" onClick={() => setAiWizardOpen(false)}>
+          <div className="mt-modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+            <div className="mt-modal-header"><span className="mt-modal-title">{T.wizardTitle}</span><button className="mt-btn ghost" onClick={() => setAiWizardOpen(false)}><X size={16} /></button></div>
+            <div className="mt-wizard-progress"><div className="mt-wizard-progress-bar" style={{ width: `${((aiWizardStep + 1) / AI_WIZARD_STEPS) * 100}%` }} /></div>
+            <div className="mt-hint" style={{ padding: "6px 18px 0" }}>{T.wizardStepOf.replace("{n}", aiWizardStep + 1).replace("{total}", AI_WIZARD_STEPS)}</div>
+            <div className="mt-modal-body">
+              {aiWizardStep === 0 && (
+                <>
+                  <div className="mt-field"><label>{T.wizardTripName}</label><input value={aiWizardAnswers.tripName} onChange={(e) => setAiWizardAnswers({ ...aiWizardAnswers, tripName: e.target.value })} placeholder={T.wizardTripNameHint} /></div>
+                  <div className="mt-field"><label>{T.wizardDestination}</label><input value={aiWizardAnswers.destination} onChange={(e) => setAiWizardAnswers({ ...aiWizardAnswers, destination: e.target.value })} placeholder={T.wizardDestinationHint} /></div>
+                </>
+              )}
+              {aiWizardStep === 1 && (
+                <>
+                  <div className="mt-hint">{T.wizardOutboundHint}</div>
+                  <div className="mt-field-row">
+                    <div className="mt-field"><label>{T.wizardFlightDate}</label><DateField value={aiWizardAnswers.outboundDate} onChange={(e) => setAiWizardAnswers({ ...aiWizardAnswers, outboundDate: e.target.value })} /></div>
+                    <div className="mt-field"><label>{T.wizardFlightTime}</label><input type="time" value={aiWizardAnswers.outboundTime} onChange={(e) => setAiWizardAnswers({ ...aiWizardAnswers, outboundTime: e.target.value })} /></div>
+                  </div>
+                  {aiWizardError && <div className="mt-error"><AlertTriangle size={13} /> {T.wizardDateRequired}</div>}
+                </>
+              )}
+              {aiWizardStep === 2 && (
+                <>
+                  <div className="mt-hint">{T.wizardReturnHint}</div>
+                  <div className="mt-field-row">
+                    <div className="mt-field"><label>{T.wizardFlightDate}</label><DateField value={aiWizardAnswers.returnDate} onChange={(e) => setAiWizardAnswers({ ...aiWizardAnswers, returnDate: e.target.value })} /></div>
+                    <div className="mt-field"><label>{T.wizardFlightTime}</label><input type="time" value={aiWizardAnswers.returnTime} onChange={(e) => setAiWizardAnswers({ ...aiWizardAnswers, returnTime: e.target.value })} /></div>
+                  </div>
+                  {aiWizardError && <div className="mt-error"><AlertTriangle size={13} /> {T.wizardDateRequired}</div>}
+                </>
+              )}
+              {aiWizardStep === 3 && (
+                <>
+                  <div className="mt-field">
+                    <label>{T.wizardTravelers}</label>
+                    <div className="mt-wizard-choices">
+                      {["solo", "couple", "family", "group"].map((k) => (
+                        <button key={k} className={"mt-wizard-choice" + (aiWizardAnswers.travelerType === k ? " selected" : "")} onClick={() => setAiWizardAnswers({ ...aiWizardAnswers, travelerType: k })}>{T["wizardTravelers_" + k]}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="mt-field">
+                    <label>{T.wizardBudget}</label>
+                    <div className="mt-wizard-choices">
+                      {["low", "mid", "high"].map((k) => (
+                        <button key={k} className={"mt-wizard-choice" + (aiWizardAnswers.budget === k ? " selected" : "")} onClick={() => setAiWizardAnswers({ ...aiWizardAnswers, budget: k })}>{T["wizardBudget_" + k]}</button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+              {aiWizardStep === 4 && (
+                <>
+                  <div className="mt-field">
+                    <label>{T.wizardInterests}</label>
+                    <div className="mt-wizard-choices">
+                      {["history", "food", "nature", "nightlife", "shopping", "art", "adventure"].map((k) => (
+                        <button key={k} className={"mt-wizard-choice" + (aiWizardAnswers.interests.includes(k) ? " selected" : "")} onClick={() => toggleWizardInterest(k)}>{T["wizardInterest_" + k]}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="mt-field">
+                    <label>{T.wizardPace}</label>
+                    <div className="mt-wizard-choices">
+                      {["relaxed", "balanced", "packed"].map((k) => (
+                        <button key={k} className={"mt-wizard-choice" + (aiWizardAnswers.pace === k ? " selected" : "")} onClick={() => setAiWizardAnswers({ ...aiWizardAnswers, pace: k })}>{T["wizardPace_" + k]}</button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+              {aiWizardStep === 5 && (
+                <>
+                  <div className="mt-field">
+                    <label>{T.wizardNotes}</label>
+                    <textarea rows={3} value={aiWizardAnswers.notes} onChange={(e) => setAiWizardAnswers({ ...aiWizardAnswers, notes: e.target.value })} placeholder={T.wizardNotesHint} />
+                  </div>
+                  <div className="mt-wizard-summary">
+                    <div className="mt-section-label">{T.wizardWillCreate}</div>
+                    <div className="mt-hint">{T.wizardWillCreateDesc}</div>
+                    <div className="mt-hint" style={{ marginTop: 6 }}>{T.wizardAiNote}</div>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="mt-modal-footer">
+              {aiWizardStep > 0 && <button className="mt-btn ghost" onClick={aiWizardBack}>{T.wizardBack}</button>}
+              <span style={{ flex: 1 }} />
+              {aiWizardStep < AI_WIZARD_STEPS - 1 ? (
+                <button className="mt-btn primary" onClick={aiWizardNext}>{T.wizardNext}</button>
+              ) : (
+                <button className="mt-btn primary" onClick={confirmAiWizard}><Wand2 size={13} /> {T.wizardCreate}</button>
+              )}
             </div>
           </div>
         </div>
