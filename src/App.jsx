@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.11.0";
+const APP_VERSION = "10.12.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -2193,20 +2193,26 @@ export default function MyTripApp() {
     if (rowIdToApply) updateRow(rowIdToApply, { typeId: id });
     setNewTypeDraft({ name: "", icon: "Tag" }); setTypeMenuOpen(null);
   }
+  function clampMenuRight(rect, menuWidth) {
+    const margin = 8;
+    const raw = window.innerWidth - rect.right;
+    const maxRight = window.innerWidth - menuWidth - margin;
+    return Math.max(margin, Math.min(raw, maxRight));
+  }
   function openColumnsMenu() {
-    if (settingsBtnRef.current) { const r = settingsBtnRef.current.getBoundingClientRect(); setColMenuPos({ top: r.bottom + 8, right: window.innerWidth - r.right }); }
+    if (settingsBtnRef.current) { const r = settingsBtnRef.current.getBoundingClientRect(); setColMenuPos({ top: r.bottom + 8, right: clampMenuRight(r, 220) }); }
     setColMenuOpen(true);
   }
   function openAddTypeMenu() {
-    if (settingsBtnRef.current) { const r = settingsBtnRef.current.getBoundingClientRect(); setAddTypePos({ top: r.bottom + 8, right: window.innerWidth - r.right }); }
+    if (settingsBtnRef.current) { const r = settingsBtnRef.current.getBoundingClientRect(); setAddTypePos({ top: r.bottom + 8, right: clampMenuRight(r, 200) }); }
     setAddTypeOpen(true);
   }
   function openSettingsMenu() {
-    if (settingsBtnRef.current) { const r = settingsBtnRef.current.getBoundingClientRect(); setSettingsMenuPos({ top: r.bottom + 8, right: window.innerWidth - r.right }); }
+    if (settingsBtnRef.current) { const r = settingsBtnRef.current.getBoundingClientRect(); setSettingsMenuPos({ top: r.bottom + 8, right: clampMenuRight(r, 220) }); }
     setSettingsMenuOpen((v) => !v);
   }
   function openActionsMenu() {
-    if (actionsBtnRef.current) { const r = actionsBtnRef.current.getBoundingClientRect(); setActionsMenuPos({ top: r.bottom + 8, right: Math.max(8, window.innerWidth - r.right) }); }
+    if (actionsBtnRef.current) { const r = actionsBtnRef.current.getBoundingClientRect(); setActionsMenuPos({ top: r.bottom + 8, right: clampMenuRight(r, 220) }); }
     setActionsMenuOpen((v) => !v);
   }
   function submitAddType() {
@@ -2419,7 +2425,8 @@ export default function MyTripApp() {
         .mytrip-app * { scrollbar-color:#C7D3CE #FFFFFF; }
         .mytrip-app input[type=date], .mytrip-app input[type=time] { appearance:auto; -webkit-appearance:auto; color-scheme:light; }
         .mytrip-app input[type=date]::-webkit-calendar-picker-indicator, .mytrip-app input[type=time]::-webkit-calendar-picker-indicator { opacity:1; cursor:pointer; }
-        .mt-header { display:flex; align-items:center; justify-content:space-between; padding:12px 20px; background:var(--surface); border-bottom:1px solid var(--border); position:sticky; top:0; z-index:30; flex-wrap:wrap; gap:8px; }
+        .mt-sticky-top { position:sticky; top:0; z-index:30; }
+        .mt-header { display:flex; align-items:center; justify-content:space-between; padding:12px 20px; background:var(--surface); border-bottom:1px solid var(--border); flex-wrap:wrap; gap:8px; }
         .mt-brand { display:flex; align-items:center; gap:9px; }
         .mt-brand-mark { width:32px; height:32px; border-radius:9px; background:var(--teal); display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; }
         .mt-brand-mark::after { content:''; position:absolute; width:44px; height:44px; border:2px solid rgba(255,255,255,.35); border-radius:50%; top:-14px; inset-inline-start:-8px; }
@@ -2435,7 +2442,7 @@ export default function MyTripApp() {
         .mt-icon-btn.active { background:var(--teal); color:#fff; border-color:var(--teal); }
         .mt-icon-btn svg { width:14px; height:14px; }
         .mt-avatar { width:26px; height:26px; border-radius:50%; background:var(--teal-tint); color:var(--teal-dark); display:flex; align-items:center; justify-content:center; border:1px solid var(--border); }
-        .mt-toolbar { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 20px; flex-wrap:wrap; }
+        .mt-toolbar { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 20px; flex-wrap:wrap; background:var(--surface); border-bottom:1px solid var(--border); }
         .mt-toolbar-group { display:flex; gap:7px; align-items:center; flex-wrap:wrap; }
         .mt-floating-menu { position:fixed; background:var(--surface); color:var(--ink); border:1px solid var(--border); border-radius:10px; box-shadow:0 12px 32px rgba(20,40,35,.18); padding:10px; z-index:200; max-width:92vw; max-height:70vh; overflow-y:auto; }
         .mt-floating-backdrop { position:fixed; inset:0; z-index:190; background:transparent; }
@@ -2721,6 +2728,7 @@ export default function MyTripApp() {
         }
       `}</style>
 
+      <div className="mt-sticky-top">
       <div className="mt-header">
         <div className="mt-brand">
           <div className="mt-brand-mark-col">
@@ -2753,6 +2761,7 @@ export default function MyTripApp() {
             onChange={(e) => { importFromFile(e.target.files && e.target.files[0]); e.target.value = ""; }} />
           {importMsg && <span className="mt-hint" style={{ color: importMsg.ok ? "#3E8E5A" : "var(--danger)" }}>{importMsg.ok ? T.importSuccess : T.importError}</span>}
         </div>
+      </div>
       </div>
 
       {settingsMenuOpen && (
