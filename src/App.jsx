@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.12.0";
+const APP_VERSION = "10.13.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -2425,25 +2425,23 @@ export default function MyTripApp() {
         .mytrip-app * { scrollbar-color:#C7D3CE #FFFFFF; }
         .mytrip-app input[type=date], .mytrip-app input[type=time] { appearance:auto; -webkit-appearance:auto; color-scheme:light; }
         .mytrip-app input[type=date]::-webkit-calendar-picker-indicator, .mytrip-app input[type=time]::-webkit-calendar-picker-indicator { opacity:1; cursor:pointer; }
-        .mt-sticky-top { position:sticky; top:0; z-index:30; }
-        .mt-header { display:flex; align-items:center; justify-content:space-between; padding:12px 20px; background:var(--surface); border-bottom:1px solid var(--border); flex-wrap:wrap; gap:8px; }
-        .mt-brand { display:flex; align-items:center; gap:9px; }
-        .mt-brand-mark { width:32px; height:32px; border-radius:9px; background:var(--teal); display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; }
+        .mt-sticky-top { position:sticky; top:0; z-index:30; background:var(--surface); border-bottom:1px solid var(--border); }
+        .mt-header-row1 { display:flex; align-items:center; justify-content:flex-start; gap:8px; padding:8px 14px 4px; }
+        .mt-header-right { display:flex; flex-direction:column; align-items:flex-end; gap:2px; }
+        .mt-brand-mark { width:30px; height:30px; border-radius:8px; background:var(--teal); display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; }
         .mt-brand-mark::after { content:''; position:absolute; width:44px; height:44px; border:2px solid rgba(255,255,255,.35); border-radius:50%; top:-14px; inset-inline-start:-8px; }
-        .mt-brand-mark svg { color:#fff; width:17px; height:17px; z-index:1; }
-        .mt-brand-text { display:flex; flex-direction:column; line-height:1.15; }
-        .mt-brand-name { font-family:'Frank Ruhl Libre',serif; font-size:20px; font-weight:700; }
-        .mt-brand-version { font-size:10px; color:var(--muted); font-weight:600; letter-spacing:.02em; }
-        .mt-brand-mark-col { display:flex; flex-direction:column; align-items:center; gap:2px; }
-        .mt-header-actions { display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
-        .mt-icon-btn { border:1px solid var(--border); background:var(--surface); color:var(--ink); border-radius:8px; padding:6px 9px; display:flex; align-items:center; gap:5px; font-size:12.5px; font-weight:500; }
+        .mt-brand-mark svg { color:#fff; width:16px; height:16px; z-index:1; }
+        .mt-brand-name { font-family:'Frank Ruhl Libre',serif; font-size:18px; font-weight:700; line-height:1; }
+        .mt-brand-version { font-size:9.5px; color:var(--muted); font-weight:600; letter-spacing:.02em; }
+        .mt-header-actions { display:flex; align-items:center; justify-content:space-between; gap:5px; flex-wrap:wrap; padding:5px 14px; }
+        .mt-icon-btn { border:1px solid var(--border); background:var(--surface); color:var(--ink); border-radius:8px; padding:5px 8px; display:flex; align-items:center; gap:5px; font-size:12.5px; font-weight:500; }
+        .mt-toolbar { display:flex; align-items:center; justify-content:space-between; gap:5px; flex-wrap:wrap; padding:5px 14px 8px; }
         .mt-icon-btn:disabled { opacity:.35; cursor:not-allowed; }
         .mt-icon-btn:hover { background:var(--teal-tint); border-color:var(--teal); }
         .mt-icon-btn.active { background:var(--teal); color:#fff; border-color:var(--teal); }
         .mt-icon-btn svg { width:14px; height:14px; }
         .mt-avatar { width:26px; height:26px; border-radius:50%; background:var(--teal-tint); color:var(--teal-dark); display:flex; align-items:center; justify-content:center; border:1px solid var(--border); }
-        .mt-toolbar { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 20px; flex-wrap:wrap; background:var(--surface); border-bottom:1px solid var(--border); }
-        .mt-toolbar-group { display:flex; gap:7px; align-items:center; flex-wrap:wrap; }
+        .mt-toolbar-group { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
         .mt-floating-menu { position:fixed; background:var(--surface); color:var(--ink); border:1px solid var(--border); border-radius:10px; box-shadow:0 12px 32px rgba(20,40,35,.18); padding:10px; z-index:200; max-width:92vw; max-height:70vh; overflow-y:auto; }
         .mt-floating-backdrop { position:fixed; inset:0; z-index:190; background:transparent; }
         .mt-menu-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:7px; }
@@ -2683,8 +2681,9 @@ export default function MyTripApp() {
         .mt-note { font-size:11px; color:var(--muted); margin-top:4px; }
 
         @media (max-width: 640px) {
-          .mt-header { padding:10px 12px; }
-          .mt-toolbar { padding:8px 12px; gap:6px; }
+          .mt-header-row1 { padding:8px 10px 4px; }
+          .mt-header-actions { padding:4px 10px; }
+          .mt-toolbar { padding:4px 10px 8px; gap:5px; }
           .mt-content { padding:0 12px 32px; }
           .mt-frame-header { padding:12px 10px; gap:7px; }
           .mt-frame-actions button, .mt-row-actions button { min-width:32px; min-height:32px; justify-content:center; }
@@ -2716,7 +2715,7 @@ export default function MyTripApp() {
         .mt-intro-tag { font-size:12.5px; color:#6B7C76; margin-top:2px; }
 
         @media print {
-          .mt-header, .mt-toolbar, .mt-suggest, .mt-row-actions, .mt-frame-actions, .mt-group-actions,
+          .mt-header-row1, .mt-header-actions, .mt-toolbar, .mt-suggest, .mt-row-actions, .mt-frame-actions, .mt-group-actions,
           .mt-drag-handle, .mt-col-resizer, .mt-frame-add-row, .mt-group-add-bottom, .mt-fx-select, .mt-fx-note,
           .mt-columns-backdrop, .mt-floating-menu, .mt-floating-backdrop { display:none !important; }
           .mytrip-app { background:#fff; }
@@ -2729,26 +2728,23 @@ export default function MyTripApp() {
       `}</style>
 
       <div className="mt-sticky-top">
-      <div className="mt-header">
-        <div className="mt-brand">
-          <div className="mt-brand-mark-col">
-            <div className="mt-brand-mark"><Plane /></div>
-            <span className="mt-brand-version">v{APP_VERSION}</span>
-          </div>
-          <span className="mt-brand-name">{T.appName}</span>
+      <div className="mt-header-row1">
+        <div className="mt-header-right">
+          <div className="mt-brand-mark"><Plane /></div>
+          <span className="mt-brand-version">v{APP_VERSION}</span>
         </div>
-        <div className="mt-header-actions">
-          <button className="mt-icon-btn" onClick={() => setLang(lang === "he" ? "en" : "he")}><Globe /> {T.lang}</button>
-          <button className={"mt-icon-btn" + (viewMode === "desktop" ? " active" : "")} onClick={() => setViewMode("desktop")} title={T.desktop}><Monitor /></button>
-          <button className={"mt-icon-btn" + (viewMode === "mobile" ? " active" : "")} onClick={() => setViewMode("mobile")} title={T.mobile}><Smartphone /></button>
-          {!loggedIn ? (
-            <button className="mt-icon-btn" onClick={() => setLoggedIn(true)}><LogIn /> {T.login}</button>
-          ) : (
-            <button className="mt-icon-btn" onClick={() => setLoggedIn(false)} title={T.mockNote}><span className="mt-avatar"><User size={14} /></span> {T.logout}</button>
-          )}
-        </div>
+        <span className="mt-brand-name">{T.appName}</span>
       </div>
-
+      <div className="mt-header-actions">
+        <button className="mt-icon-btn" onClick={() => setLang(lang === "he" ? "en" : "he")}><Globe /> {T.lang}</button>
+        <button className={"mt-icon-btn" + (viewMode === "desktop" ? " active" : "")} onClick={() => setViewMode("desktop")} title={T.desktop}><Monitor /></button>
+        <button className={"mt-icon-btn" + (viewMode === "mobile" ? " active" : "")} onClick={() => setViewMode("mobile")} title={T.mobile}><Smartphone /></button>
+        {!loggedIn ? (
+          <button className="mt-icon-btn" onClick={() => setLoggedIn(true)}><LogIn /> {T.login}</button>
+        ) : (
+          <button className="mt-icon-btn" onClick={() => setLoggedIn(false)} title={T.mockNote}><span className="mt-avatar"><User size={14} /></span> {T.logout}</button>
+        )}
+      </div>
       <div className="mt-toolbar">
         <div className="mt-toolbar-group">
           <button className="mt-icon-btn" ref={settingsBtnRef} onClick={openSettingsMenu}><Menu /> {T.settings}</button>
