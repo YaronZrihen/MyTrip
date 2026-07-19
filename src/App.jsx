@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.25.0";
+const APP_VERSION = "10.26.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -644,14 +644,21 @@ function deriveSmartAlias(result, isFlightRow, lang) {
   }
   return cityName;
 }
-function fetchDrivingRoute(a, b) {
-  return throttledCall(() => fetch(`https://router.project-osrm.org/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?overview=false`)
+function fetchDrivingRoute(a, b, profile) {
+  const p = profile || "driving";
+  return throttledCall(() => fetch(`https://router.project-osrm.org/route/v1/${p}/${a.lon},${a.lat};${b.lon},${b.lat}?overview=false`)
     .then((r) => { if (!r.ok) throw new Error("http-" + r.status); return r.json(); })
     .then((data) => {
       const route = data && data.routes && data.routes[0];
       if (!route) return null;
       return { distanceKm: route.distance / 1000, durationMin: route.duration / 60 };
     }));
+}
+function osrmProfileForType(typeId) {
+  const mode = TRAVEL_MODE_MAP[typeId];
+  if (mode === "walking") return "walking";
+  if (mode === "bicycling") return "cycling";
+  return "driving";
 }
 
 /* Weather — Open-Meteo (free, no API key). Forecast only covers ~16 days ahead. */
@@ -834,7 +841,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
     const origin = hasOwnFrom ? rowStartPoint(row) : (prevRow ? rowEndPoint(prevRow) : "");
     const dest = rowEndPoint(row);
     if (!origin || !dest) return;
-    const sig = origin + "|" + dest + "|" + (row.startTime || "");
+    const sig = origin + "|" + dest + "|" + (row.startTime || "") + "|" + row.typeId;
     if (lastRouteCalcSig.current === sig || distLoading) return;
     lastRouteCalcSig.current = sig;
     setDistLoading(true);
@@ -845,7 +852,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
     Promise.all([originP, destP]).then(([a, b]) => {
       setDistLoading(false);
       if (!a || !b) return;
-      return fetchDrivingRoute(a, b).then((info) => {
+      return fetchDrivingRoute(a, b, osrmProfileForType(row.typeId)).then((info) => {
         if (!info) return;
         const patch = { routeDistanceKm: info.distanceKm, routeDurationMin: info.durationMin, toLat: b.lat, toLon: b.lon };
         if (hasOwnFrom) { patch.fromLat = a.lat; patch.fromLon = a.lon; }
@@ -861,7 +868,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
   useEffect(() => {
     fetchRouteDistance();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [row.id, row.from, row.to, row.startTime, row.fromLat, row.fromLon, row.toLat, row.toLon, prevRow && prevRow.to, prevRow && prevRow.toLat, prevRow && prevRow.toLon]);
+  }, [row.id, row.from, row.to, row.startTime, row.typeId, row.fromLat, row.fromLon, row.toLat, row.toLon, prevRow && prevRow.to, prevRow && prevRow.toLat, prevRow && prevRow.toLon]);
 
   const [fromVerifyLoading, setFromVerifyLoading] = useState(false);
   useEffect(() => {
@@ -1440,7 +1447,7 @@ function MobileCardMeta({ row, prevRow, ctx }) {
     const origin = hasOwnFrom ? rowStartPoint(row) : (prevRow ? rowEndPoint(prevRow) : "");
     const dest = rowEndPoint(row);
     if (!origin || !dest) return;
-    const sig = origin + "|" + dest + "|" + (row.startTime || "");
+    const sig = origin + "|" + dest + "|" + (row.startTime || "") + "|" + row.typeId;
     if (lastRouteCalcSig.current === sig || distLoading) return;
     lastRouteCalcSig.current = sig;
     setDistLoading(true);
@@ -1451,7 +1458,7 @@ function MobileCardMeta({ row, prevRow, ctx }) {
     Promise.all([originP, destP]).then(([a, b]) => {
       setDistLoading(false);
       if (!a || !b) return;
-      return fetchDrivingRoute(a, b).then((info) => {
+      return fetchDrivingRoute(a, b, osrmProfileForType(row.typeId)).then((info) => {
         if (!info) return;
         const patch = { routeDistanceKm: info.distanceKm, routeDurationMin: info.durationMin, toLat: b.lat, toLon: b.lon };
         if (hasOwnFrom) { patch.fromLat = a.lat; patch.fromLon = a.lon; }
@@ -1464,7 +1471,7 @@ function MobileCardMeta({ row, prevRow, ctx }) {
       });
     }).catch(() => setDistLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [row.id, row.from, row.to, row.startTime, row.fromLat, row.fromLon, row.toLat, row.toLon, prevRow && prevRow.to, prevRow && prevRow.toLat, prevRow && prevRow.toLon]);
+  }, [row.id, row.from, row.to, row.startTime, row.typeId, row.fromLat, row.fromLon, row.toLat, row.toLon, prevRow && prevRow.to, prevRow && prevRow.toLat, prevRow && prevRow.toLon]);
 
   const [fromVerifyLoading, setFromVerifyLoading] = useState(false);
   useEffect(() => {
