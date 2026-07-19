@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.27.0";
+const APP_VERSION = "10.28.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -186,6 +186,8 @@ const T_DICT = {
     wizardWillCreate: "מה ייווצר", wizardWillCreateDesc: "מסגרת טיול עם תאריכי הטיסות שהזנת, שתי רשומות טיסה (הלוך וחזור), ושלד מלון מוכן למילוי לכל יום ביניים.",
     wizardAiNote: "תחומי העניין, התקציב והקצב שבחרת נשמרים במסגרת — הצעות פעילויות בפועל שמבוססות עליהם ידרשו חיבור לשרת AI בעתיד.",
     wizardBack: "הקודם", wizardNext: "הבא", wizardCreate: "צור טיול",
+    computedEndTimeHint: "שדה מחושב לפי מסלול Google Maps, בהתאם לאמצעי התחבורה שנבחר בתיאור.", chronoEndWarning: "רצף השעות (כולל שעות סיום) אינו כרונולוגי.",
+    noOriginHint: "אין צורך בשדה מוצא עבור סוג רשומה זה.",
     dragDayHint: "גרור להעברת היום למסגרת אחרת", dropDayToRoot: "שחרר כאן כדי להוציא את היום מהמסגרת", showOverallRoute: "הצג מסלול טיול כולל",
     tripSummary: "סיכום הטיול", summaryFlights: "טיסות", summaryHotels: "מלונות", summaryPois: "נק׳ עניין", summaryRestaurants: "מסעדות", summaryAvgRating: "דירוג ממוצע",
     summaryTotal: "סה״כ", summaryKmNoFlights: "ללא טיסות", summaryNights: "לילות", summaryAttractions: "אטרקציות", summaryDayTours: "טיולי יום", summaryGuidedTours: "טיולים מודרכים",
@@ -289,6 +291,8 @@ const T_DICT = {
     wizardWillCreate: "What will be created", wizardWillCreateDesc: "A trip frame spanning your flight dates, two flight records (outbound and return), and a fill-in-ready hotel skeleton for each day in between.",
     wizardAiNote: "Your interests, budget, and pace are saved on the frame — actual activity suggestions based on them will need a future AI server connection.",
     wizardBack: "Back", wizardNext: "Next", wizardCreate: "Create trip",
+    computedEndTimeHint: "Computed from the Google Maps route, based on the transportation mode selected in the description.", chronoEndWarning: "The time sequence (including end times) isn't chronological.",
+    noOriginHint: "No origin field is needed for this record type.",
     dragDayHint: "Drag to move this day to another frame", dropDayToRoot: "Drop here to take this day out of its frame", showOverallRoute: "Show overall trip route",
     tripSummary: "Trip summary", summaryFlights: "Flights", summaryHotels: "Hotels", summaryPois: "Points of interest", summaryRestaurants: "Restaurants", summaryAvgRating: "Average rating",
     summaryTotal: "total", summaryKmNoFlights: "excluding flights", summaryNights: "nights", summaryAttractions: "attractions", summaryDayTours: "day tours", summaryGuidedTours: "guided tours",
@@ -344,6 +348,7 @@ function detectTextAlign(text) {
   return undefined;
 }
 function typeDisplayName(t, lang) { return t.name_he != null ? (lang === "en" ? t.name_en : t.name_he) : t.name; }
+function noOriginNeeded(typeId) { return typeId === "restaurant" || typeId === "poi" || typeId === "attraction"; }
 function isAccommodationType(typeId) { return typeId === "hotel" || typeId === "hostel" || typeId === "apartment"; }
 
 /* Simplified OSM opening_hours check — handles common "Mo-Fr 09:00-18:00" style rules only.
@@ -791,11 +796,17 @@ function dayRouteUrl(rowsInDay) {
   return "https://www.google.com/maps/dir/" + deduped.map((p) => encodeURIComponent(p)).join("/");
 }
 function isChronological(rowsList) {
-  let last = null;
+  let lastStart = null, lastEnd = null;
   for (const r of rowsList) {
-    if (!r.startTime) continue;
-    if (last !== null && r.startTime < last) return false;
-    last = r.startTime;
+    if (r.startTime) {
+      if (lastStart !== null && r.startTime < lastStart) return false;
+      lastStart = r.startTime;
+    }
+    if (r.endTime) {
+      if (lastEnd !== null && r.endTime < lastEnd) return false;
+      if (r.startTime && !r.overnight && r.endTime < r.startTime) return false;
+      lastEnd = r.endTime;
+    }
   }
   return true;
 }
@@ -873,7 +884,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
 
   const lastRouteCalcSig = useRef(null);
   function fetchRouteDistance() {
-    const hasOwnFrom = !!(row.from && row.from.trim());
+    const hasOwnFrom = !!(row.from && row.from.trim()) && !noOriginNeeded(row.typeId);
     const origin = hasOwnFrom ? rowStartPoint(row) : (prevRow ? rowEndPoint(prevRow) : "");
     const dest = rowEndPoint(row);
     if (!origin || !dest) return;
@@ -892,10 +903,11 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
         if (!info) return;
         const patch = { routeDistanceKm: info.distanceKm, routeDurationMin: info.durationMin, toLat: b.lat, toLon: b.lon };
         if (hasOwnFrom) { patch.fromLat = a.lat; patch.fromLon = a.lon; }
-        if (row.startTime) {
+        if (row.startTime && (!row.endTime || row.endTimeAuto)) {
           const [h, m] = row.startTime.split(":").map(Number);
           const totalMin = (h * 60 + m + Math.round(info.durationMin) + 1440) % 1440;
           patch.endTime = `${String(Math.floor(totalMin / 60)).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
+          patch.endTimeAuto = true;
         }
         updateRow(row.id, patch);
       });
@@ -1046,9 +1058,9 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
         <span className={"mt-loc-cell" + (fromVerified ? " has-badge" : "")}>
           {lang === "he" && fromVerified && <a className="mt-loc-badge" href={row.fromVerifiedUrl} target="_blank" rel="noreferrer" title={T.openMap}><MapPin size={11} /></a>}
           {row.fromAlias ? (
-            <input className="mt-editable" dir="auto" style={{ textAlign: detectTextAlign(row.fromAlias) }} title={row.from} value={row.fromAlias} onChange={(e) => updateRow(row.id, { fromAlias: e.target.value })} />
+            <input className="mt-editable" dir="auto" disabled={noOriginNeeded(row.typeId)} style={{ textAlign: detectTextAlign(row.fromAlias) }} title={noOriginNeeded(row.typeId) ? T.noOriginHint : row.from} value={row.fromAlias} onChange={(e) => updateRow(row.id, { fromAlias: e.target.value })} />
           ) : (
-            <input className="mt-editable" dir="auto" style={{ textAlign: detectTextAlign(row.from) }} title={row.from} placeholder={getTypeHint(row.typeId, "from", lang)} value={row.from} onChange={(e) => updateRow(row.id, { from: e.target.value })} />
+            <input className="mt-editable" dir="auto" disabled={noOriginNeeded(row.typeId)} style={{ textAlign: detectTextAlign(row.from) }} title={noOriginNeeded(row.typeId) ? T.noOriginHint : row.from} placeholder={getTypeHint(row.typeId, "from", lang)} value={row.from} onChange={(e) => updateRow(row.id, { from: e.target.value })} />
           )}
           {lang !== "he" && fromVerified && <a className="mt-loc-badge" href={row.fromVerifiedUrl} target="_blank" rel="noreferrer" title={T.openMap}><MapPin size={11} /></a>}
         </span>
@@ -1066,7 +1078,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
       );
       case "startTime": return <input className="mt-editable mt-time" type="time" value={row.startTime} onChange={(e) => updateRow(row.id, { startTime: e.target.value })} />;
       case "duration": return <span title={dur === null ? "" : dur} style={{ color: dur === null ? "var(--danger)" : "var(--muted)", fontSize: 12 }}>{dur === null ? "!" : dur}</span>;
-      case "endTime": return <input className="mt-editable mt-time" type="time" value={row.endTime} onChange={(e) => updateRow(row.id, { endTime: e.target.value })} />;
+      case "endTime": return <input className={"mt-editable mt-time" + (row.endTimeAuto ? " mt-computed-field" : "")} type="time" value={row.endTime} title={row.endTimeAuto ? T.computedEndTimeHint : undefined} onChange={(e) => updateRow(row.id, { endTime: e.target.value, endTimeAuto: false })} />;
       case "route": return routeUrl ? (
         <span className="mt-route-mini">
           <a className="mt-link-icon" href={routeUrl} target="_blank" rel="noreferrer" title={T.routeTooltip}><Route size={14} /></a>
@@ -1479,7 +1491,7 @@ function MobileCardMeta({ row, prevRow, ctx }) {
   }, [row.id, row.date, row.to, row.toAlias, row.toLat, row.toLon]);
 
   useEffect(() => {
-    const hasOwnFrom = !!(row.from && row.from.trim());
+    const hasOwnFrom = !!(row.from && row.from.trim()) && !noOriginNeeded(row.typeId);
     const origin = hasOwnFrom ? rowStartPoint(row) : (prevRow ? rowEndPoint(prevRow) : "");
     const dest = rowEndPoint(row);
     if (!origin || !dest) return;
@@ -1498,10 +1510,11 @@ function MobileCardMeta({ row, prevRow, ctx }) {
         if (!info) return;
         const patch = { routeDistanceKm: info.distanceKm, routeDurationMin: info.durationMin, toLat: b.lat, toLon: b.lon };
         if (hasOwnFrom) { patch.fromLat = a.lat; patch.fromLon = a.lon; }
-        if (row.startTime) {
+        if (row.startTime && (!row.endTime || row.endTimeAuto)) {
           const [h, m] = row.startTime.split(":").map(Number);
           const totalMin = (h * 60 + m + Math.round(info.durationMin) + 1440) % 1440;
           patch.endTime = `${String(Math.floor(totalMin / 60)).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
+          patch.endTimeAuto = true;
         }
         updateRow(row.id, patch);
       });
@@ -2903,6 +2916,7 @@ export default function MyTripApp() {
         .mt-editable:focus { outline:none; border-color:var(--teal); background:#fff; }
         .mt-editable.mt-time:focus, .mt-editable[type=number]:focus { outline:none; border-color:var(--teal); background:#fff; }
         .mt-editable.mt-time { min-width:60px; font-weight:700; color:var(--ink); padding-inline-end:2px; }
+        .mt-computed-field { text-decoration:underline; text-decoration-style:dotted; text-decoration-color:var(--teal); text-underline-offset:2px; }
         .mt-editable.mt-time::-webkit-calendar-picker-indicator { padding:1px; margin-inline-start:1px; width:10px; height:10px; opacity:.6; }
         .mt-editable[type=number] { min-width:38px; padding-inline-start:1px; -moz-appearance:textfield; }
         .mt-editable[type=number]::-webkit-outer-spin-button, .mt-editable[type=number]::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
@@ -3608,7 +3622,7 @@ export default function MyTripApp() {
 
               <div className="mt-field-row">
                 <div className="mt-field"><label>{T.start}</label><input type="time" value={cardDraft.startTime} onChange={(e) => setCardDraft({ ...cardDraft, startTime: e.target.value })} /></div>
-                <div className="mt-field"><label>{T.end}</label><input type="time" value={cardDraft.endTime} onChange={(e) => setCardDraft({ ...cardDraft, endTime: e.target.value })} /></div>
+                <div className="mt-field"><label>{T.end}</label><input type="time" className={cardDraft.endTimeAuto ? "mt-computed-field" : ""} title={cardDraft.endTimeAuto ? T.computedEndTimeHint : undefined} value={cardDraft.endTime} onChange={(e) => setCardDraft({ ...cardDraft, endTime: e.target.value, endTimeAuto: false })} /></div>
               </div>
               <label className="mt-checkbox-row"><input type="checkbox" checked={!!cardDraft.overnight} onChange={(e) => setCardDraft({ ...cardDraft, overnight: e.target.checked })} />{T.overnight}</label>
               {cardHasTimeError && <div className="mt-error"><AlertTriangle /> {T.timeError}</div>}
@@ -3618,15 +3632,15 @@ export default function MyTripApp() {
                 <div className="mt-loc-mobile">
                   <div className="mt-loc-mobile-row">
                     <span className="mt-loc-row-label">{T.from}</span>
-                    <input className="mt-loc-grid-input" dir="auto" value={cardDraft.from} placeholder={getTypeHint(cardDraft.typeId, "from", lang)} onChange={(e) => setCardDraft({ ...cardDraft, from: e.target.value })} />
+                    <input className="mt-loc-grid-input" dir="auto" disabled={noOriginNeeded(cardDraft.typeId)} title={noOriginNeeded(cardDraft.typeId) ? T.noOriginHint : undefined} value={cardDraft.from} placeholder={getTypeHint(cardDraft.typeId, "from", lang)} onChange={(e) => setCardDraft({ ...cardDraft, from: e.target.value })} />
                     <span className="mt-loc-icons">
-                      <button className="mt-btn ghost mt-btn-icon" title={T.copyPrevDest} disabled={!prevRowForCard || !prevRowForCard.to} onClick={copyPrevDestinationToFrom}><Copy size={13} /></button>
-                      <button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openLocationPicker("from")}><MapPin size={13} /></button>
+                      <button className="mt-btn ghost mt-btn-icon" title={T.copyPrevDest} disabled={noOriginNeeded(cardDraft.typeId) || !prevRowForCard || !prevRowForCard.to} onClick={copyPrevDestinationToFrom}><Copy size={13} /></button>
+                      <button className="mt-btn ghost mt-btn-icon" disabled={noOriginNeeded(cardDraft.typeId)} title={T.verify} onClick={() => openLocationPicker("from")}><MapPin size={13} /></button>
                     </span>
                     {fromVerifiedCard && <PopoverInfoIcon icon={CircleCheck} color="#3E8E5A"><div>{T.verified}</div><a href={cardDraft.fromVerifiedUrl} target="_blank" rel="noreferrer">{T.openMap}</a></PopoverInfoIcon>}
                   </div>
                   <div className="mt-loc-mobile-alias-row">
-                    <input dir="auto" value={cardDraft.fromAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "fromAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, fromAlias: e.target.value })} />
+                    <input dir="auto" disabled={noOriginNeeded(cardDraft.typeId)} value={cardDraft.fromAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "fromAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, fromAlias: e.target.value })} />
                     <PopoverInfoIcon icon={Info} trigger="hover">{T.aliasHint}</PopoverInfoIcon>
                   </div>
 
@@ -3652,13 +3666,13 @@ export default function MyTripApp() {
 
                 <span className="mt-loc-row-label">{T.from}</span>
                 <span className="mt-loc-icons">
-                  <button className="mt-btn ghost mt-btn-icon" title={T.copyPrevDest} disabled={!prevRowForCard || !prevRowForCard.to} onClick={copyPrevDestinationToFrom}><Copy size={13} /></button>
-                  <button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openLocationPicker("from")}><MapPin size={13} /></button>
+                  <button className="mt-btn ghost mt-btn-icon" title={T.copyPrevDest} disabled={noOriginNeeded(cardDraft.typeId) || !prevRowForCard || !prevRowForCard.to} onClick={copyPrevDestinationToFrom}><Copy size={13} /></button>
+                  <button className="mt-btn ghost mt-btn-icon" disabled={noOriginNeeded(cardDraft.typeId)} title={T.verify} onClick={() => openLocationPicker("from")}><MapPin size={13} /></button>
                 </span>
-                <input className="mt-loc-grid-input" dir="auto" value={cardDraft.from} placeholder={getTypeHint(cardDraft.typeId, "from", lang)} onChange={(e) => setCardDraft({ ...cardDraft, from: e.target.value })} />
+                <input className="mt-loc-grid-input" dir="auto" disabled={noOriginNeeded(cardDraft.typeId)} title={noOriginNeeded(cardDraft.typeId) ? T.noOriginHint : undefined} value={cardDraft.from} placeholder={getTypeHint(cardDraft.typeId, "from", lang)} onChange={(e) => setCardDraft({ ...cardDraft, from: e.target.value })} />
                 <span className="mt-loc-verified-slot">{fromVerifiedCard && <PopoverInfoIcon icon={CircleCheck} color="#3E8E5A"><div>{T.verified}</div><a href={cardDraft.fromVerifiedUrl} target="_blank" rel="noreferrer">{T.openMap}</a></PopoverInfoIcon>}</span>
                 <span className="mt-loc-alias-cell">
-                  <input dir="auto" value={cardDraft.fromAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "fromAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, fromAlias: e.target.value })} />
+                  <input dir="auto" disabled={noOriginNeeded(cardDraft.typeId)} value={cardDraft.fromAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "fromAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, fromAlias: e.target.value })} />
                   <PopoverInfoIcon icon={Info} trigger="hover">{T.aliasHint}</PopoverInfoIcon>
                 </span>
 
