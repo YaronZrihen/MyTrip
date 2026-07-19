@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.18.1";
+const APP_VERSION = "10.18.2";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1197,6 +1197,7 @@ function DateRangeField({ startDate, endDate, onChange, lang, T }) {
 
 function PlaceIconWithPreview({ row, tm, Icon, warnings, T, lang, onOpenFull }) {
   const [showPreview, setShowPreview] = useState(false);
+  const [everShown, setEverShown] = useState(false);
   const [previewPos, setPreviewPos] = useState({ top: 0, left: 0 });
   const btnRef = useRef(null);
   const hoverTimer = useRef(null);
@@ -1206,6 +1207,7 @@ function PlaceIconWithPreview({ row, tm, Icon, warnings, T, lang, onOpenFull }) 
     if (!placeId || !hasGooglePlaces()) return;
     hoverTimer.current = setTimeout(() => {
       if (btnRef.current) { const r = btnRef.current.getBoundingClientRect(); setPreviewPos({ top: r.bottom + 6, left: r.left }); }
+      setEverShown(true);
       setShowPreview(true);
     }, 300);
   }
@@ -1217,8 +1219,8 @@ function PlaceIconWithPreview({ row, tm, Icon, warnings, T, lang, onOpenFull }) 
   return (
     <span style={{ position: "relative", display: "inline-block" }} onMouseEnter={handleEnter} onMouseLeave={handleLeave} onFocus={handleEnter} onBlur={handleLeave}>
       <button ref={btnRef} className="mt-type-icon mt-type-icon-btn" style={{ background: tm.color }} onClick={onOpenFull}><Icon /></button>
-      {showPreview && (
-        <div className="mt-place-preview-wrap" style={{ top: previewPos.top, left: previewPos.left }}>
+      {everShown && (
+        <div className="mt-place-preview-wrap" style={{ top: previewPos.top, left: previewPos.left, display: showPreview ? "block" : "none" }}>
           <GooglePlaceDetailsCompact placeId={placeId} T={T} />
         </div>
       )}
@@ -1269,7 +1271,7 @@ function GooglePlaceDetailsCompact({ placeId, T }) {
   if (state === "error") return <div className="mt-hint" style={{ padding: 10 }}>{T.googleUiKitError}</div>;
   if (state === "loading") return <div className="mt-hint" style={{ padding: 10 }}>{T.locSearching}</div>;
   return (
-    <gmp-place-details-compact orientation="horizontal" truncation-preferred style={{ width: "280px", border: "none", padding: 0, margin: 0 }}>
+    <gmp-place-details-compact truncation-preferred style={{ width: "280px", border: "none", padding: 0, margin: 0 }}>
       <gmp-place-details-place-request place={placeId}></gmp-place-details-place-request>
       <GooglePlaceContentConfig />
     </gmp-place-details-compact>
