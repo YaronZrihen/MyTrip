@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.18.2";
+const APP_VERSION = "10.20.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1198,15 +1198,27 @@ function DateRangeField({ startDate, endDate, onChange, lang, T }) {
 function PlaceIconWithPreview({ row, tm, Icon, warnings, T, lang, onOpenFull }) {
   const [showPreview, setShowPreview] = useState(false);
   const [everShown, setEverShown] = useState(false);
-  const [previewPos, setPreviewPos] = useState({ top: 0, left: 0 });
+  const [previewPos, setPreviewPos] = useState({ top: 0, right: 0 });
   const btnRef = useRef(null);
   const hoverTimer = useRef(null);
   const placeId = row.fromPlaceId || row.toPlaceId;
+  const mapUrl = row.fromVerifiedUrl || row.toVerifiedUrl;
+  const PREVIEW_WIDTH = 280;
 
+  function computePos() {
+    if (btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      const margin = 8;
+      const rawRight = window.innerWidth - r.right;
+      const maxRight = window.innerWidth - PREVIEW_WIDTH - margin;
+      setPreviewPos({ top: r.bottom + 6, right: Math.max(margin, Math.min(rawRight, maxRight)) });
+    }
+  }
   function handleEnter() {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
     if (!placeId || !hasGooglePlaces()) return;
     hoverTimer.current = setTimeout(() => {
-      if (btnRef.current) { const r = btnRef.current.getBoundingClientRect(); setPreviewPos({ top: r.bottom + 6, left: r.left }); }
+      computePos();
       setEverShown(true);
       setShowPreview(true);
     }, 300);
@@ -1215,12 +1227,28 @@ function PlaceIconWithPreview({ row, tm, Icon, warnings, T, lang, onOpenFull }) 
     if (hoverTimer.current) clearTimeout(hoverTimer.current);
     setShowPreview(false);
   }
+  function handleClick(e) {
+    e.stopPropagation();
+    if (!placeId || !hasGooglePlaces()) return;
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    computePos();
+    setEverShown(true);
+    setShowPreview((v) => !v);
+  }
+  function handlePreviewClick(e) {
+    e.stopPropagation();
+    if (mapUrl) window.open(mapUrl, "_blank", "noopener,noreferrer");
+  }
 
   return (
     <span style={{ position: "relative", display: "inline-block" }} onMouseEnter={handleEnter} onMouseLeave={handleLeave} onFocus={handleEnter} onBlur={handleLeave}>
-      <button ref={btnRef} className="mt-type-icon mt-type-icon-btn" style={{ background: tm.color }} onClick={onOpenFull}><Icon /></button>
+      <button ref={btnRef} className="mt-type-icon mt-type-icon-btn" style={{ background: tm.color }} onClick={handleClick}><Icon /></button>
+      {everShown && showPreview && (
+        <div className="mt-floating-backdrop" onClick={(e) => { e.stopPropagation(); setShowPreview(false); }} />
+      )}
       {everShown && (
-        <div className="mt-place-preview-wrap" style={{ top: previewPos.top, left: previewPos.left, display: showPreview ? "block" : "none" }}>
+        <div className="mt-place-preview-wrap" style={{ top: previewPos.top, right: previewPos.right, width: PREVIEW_WIDTH, display: showPreview ? "block" : "none", cursor: mapUrl ? "pointer" : "default" }}
+          onMouseEnter={handleEnter} onMouseLeave={handleLeave} onClick={handlePreviewClick} title={mapUrl ? T.openMap : undefined}>
           <GooglePlaceDetailsCompact placeId={placeId} T={T} />
         </div>
       )}
@@ -1449,7 +1477,7 @@ function MobileCardMeta({ row, ctx }) {
 
 function DayGroup({ g, fid, depth, ctx }) {
   const { T, lang, effectiveMobile, collapsedGroups, setCollapsedGroups, collapsedParents, setCollapsedParents,
-    addRow, openCard, types, visibleColumns, openAddDayModal, rows, sortDayByTime, getColWidth, startResize, dragDayKey, setDragDayKey, startDayPointerDrag, dragId, startRowPointerDrag } = ctx;
+    addRow, openCard, types, visibleColumns, openAddDayModal, rows, sortDayByTime, getColWidth, startResize, dragDayKey, setDragDayKey, startDayPointerDrag, dragId, startRowPointerDrag, openHotelInfo } = ctx;
   const gk = (fid || "root") + "__" + g.date;
   const collapsed = !!collapsedGroups[gk];
   const childrenOf = (pid) => childrenOfPure(rows, pid);
@@ -1490,7 +1518,7 @@ function DayGroup({ g, fid, depth, ctx }) {
               <div className="mt-card" key={r.id} data-row-drop={r.id} style={{ opacity: dragId === r.id ? 0.4 : 1 }} onClick={() => openCard(r)}>
                 <div className="mt-card-top">
                   <div className="mt-type-chip">
-                    <span className="mt-type-icon" style={{ background: tm.color }}><Icon /></span>
+                    <PlaceIconWithPreview row={r} tm={tm} Icon={Icon} warnings={[]} T={T} lang={lang} onOpenFull={() => openHotelInfo(r)} />
                     <strong className={warningClass(cardWarnings)} style={{ fontSize: 13.5 }} title={cardWarnings.length ? warningText(cardWarnings) : undefined}>{tm.name}</strong>
                   </div>
                   <span className="mt-card-times">{r.startTime || "—"}{r.endTime ? ` – ${r.endTime}` : ""}</span>
@@ -2656,7 +2684,7 @@ export default function MyTripApp() {
         .mt-type-icon-btn:hover { filter:brightness(1.1); box-shadow:0 0 0 2px var(--teal-tint); }
         .mt-hotel-photo-demo { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; height:110px; border-radius:10px; background:linear-gradient(135deg,var(--teal-tint),var(--bg)); color:var(--teal); border:1.5px dashed var(--border); font-size:11px; text-align:center; padding:8px; }
         .mt-hotel-photo-real { width:100%; height:150px; object-fit:cover; border-radius:10px; }
-        .mt-place-preview-wrap { position:fixed; z-index:250; box-shadow:0 8px 24px rgba(20,40,35,.18); border-radius:10px; overflow:hidden; pointer-events:none; }
+        .mt-place-preview-wrap { position:fixed; z-index:250; box-shadow:0 8px 24px rgba(20,40,35,.18); border-radius:10px; overflow:hidden; pointer-events:auto; }
         .mt-hotel-rating-demo { display:flex; align-items:center; gap:2px; color:#D9A23D; }
         .mt-hotel-rating-demo .mt-hint { margin-inline-start:6px; color:var(--muted); }
         .mt-type-icon svg { width:12px; height:12px; color:#fff; }
