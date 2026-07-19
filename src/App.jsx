@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.22.0";
+const APP_VERSION = "10.23.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -135,6 +135,7 @@ const T_DICT = {
     fetchFlightData: "משוך נתונים לפי מספר טיסה", flightApiMissing: "לצורך משיכה אוטומטית יש לחבר ספק נתוני טיסות (כגון AeroDataBox) עם מפתח API ופרוקסי בצד השרת. שדה זה מוכן לחיבור עתידי.",
     chronoWarning: "סדר הרשומות ביום זה אינו כרונולוגי לפי שעה", sortByTime: "מיין לפי שעה",
     addDayModalTitle: "הוספת יום חדש", addDayDate: "תאריך", confirmAdd: "הוסף",
+    addDayAutoRecords: "רשומות אוטומטיות ליום", addDayHotel: "מלון", addDayTaxi: "מונית", addDayPoi: "נקודת עניין",
     verify: "אמת מול מפות", verified: "מאומת", openMap: "פתח במפה", pickFromMap: "בחר מהמפה",
     fromAlias: "כינוי למוצא", toAlias: "כינוי ליעד", aliasHint: "יוצג בעמודה במקום הטקסט המלא. מתמלא אוטומטית בשם מקוצר בעת אימות מיקום (לפי הכתובת שנמצאה) — ניתן תמיד לשנות ידנית.",
     flightAliasPlaceholder: "לדוגמה: תל אביב (TLV)", copyPrevDest: "העתק יעד משורה קודמת",
@@ -236,6 +237,7 @@ const T_DICT = {
     fetchFlightData: "Fetch data by flight number", flightApiMissing: "Live lookup needs a flight-data provider (e.g. AeroDataBox) with an API key and a server-side proxy. This field is ready to be wired up later.",
     chronoWarning: "Records on this day are not in chronological time order", sortByTime: "Sort by time",
     addDayModalTitle: "Add a new day", addDayDate: "Date", confirmAdd: "Add",
+    addDayAutoRecords: "Automatic records for the day", addDayHotel: "Hotel", addDayTaxi: "Taxi", addDayPoi: "Point of interest",
     verify: "Verify with Maps", verified: "Verified", openMap: "Open in Maps", pickFromMap: "Pick from map",
     fromAlias: "Origin nickname", toAlias: "Destination nickname", aliasHint: "Shown in the table instead of the full text. Auto-filled with a short name when you verify a location (based on the matched address) — you can always edit it manually.",
     flightAliasPlaceholder: "e.g. Tel Aviv (TLV)", copyPrevDest: "Copy previous row's destination",
@@ -826,23 +828,35 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
 
   function fetchRouteDistance() {
     if (row.routeDistanceKm != null || distLoading) return;
-    const origin = rowStartPoint(row), dest = rowEndPoint(row);
+    const hasOwnFrom = !!(row.from && row.from.trim());
+    const origin = hasOwnFrom ? rowStartPoint(row) : (prevRow ? rowEndPoint(prevRow) : "");
+    const dest = rowEndPoint(row);
     if (!origin || !dest) return;
     setDistLoading(true);
-    const originP = (row.fromLat != null && row.fromLon != null) ? Promise.resolve({ lat: row.fromLat, lon: row.fromLon }) : geocodeText(origin);
+    const originLat = hasOwnFrom ? row.fromLat : (prevRow ? prevRow.toLat : null);
+    const originLon = hasOwnFrom ? row.fromLon : (prevRow ? prevRow.toLon : null);
+    const originP = (originLat != null && originLon != null) ? Promise.resolve({ lat: originLat, lon: originLon }) : geocodeText(origin);
     const destP = (row.toLat != null && row.toLon != null) ? Promise.resolve({ lat: row.toLat, lon: row.toLon }) : geocodeText(dest);
     Promise.all([originP, destP]).then(([a, b]) => {
       setDistLoading(false);
       if (!a || !b) return;
       return fetchDrivingRoute(a, b).then((info) => {
-        if (info) updateRow(row.id, { routeDistanceKm: info.distanceKm, routeDurationMin: info.durationMin, fromLat: a.lat, fromLon: a.lon, toLat: b.lat, toLon: b.lon });
+        if (!info) return;
+        const patch = { routeDistanceKm: info.distanceKm, routeDurationMin: info.durationMin, toLat: b.lat, toLon: b.lon };
+        if (hasOwnFrom) { patch.fromLat = a.lat; patch.fromLon = a.lon; }
+        if (row.startTime && !row.endTime) {
+          const [h, m] = row.startTime.split(":").map(Number);
+          const totalMin = (h * 60 + m + Math.round(info.durationMin) + 1440) % 1440;
+          patch.endTime = `${String(Math.floor(totalMin / 60)).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
+        }
+        updateRow(row.id, patch);
       });
     }).catch(() => setDistLoading(false));
   }
   useEffect(() => {
     fetchRouteDistance();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [row.id, row.from, row.to, row.fromLat, row.fromLon, row.toLat, row.toLon]);
+  }, [row.id, row.from, row.to, row.fromLat, row.fromLon, row.toLat, row.toLon, prevRow && prevRow.to, prevRow && prevRow.toLat, prevRow && prevRow.toLon]);
 
   const [fromVerifyLoading, setFromVerifyLoading] = useState(false);
   useEffect(() => {
@@ -1392,7 +1406,7 @@ function PlaceInfoModal({ row, onClose, T }) {
   );
 }
 
-function MobileCardMeta({ row, ctx }) {
+function MobileCardMeta({ row, prevRow, ctx }) {
   const { T, lang, updateRow, openCard, openHotelInfo } = ctx;
   const [distLoading, setDistLoading] = useState(false);
   const [weatherLoading, setWeatherLoading] = useState(false);
@@ -1417,20 +1431,32 @@ function MobileCardMeta({ row, ctx }) {
 
   useEffect(() => {
     if (row.routeDistanceKm != null || distLoading) return;
-    const origin = rowStartPoint(row), dest = rowEndPoint(row);
+    const hasOwnFrom = !!(row.from && row.from.trim());
+    const origin = hasOwnFrom ? rowStartPoint(row) : (prevRow ? rowEndPoint(prevRow) : "");
+    const dest = rowEndPoint(row);
     if (!origin || !dest) return;
     setDistLoading(true);
-    const originP = (row.fromLat != null && row.fromLon != null) ? Promise.resolve({ lat: row.fromLat, lon: row.fromLon }) : geocodeText(origin);
+    const originLat = hasOwnFrom ? row.fromLat : (prevRow ? prevRow.toLat : null);
+    const originLon = hasOwnFrom ? row.fromLon : (prevRow ? prevRow.toLon : null);
+    const originP = (originLat != null && originLon != null) ? Promise.resolve({ lat: originLat, lon: originLon }) : geocodeText(origin);
     const destP = (row.toLat != null && row.toLon != null) ? Promise.resolve({ lat: row.toLat, lon: row.toLon }) : geocodeText(dest);
     Promise.all([originP, destP]).then(([a, b]) => {
       setDistLoading(false);
       if (!a || !b) return;
       return fetchDrivingRoute(a, b).then((info) => {
-        if (info) updateRow(row.id, { routeDistanceKm: info.distanceKm, routeDurationMin: info.durationMin, fromLat: a.lat, fromLon: a.lon, toLat: b.lat, toLon: b.lon });
+        if (!info) return;
+        const patch = { routeDistanceKm: info.distanceKm, routeDurationMin: info.durationMin, toLat: b.lat, toLon: b.lon };
+        if (hasOwnFrom) { patch.fromLat = a.lat; patch.fromLon = a.lon; }
+        if (row.startTime && !row.endTime) {
+          const [h, m] = row.startTime.split(":").map(Number);
+          const totalMin = (h * 60 + m + Math.round(info.durationMin) + 1440) % 1440;
+          patch.endTime = `${String(Math.floor(totalMin / 60)).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
+        }
+        updateRow(row.id, patch);
       });
     }).catch(() => setDistLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [row.id, row.from, row.to, row.fromLat, row.fromLon, row.toLat, row.toLon]);
+  }, [row.id, row.from, row.to, row.fromLat, row.fromLon, row.toLat, row.toLon, prevRow && prevRow.to, prevRow && prevRow.toLat, prevRow && prevRow.toLon]);
 
   const [fromVerifyLoading, setFromVerifyLoading] = useState(false);
   useEffect(() => {
@@ -1530,7 +1556,7 @@ function DayGroup({ g, fid, depth, ctx }) {
       )}
       {!collapsed && (effectiveMobile ? (
         <div className="mt-cards">
-          {allRowsHere.map((r) => {
+          {allRowsHere.map((r, ri) => {
             const tm = typeMeta(r.typeId, types, T, lang); const Icon = ICONS[tm.icon] || Tag;
             const fromLabel = r.fromAlias || r.from, toLabel = r.toAlias || r.to;
             const cardWarnings = getRowWarning(r, T);
@@ -1552,7 +1578,7 @@ function DayGroup({ g, fid, depth, ctx }) {
                   </div>
                 )}
                 <div className="mt-card-bottom">
-                  <MobileCardMeta row={r} ctx={ctx} />
+                  <MobileCardMeta row={r} prevRow={ri > 0 ? allRowsHere[ri - 1] : null} ctx={ctx} />
                   {Number(r.costAmount) > 0 && <span className="mt-cost">{r.costCurrency}{r.costAmount}</span>}
                 </div>
               </div>
@@ -2396,7 +2422,7 @@ export default function MyTripApp() {
   }
 
   /* ---------- add-day modal ---------- */
-  function openAddDayModal(fid) { setAddDayCtx({ fid, date: nextDateInContext(fid) }); }
+  function openAddDayModal(fid) { setAddDayCtx({ fid, date: nextDateInContext(fid), addHotel: true, addTaxi: true, addPoi: true }); }
   function closeAddDayModal() { setAddDayCtx(null); }
   const addDayFrame = addDayCtx && addDayCtx.fid ? frames.find((f) => f.id === addDayCtx.fid) : null;
   const addDayIssue = addDayCtx && addDayFrame && (addDayCtx.date < addDayFrame.startDate || addDayCtx.date > addDayFrame.endDate) ? T.rowOutOfFrame : null;
@@ -2415,22 +2441,34 @@ export default function MyTripApp() {
   function confirmAddDay() {
     if (!addDayCtx || !addDayCtx.date || addDayIssue) return;
     const prevHotel = findLastHotelInfo(addDayCtx.date);
-    const id1 = addRow(addDayCtx.date, null, addDayCtx.fid);
-    updateRow(id1, {
-      typeId: "hotel", startTime: "08:00",
-      from: prevHotel ? prevHotel.name : "", fromAlias: prevHotel ? prevHotel.alias : "",
-      fromLat: prevHotel ? prevHotel.lat : null, fromLon: prevHotel ? prevHotel.lon : null,
-      fromVerifiedUrl: prevHotel ? prevHotel.verifiedUrl : "", fromVerifiedText: prevHotel ? prevHotel.verifiedText : "",
-      fromPlaceId: prevHotel ? prevHotel.placeId : null,
-    });
-    const id2 = addRow(addDayCtx.date, null, addDayCtx.fid);
-    updateRow(id2, {
-      typeId: "hotel", startTime: "22:00",
-      to: prevHotel ? prevHotel.name : "", toAlias: prevHotel ? prevHotel.alias : "",
-      toLat: prevHotel ? prevHotel.lat : null, toLon: prevHotel ? prevHotel.lon : null,
-      toVerifiedUrl: prevHotel ? prevHotel.verifiedUrl : "", toVerifiedText: prevHotel ? prevHotel.verifiedText : "",
-      toPlaceId: prevHotel ? prevHotel.placeId : null,
-    });
+    if (addDayCtx.addHotel) {
+      const id1 = addRow(addDayCtx.date, null, addDayCtx.fid);
+      updateRow(id1, {
+        typeId: "hotel", startTime: "08:00",
+        from: prevHotel ? prevHotel.name : "", fromAlias: prevHotel ? prevHotel.alias : "",
+        fromLat: prevHotel ? prevHotel.lat : null, fromLon: prevHotel ? prevHotel.lon : null,
+        fromVerifiedUrl: prevHotel ? prevHotel.verifiedUrl : "", fromVerifiedText: prevHotel ? prevHotel.verifiedText : "",
+        fromPlaceId: prevHotel ? prevHotel.placeId : null,
+      });
+    }
+    if (addDayCtx.addTaxi) {
+      const idTaxi = addRow(addDayCtx.date, null, addDayCtx.fid);
+      updateRow(idTaxi, { typeId: "taxi", startTime: "08:00" });
+    }
+    if (addDayCtx.addPoi) {
+      const idPoi = addRow(addDayCtx.date, null, addDayCtx.fid);
+      updateRow(idPoi, { typeId: "poi", startTime: "09:00" });
+    }
+    if (addDayCtx.addHotel) {
+      const id2 = addRow(addDayCtx.date, null, addDayCtx.fid);
+      updateRow(id2, {
+        typeId: "hotel", endTime: "22:00",
+        to: prevHotel ? prevHotel.name : "", toAlias: prevHotel ? prevHotel.alias : "",
+        toLat: prevHotel ? prevHotel.lat : null, toLon: prevHotel ? prevHotel.lon : null,
+        toVerifiedUrl: prevHotel ? prevHotel.verifiedUrl : "", toVerifiedText: prevHotel ? prevHotel.verifiedText : "",
+        toPlaceId: prevHotel ? prevHotel.placeId : null,
+      });
+    }
     closeAddDayModal();
   }
 
@@ -3386,10 +3424,18 @@ export default function MyTripApp() {
       {addDayCtx && (
         <div className="mt-modal-backdrop" onClick={closeAddDayModal}>
           <div className="mt-modal narrow" onClick={(e) => e.stopPropagation()}>
-            <div className="mt-modal-header"><span className="mt-modal-title">{T.addDayModalTitle}</span><button className="mt-btn ghost" onClick={closeAddDayModal}><X size={16} /></button></div>
+            <div className="mt-modal-header"><span className="mt-modal-title" style={{ fontFamily: "inherit" }}>{T.addDayModalTitle}</span><button className="mt-btn ghost" onClick={closeAddDayModal}><X size={16} /></button></div>
             <div className="mt-modal-body">
               <div className="mt-field"><label>{T.addDayDate}</label><DateField value={addDayCtx.date} onChange={(e) => setAddDayCtx({ ...addDayCtx, date: e.target.value })} /></div>
               {addDayIssue && <div className="mt-error"><AlertTriangle /> {addDayIssue}</div>}
+              <div className="mt-field">
+                <label>{T.addDayAutoRecords}</label>
+                <div className="mt-wizard-choices">
+                  <button type="button" className={"mt-wizard-choice" + (addDayCtx.addHotel ? " selected" : "")} onClick={() => setAddDayCtx({ ...addDayCtx, addHotel: !addDayCtx.addHotel })}><BedDouble size={13} /> {T.addDayHotel}</button>
+                  <button type="button" className={"mt-wizard-choice" + (addDayCtx.addTaxi ? " selected" : "")} onClick={() => setAddDayCtx({ ...addDayCtx, addTaxi: !addDayCtx.addTaxi })}><Car size={13} /> {T.addDayTaxi}</button>
+                  <button type="button" className={"mt-wizard-choice" + (addDayCtx.addPoi ? " selected" : "")} onClick={() => setAddDayCtx({ ...addDayCtx, addPoi: !addDayCtx.addPoi })}><MapPin size={13} /> {T.addDayPoi}</button>
+                </div>
+              </div>
             </div>
             <div className="mt-modal-footer">
               <button className="mt-btn ghost" onClick={closeAddDayModal}>{T.cancel}</button>
