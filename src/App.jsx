@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.23.0";
+const APP_VERSION = "10.24.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -135,7 +135,8 @@ const T_DICT = {
     fetchFlightData: "משוך נתונים לפי מספר טיסה", flightApiMissing: "לצורך משיכה אוטומטית יש לחבר ספק נתוני טיסות (כגון AeroDataBox) עם מפתח API ופרוקסי בצד השרת. שדה זה מוכן לחיבור עתידי.",
     chronoWarning: "סדר הרשומות ביום זה אינו כרונולוגי לפי שעה", sortByTime: "מיין לפי שעה",
     addDayModalTitle: "הוספת יום חדש", addDayDate: "תאריך", confirmAdd: "הוסף",
-    addDayAutoRecords: "רשומות אוטומטיות ליום", addDayHotel: "מלון", addDayTaxi: "מונית", addDayPoi: "נקודת עניין",
+    addDayAutoRecords: "רשומות אוטומטיות ליום", addDayHotel: "מלון", addDayTransport: "תחבורה", addDayPoi: "נקודת עניין",
+    demoLocationName: "וותיקן",
     verify: "אמת מול מפות", verified: "מאומת", openMap: "פתח במפה", pickFromMap: "בחר מהמפה",
     fromAlias: "כינוי למוצא", toAlias: "כינוי ליעד", aliasHint: "יוצג בעמודה במקום הטקסט המלא. מתמלא אוטומטית בשם מקוצר בעת אימות מיקום (לפי הכתובת שנמצאה) — ניתן תמיד לשנות ידנית.",
     flightAliasPlaceholder: "לדוגמה: תל אביב (TLV)", copyPrevDest: "העתק יעד משורה קודמת",
@@ -237,7 +238,8 @@ const T_DICT = {
     fetchFlightData: "Fetch data by flight number", flightApiMissing: "Live lookup needs a flight-data provider (e.g. AeroDataBox) with an API key and a server-side proxy. This field is ready to be wired up later.",
     chronoWarning: "Records on this day are not in chronological time order", sortByTime: "Sort by time",
     addDayModalTitle: "Add a new day", addDayDate: "Date", confirmAdd: "Add",
-    addDayAutoRecords: "Automatic records for the day", addDayHotel: "Hotel", addDayTaxi: "Taxi", addDayPoi: "Point of interest",
+    addDayAutoRecords: "Automatic records for the day", addDayHotel: "Hotel", addDayTransport: "Transportation", addDayPoi: "Point of interest",
+    demoLocationName: "Vatican",
     verify: "Verify with Maps", verified: "Verified", openMap: "Open in Maps", pickFromMap: "Pick from map",
     fromAlias: "Origin nickname", toAlias: "Destination nickname", aliasHint: "Shown in the table instead of the full text. Auto-filled with a short name when you verify a location (based on the matched address) — you can always edit it manually.",
     flightAliasPlaceholder: "e.g. Tel Aviv (TLV)", copyPrevDest: "Copy previous row's destination",
@@ -2422,7 +2424,7 @@ export default function MyTripApp() {
   }
 
   /* ---------- add-day modal ---------- */
-  function openAddDayModal(fid) { setAddDayCtx({ fid, date: nextDateInContext(fid), addHotel: true, addTaxi: true, addPoi: true }); }
+  function openAddDayModal(fid) { setAddDayCtx({ fid, date: nextDateInContext(fid), addHotel: true, addTransport: true, addPoi: true }); }
   function closeAddDayModal() { setAddDayCtx(null); }
   const addDayFrame = addDayCtx && addDayCtx.fid ? frames.find((f) => f.id === addDayCtx.fid) : null;
   const addDayIssue = addDayCtx && addDayFrame && (addDayCtx.date < addDayFrame.startDate || addDayCtx.date > addDayFrame.endDate) ? T.rowOutOfFrame : null;
@@ -2451,13 +2453,17 @@ export default function MyTripApp() {
         fromPlaceId: prevHotel ? prevHotel.placeId : null,
       });
     }
-    if (addDayCtx.addTaxi) {
+    if (addDayCtx.addTransport) {
       const idTaxi = addRow(addDayCtx.date, null, addDayCtx.fid);
-      updateRow(idTaxi, { typeId: "taxi", startTime: "08:00" });
+      updateRow(idTaxi, { typeId: "taxi", startTime: "08:00", to: T.demoLocationName });
     }
     if (addDayCtx.addPoi) {
       const idPoi = addRow(addDayCtx.date, null, addDayCtx.fid);
-      updateRow(idPoi, { typeId: "poi", startTime: "09:00" });
+      updateRow(idPoi, { typeId: "poi", startTime: "09:00", from: T.demoLocationName, to: T.demoLocationName });
+    }
+    if (addDayCtx.addTransport) {
+      const idBus = addRow(addDayCtx.date, null, addDayCtx.fid);
+      updateRow(idBus, { typeId: "bus", startTime: "12:00", to: T.demoLocationName });
     }
     if (addDayCtx.addHotel) {
       const id2 = addRow(addDayCtx.date, null, addDayCtx.fid);
@@ -3432,7 +3438,7 @@ export default function MyTripApp() {
                 <label>{T.addDayAutoRecords}</label>
                 <div className="mt-wizard-choices">
                   <button type="button" className={"mt-wizard-choice" + (addDayCtx.addHotel ? " selected" : "")} onClick={() => setAddDayCtx({ ...addDayCtx, addHotel: !addDayCtx.addHotel })}><BedDouble size={13} /> {T.addDayHotel}</button>
-                  <button type="button" className={"mt-wizard-choice" + (addDayCtx.addTaxi ? " selected" : "")} onClick={() => setAddDayCtx({ ...addDayCtx, addTaxi: !addDayCtx.addTaxi })}><Car size={13} /> {T.addDayTaxi}</button>
+                  <button type="button" className={"mt-wizard-choice" + (addDayCtx.addTransport ? " selected" : "")} onClick={() => setAddDayCtx({ ...addDayCtx, addTransport: !addDayCtx.addTransport })}><Car size={13} /> {T.addDayTransport}</button>
                   <button type="button" className={"mt-wizard-choice" + (addDayCtx.addPoi ? " selected" : "")} onClick={() => setAddDayCtx({ ...addDayCtx, addPoi: !addDayCtx.addPoi })}><MapPin size={13} /> {T.addDayPoi}</button>
                 </div>
               </div>
