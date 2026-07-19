@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.18.0";
+const APP_VERSION = "10.18.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1269,7 +1269,7 @@ function GooglePlaceDetailsCompact({ placeId, T }) {
   if (state === "error") return <div className="mt-hint" style={{ padding: 10 }}>{T.googleUiKitError}</div>;
   if (state === "loading") return <div className="mt-hint" style={{ padding: 10 }}>{T.locSearching}</div>;
   return (
-    <gmp-place-details-compact orientation="vertical" truncation-preferred style={{ width: "240px", border: "none", padding: 0, margin: 0 }}>
+    <gmp-place-details-compact orientation="horizontal" truncation-preferred style={{ width: "280px", border: "none", padding: 0, margin: 0 }}>
       <gmp-place-details-place-request place={placeId}></gmp-place-details-place-request>
       <GooglePlaceContentConfig />
     </gmp-place-details-compact>
