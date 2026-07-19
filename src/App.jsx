@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.29.0";
+const APP_VERSION = "10.30.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -916,7 +916,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
   useEffect(() => {
     fetchRouteDistance();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [row.id, row.from, row.to, row.startTime, row.typeId, row.fromLat, row.fromLon, row.toLat, row.toLon, prevRow && prevRow.to, prevRow && prevRow.toLat, prevRow && prevRow.toLon]);
+  }, [row.id, row.from, row.to, row.fromAlias, row.toAlias, row.startTime, row.typeId, row.fromLat, row.fromLon, row.toLat, row.toLon, prevRow && prevRow.to, prevRow && prevRow.toAlias, prevRow && prevRow.toLat, prevRow && prevRow.toLon]);
 
   const [fromVerifyLoading, setFromVerifyLoading] = useState(false);
   useEffect(() => {
@@ -1524,7 +1524,7 @@ function MobileCardMeta({ row, prevRow, ctx }) {
       });
     }).catch(() => setDistLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [row.id, row.from, row.to, row.startTime, row.typeId, row.fromLat, row.fromLon, row.toLat, row.toLon, prevRow && prevRow.to, prevRow && prevRow.toLat, prevRow && prevRow.toLon]);
+  }, [row.id, row.from, row.to, row.fromAlias, row.toAlias, row.startTime, row.typeId, row.fromLat, row.fromLon, row.toLat, row.toLon, prevRow && prevRow.to, prevRow && prevRow.toAlias, prevRow && prevRow.toLat, prevRow && prevRow.toLon]);
 
   const [fromVerifyLoading, setFromVerifyLoading] = useState(false);
   useEffect(() => {
