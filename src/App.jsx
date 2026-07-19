@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.28.0";
+const APP_VERSION = "10.29.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -464,8 +464,8 @@ function rowFrameIssue(draft, frames, T) {
   if (draft.date < f.startDate || draft.date > f.endDate) return T.rowOutOfFrame;
   return null;
 }
-function rowStartPoint(row) { return (row.from && row.from.trim()) || ""; }
-function rowEndPoint(row) { return (row.to && row.to.trim()) || ""; }
+function rowStartPoint(row) { return (row.from && row.from.trim()) || (row.fromAlias && row.fromAlias.trim()) || ""; }
+function rowEndPoint(row) { return (row.to && row.to.trim()) || (row.toAlias && row.toAlias.trim()) || ""; }
 const TRAVEL_MODE_MAP = {
   taxi: "driving", "car-rental": "driving", caravan: "driving", motorcycle: "driving",
   bicycle: "bicycling", scooter: "bicycling",
@@ -1025,7 +1025,11 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
                       <React.Fragment key={grp.category}>
                         <div className="mt-type-cat-label">{CATEGORY_LABELS[lang][grp.category] || grp.category}</div>
                         {grp.items.map((t) => { const TI = ICONS[t.icon] || Tag; const selected = t.id === row.typeId; return (
-                          <button key={t.id} className={"opt" + (selected ? " selected" : "")} onClick={() => { updateRow(row.id, { typeId: t.id }); setTypeMenuOpen(null); }}>
+                          <button key={t.id} className={"opt" + (selected ? " selected" : "")} onClick={() => {
+                            const patch = { typeId: t.id };
+                            if (noOriginNeeded(t.id)) { patch.from = ""; patch.fromAlias = ""; patch.fromLat = null; patch.fromLon = null; patch.fromVerifiedUrl = ""; patch.fromVerifiedText = ""; patch.fromPlaceId = null; }
+                            updateRow(row.id, patch); setTypeMenuOpen(null);
+                          }}>
                             <span className="mt-type-icon" style={{ background: t.color, width: 20, height: 20 }}><TI size={11} /></span>
                             <span style={{ flex: 1 }}>{typeDisplayName(t, lang)}</span>
                             {selected && <Check size={13} />}
@@ -2178,7 +2182,7 @@ export default function MyTripApp() {
       const startTime = `${String(h % 24).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
       h += 1;
       const id = addRow(routeImportDate, null, fid);
-      updateRow(id, { typeId: "poi", from: name, to: name, startTime });
+      updateRow(id, { typeId: "poi", to: name, startTime });
     });
     setRouteImportOpen(false);
   }
@@ -2525,7 +2529,7 @@ export default function MyTripApp() {
     }
     if (addDayCtx.addPoi) {
       const idPoi = addRow(addDayCtx.date, null, addDayCtx.fid);
-      updateRow(idPoi, { typeId: "poi", startTime: "09:00", from: T.demoLocationName, to: T.demoLocationName });
+      updateRow(idPoi, { typeId: "poi", startTime: "09:00", to: T.demoLocationName });
     }
     if (addDayCtx.addTransport) {
       const idTaxi = addRow(addDayCtx.date, null, addDayCtx.fid);
@@ -2916,7 +2920,7 @@ export default function MyTripApp() {
         .mt-editable:focus { outline:none; border-color:var(--teal); background:#fff; }
         .mt-editable.mt-time:focus, .mt-editable[type=number]:focus { outline:none; border-color:var(--teal); background:#fff; }
         .mt-editable.mt-time { min-width:60px; font-weight:700; color:var(--ink); padding-inline-end:2px; }
-        .mt-computed-field { text-decoration:underline; text-decoration-style:dotted; text-decoration-color:var(--teal); text-underline-offset:2px; }
+        .mt-computed-field { border-bottom:2px dotted var(--teal) !important; }
         .mt-editable.mt-time::-webkit-calendar-picker-indicator { padding:1px; margin-inline-start:1px; width:10px; height:10px; opacity:.6; }
         .mt-editable[type=number] { min-width:38px; padding-inline-start:1px; -moz-appearance:textfield; }
         .mt-editable[type=number]::-webkit-outer-spin-button, .mt-editable[type=number]::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
@@ -3608,7 +3612,11 @@ export default function MyTripApp() {
               <div className="mt-field-row">
                 <div className="mt-field">
                   <label>{T.type}</label>
-                  <select value={cardDraft.typeId} onChange={(e) => setCardDraft({ ...cardDraft, typeId: e.target.value })}>
+                  <select value={cardDraft.typeId} onChange={(e) => {
+                    const newType = e.target.value;
+                    if (noOriginNeeded(newType)) setCardDraft({ ...cardDraft, typeId: newType, from: "", fromAlias: "", fromLat: null, fromLon: null, fromVerifiedUrl: "", fromVerifiedText: "", fromPlaceId: null });
+                    else setCardDraft({ ...cardDraft, typeId: newType });
+                  }}>
                     <option value="unset">{T.selectType}</option>
                     {groupTypesByCategory(types).map((grp) => (
                       <optgroup key={grp.category} label={CATEGORY_LABELS[lang][grp.category] || grp.category}>
