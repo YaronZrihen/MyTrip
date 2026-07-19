@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.17.0";
+const APP_VERSION = "10.18.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -836,12 +836,15 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
     if (!row.from) return;
     const fullyVerified = hasGooglePlaces() ? (row.fromPlaceId && row.fromVerifiedText === row.from) : (row.fromVerifiedUrl && row.fromVerifiedText === row.from);
     if (fullyVerified) return;
-    if (fromVerifyLoading) return;
-    setFromVerifyLoading(true);
-    autoVerifyLocationField(row, "from", lang).then((patch) => {
-      setFromVerifyLoading(false);
-      if (patch) updateRow(row.id, patch);
-    }).catch(() => setFromVerifyLoading(false));
+    const timer = setTimeout(() => {
+      if (fromVerifyLoading) return;
+      setFromVerifyLoading(true);
+      autoVerifyLocationField(row, "from", lang).then((patch) => {
+        setFromVerifyLoading(false);
+        if (patch) updateRow(row.id, patch);
+      }).catch(() => setFromVerifyLoading(false));
+    }, 900);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [row.id, row.from, row.fromLat, row.fromLon, row.fromPlaceId]);
 
@@ -850,12 +853,15 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
     if (!row.to) return;
     const fullyVerified = hasGooglePlaces() ? (row.toPlaceId && row.toVerifiedText === row.to) : (row.toVerifiedUrl && row.toVerifiedText === row.to);
     if (fullyVerified) return;
-    if (toVerifyLoading) return;
-    setToVerifyLoading(true);
-    autoVerifyLocationField(row, "to", lang).then((patch) => {
-      setToVerifyLoading(false);
-      if (patch) updateRow(row.id, patch);
-    }).catch(() => setToVerifyLoading(false));
+    const timer = setTimeout(() => {
+      if (toVerifyLoading) return;
+      setToVerifyLoading(true);
+      autoVerifyLocationField(row, "to", lang).then((patch) => {
+        setToVerifyLoading(false);
+        if (patch) updateRow(row.id, patch);
+      }).catch(() => setToVerifyLoading(false));
+    }, 900);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [row.id, row.to, row.toLat, row.toLon, row.toPlaceId]);
 
@@ -1381,12 +1387,15 @@ function MobileCardMeta({ row, ctx }) {
     if (!row.from) return;
     const fullyVerified = hasGooglePlaces() ? (row.fromPlaceId && row.fromVerifiedText === row.from) : (row.fromVerifiedUrl && row.fromVerifiedText === row.from);
     if (fullyVerified) return;
-    if (fromVerifyLoading) return;
-    setFromVerifyLoading(true);
-    autoVerifyLocationField(row, "from", lang).then((patch) => {
-      setFromVerifyLoading(false);
-      if (patch) updateRow(row.id, patch);
-    }).catch(() => setFromVerifyLoading(false));
+    const timer = setTimeout(() => {
+      if (fromVerifyLoading) return;
+      setFromVerifyLoading(true);
+      autoVerifyLocationField(row, "from", lang).then((patch) => {
+        setFromVerifyLoading(false);
+        if (patch) updateRow(row.id, patch);
+      }).catch(() => setFromVerifyLoading(false));
+    }, 900);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [row.id, row.from, row.fromLat, row.fromLon, row.fromPlaceId]);
 
@@ -1395,12 +1404,15 @@ function MobileCardMeta({ row, ctx }) {
     if (!row.to) return;
     const fullyVerified = hasGooglePlaces() ? (row.toPlaceId && row.toVerifiedText === row.to) : (row.toVerifiedUrl && row.toVerifiedText === row.to);
     if (fullyVerified) return;
-    if (toVerifyLoading) return;
-    setToVerifyLoading(true);
-    autoVerifyLocationField(row, "to", lang).then((patch) => {
-      setToVerifyLoading(false);
-      if (patch) updateRow(row.id, patch);
-    }).catch(() => setToVerifyLoading(false));
+    const timer = setTimeout(() => {
+      if (toVerifyLoading) return;
+      setToVerifyLoading(true);
+      autoVerifyLocationField(row, "to", lang).then((patch) => {
+        setToVerifyLoading(false);
+        if (patch) updateRow(row.id, patch);
+      }).catch(() => setToVerifyLoading(false));
+    }, 900);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [row.id, row.to, row.toLat, row.toLon, row.toPlaceId]);
 
