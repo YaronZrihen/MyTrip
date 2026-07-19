@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.26.0";
+const APP_VERSION = "10.27.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -660,6 +660,42 @@ function osrmProfileForType(typeId) {
   if (mode === "bicycling") return "cycling";
   return "driving";
 }
+function googleTravelModeForType(typeId) {
+  const mode = TRAVEL_MODE_MAP[typeId];
+  if (mode === "walking") return "WALK";
+  if (mode === "bicycling") return "BICYCLE";
+  if (mode === "transit") return "TRANSIT";
+  return "DRIVE";
+}
+function computeGoogleRoute(a, b, travelMode) {
+  if (!GOOGLE_PLACES_KEY) return Promise.resolve(null);
+  const fieldMask = "routes.duration,routes.distanceMeters";
+  const body = {
+    origin: { location: { latLng: { latitude: a.lat, longitude: a.lon } } },
+    destination: { location: { latLng: { latitude: b.lat, longitude: b.lon } } },
+    travelMode,
+  };
+  if (travelMode === "DRIVE") body.routingPreference = "TRAFFIC_AWARE";
+  return fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Goog-Api-Key": GOOGLE_PLACES_KEY, "X-Goog-FieldMask": fieldMask },
+    body: JSON.stringify(body),
+  })
+    .then((r) => { if (!r.ok) return extractGoogleApiError(r); return r.json(); })
+    .then((data) => {
+      const route = data && data.routes && data.routes[0];
+      if (!route) return null;
+      const durSec = parseFloat((route.duration || "0s").replace("s", "")) || 0;
+      return { distanceKm: (route.distanceMeters || 0) / 1000, durationMin: durSec / 60 };
+    })
+    .catch(() => null);
+}
+function fetchRouteInfo(a, b, typeId) {
+  if (hasGooglePlaces()) {
+    return computeGoogleRoute(a, b, googleTravelModeForType(typeId)).then((info) => info || fetchDrivingRoute(a, b, osrmProfileForType(typeId)));
+  }
+  return fetchDrivingRoute(a, b, osrmProfileForType(typeId));
+}
 
 /* Weather — Open-Meteo (free, no API key). Forecast only covers ~16 days ahead. */
 const WMO_ICON_MAP = {
@@ -852,7 +888,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
     Promise.all([originP, destP]).then(([a, b]) => {
       setDistLoading(false);
       if (!a || !b) return;
-      return fetchDrivingRoute(a, b, osrmProfileForType(row.typeId)).then((info) => {
+      return fetchRouteInfo(a, b, row.typeId).then((info) => {
         if (!info) return;
         const patch = { routeDistanceKm: info.distanceKm, routeDurationMin: info.durationMin, toLat: b.lat, toLon: b.lon };
         if (hasOwnFrom) { patch.fromLat = a.lat; patch.fromLon = a.lon; }
@@ -1458,7 +1494,7 @@ function MobileCardMeta({ row, prevRow, ctx }) {
     Promise.all([originP, destP]).then(([a, b]) => {
       setDistLoading(false);
       if (!a || !b) return;
-      return fetchDrivingRoute(a, b, osrmProfileForType(row.typeId)).then((info) => {
+      return fetchRouteInfo(a, b, row.typeId).then((info) => {
         if (!info) return;
         const patch = { routeDistanceKm: info.distanceKm, routeDurationMin: info.durationMin, toLat: b.lat, toLon: b.lon };
         if (hasOwnFrom) { patch.fromLat = a.lat; patch.fromLon = a.lon; }
