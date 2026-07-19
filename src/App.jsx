@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.24.0";
+const APP_VERSION = "10.25.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -828,12 +828,15 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
   const [showAddTypeForm, setShowAddTypeForm] = useState(false);
   const [distLoading, setDistLoading] = useState(false);
 
+  const lastRouteCalcSig = useRef(null);
   function fetchRouteDistance() {
-    if (row.routeDistanceKm != null || distLoading) return;
     const hasOwnFrom = !!(row.from && row.from.trim());
     const origin = hasOwnFrom ? rowStartPoint(row) : (prevRow ? rowEndPoint(prevRow) : "");
     const dest = rowEndPoint(row);
     if (!origin || !dest) return;
+    const sig = origin + "|" + dest + "|" + (row.startTime || "");
+    if (lastRouteCalcSig.current === sig || distLoading) return;
+    lastRouteCalcSig.current = sig;
     setDistLoading(true);
     const originLat = hasOwnFrom ? row.fromLat : (prevRow ? prevRow.toLat : null);
     const originLon = hasOwnFrom ? row.fromLon : (prevRow ? prevRow.toLon : null);
@@ -846,7 +849,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
         if (!info) return;
         const patch = { routeDistanceKm: info.distanceKm, routeDurationMin: info.durationMin, toLat: b.lat, toLon: b.lon };
         if (hasOwnFrom) { patch.fromLat = a.lat; patch.fromLon = a.lon; }
-        if (row.startTime && !row.endTime) {
+        if (row.startTime) {
           const [h, m] = row.startTime.split(":").map(Number);
           const totalMin = (h * 60 + m + Math.round(info.durationMin) + 1440) % 1440;
           patch.endTime = `${String(Math.floor(totalMin / 60)).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
@@ -858,7 +861,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
   useEffect(() => {
     fetchRouteDistance();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [row.id, row.from, row.to, row.fromLat, row.fromLon, row.toLat, row.toLon, prevRow && prevRow.to, prevRow && prevRow.toLat, prevRow && prevRow.toLon]);
+  }, [row.id, row.from, row.to, row.startTime, row.fromLat, row.fromLon, row.toLat, row.toLon, prevRow && prevRow.to, prevRow && prevRow.toLat, prevRow && prevRow.toLon]);
 
   const [fromVerifyLoading, setFromVerifyLoading] = useState(false);
   useEffect(() => {
@@ -1411,6 +1414,7 @@ function PlaceInfoModal({ row, onClose, T }) {
 function MobileCardMeta({ row, prevRow, ctx }) {
   const { T, lang, updateRow, openCard, openHotelInfo } = ctx;
   const [distLoading, setDistLoading] = useState(false);
+  const lastRouteCalcSig = useRef(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const routeUrl = rowOwnRouteUrl(row);
   const hasWeather = row.weatherCode != null && row.weatherForDate === row.date;
@@ -1432,11 +1436,13 @@ function MobileCardMeta({ row, prevRow, ctx }) {
   }, [row.id, row.date, row.to, row.toAlias, row.toLat, row.toLon]);
 
   useEffect(() => {
-    if (row.routeDistanceKm != null || distLoading) return;
     const hasOwnFrom = !!(row.from && row.from.trim());
     const origin = hasOwnFrom ? rowStartPoint(row) : (prevRow ? rowEndPoint(prevRow) : "");
     const dest = rowEndPoint(row);
     if (!origin || !dest) return;
+    const sig = origin + "|" + dest + "|" + (row.startTime || "");
+    if (lastRouteCalcSig.current === sig || distLoading) return;
+    lastRouteCalcSig.current = sig;
     setDistLoading(true);
     const originLat = hasOwnFrom ? row.fromLat : (prevRow ? prevRow.toLat : null);
     const originLon = hasOwnFrom ? row.fromLon : (prevRow ? prevRow.toLon : null);
@@ -1449,7 +1455,7 @@ function MobileCardMeta({ row, prevRow, ctx }) {
         if (!info) return;
         const patch = { routeDistanceKm: info.distanceKm, routeDurationMin: info.durationMin, toLat: b.lat, toLon: b.lon };
         if (hasOwnFrom) { patch.fromLat = a.lat; patch.fromLon = a.lon; }
-        if (row.startTime && !row.endTime) {
+        if (row.startTime) {
           const [h, m] = row.startTime.split(":").map(Number);
           const totalMin = (h * 60 + m + Math.round(info.durationMin) + 1440) % 1440;
           patch.endTime = `${String(Math.floor(totalMin / 60)).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
@@ -1458,7 +1464,7 @@ function MobileCardMeta({ row, prevRow, ctx }) {
       });
     }).catch(() => setDistLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [row.id, row.from, row.to, row.fromLat, row.fromLon, row.toLat, row.toLon, prevRow && prevRow.to, prevRow && prevRow.toLat, prevRow && prevRow.toLon]);
+  }, [row.id, row.from, row.to, row.startTime, row.fromLat, row.fromLon, row.toLat, row.toLon, prevRow && prevRow.to, prevRow && prevRow.toLat, prevRow && prevRow.toLon]);
 
   const [fromVerifyLoading, setFromVerifyLoading] = useState(false);
   useEffect(() => {
@@ -2454,16 +2460,23 @@ export default function MyTripApp() {
       });
     }
     if (addDayCtx.addTransport) {
-      const idTaxi = addRow(addDayCtx.date, null, addDayCtx.fid);
-      updateRow(idTaxi, { typeId: "taxi", startTime: "08:00", to: T.demoLocationName });
+      const idBus = addRow(addDayCtx.date, null, addDayCtx.fid);
+      updateRow(idBus, {
+        typeId: "bus", startTime: "08:00", to: T.demoLocationName,
+        from: prevHotel ? prevHotel.name : "", fromAlias: prevHotel ? prevHotel.alias : "",
+        fromLat: prevHotel ? prevHotel.lat : null, fromLon: prevHotel ? prevHotel.lon : null,
+      });
     }
     if (addDayCtx.addPoi) {
       const idPoi = addRow(addDayCtx.date, null, addDayCtx.fid);
       updateRow(idPoi, { typeId: "poi", startTime: "09:00", from: T.demoLocationName, to: T.demoLocationName });
     }
     if (addDayCtx.addTransport) {
-      const idBus = addRow(addDayCtx.date, null, addDayCtx.fid);
-      updateRow(idBus, { typeId: "bus", startTime: "12:00", to: T.demoLocationName });
+      const idTaxi = addRow(addDayCtx.date, null, addDayCtx.fid);
+      updateRow(idTaxi, {
+        typeId: "taxi", startTime: "11:00", to: prevHotel ? prevHotel.name : "",
+        toAlias: prevHotel ? prevHotel.alias : "", toLat: prevHotel ? prevHotel.lat : null, toLon: prevHotel ? prevHotel.lon : null,
+      });
     }
     if (addDayCtx.addHotel) {
       const id2 = addRow(addDayCtx.date, null, addDayCtx.fid);
