@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.21.0";
+const APP_VERSION = "10.22.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -2125,30 +2125,42 @@ export default function MyTripApp() {
   }
   function generateTravelJournal(fid) {
     function esc(s) { return (s || "").toString().replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
-    function collectFrameIds(id) {
-      let ids = [id];
-      frames.filter((f) => f.parentFrameId === id).forEach((f) => { ids = ids.concat(collectFrameIds(f.id)); });
-      return ids;
-    }
     const frame = frames.find((f) => f.id === fid);
-    const frameIds = new Set(collectFrameIds(fid));
-    const journalRows = rows.filter((r) => frameIds.has(r.frameId || null) && r.personalExperience && r.personalExperience.trim())
-      .sort((a, b) => (a.date + (a.startTime || "")).localeCompare(b.date + (b.startTime || "")));
     const stats = frameSummaryStats(rows, frames, fid);
     const totals = frameTotals(fid);
     const convertedTotal = Object.entries(totals).reduce((sum, [cur, amt]) => sum + convertAmount(amt, cur, displayCurrency), 0);
     const routeUrl = frameRouteUrl(rows, frames, fid, true);
 
-    const entriesHtml = journalRows.map((r) => {
+    function journalRowHtml(r, depth) {
       const tm = typeMeta(r.typeId, types, T, lang);
-      const place = r.toAlias || r.to || r.fromAlias || r.from || "";
-      const starsHtml = r.personalRating ? `<div style="color:#D9A23D;font-size:14px;">${"★".repeat(r.personalRating)}${"☆".repeat(5 - r.personalRating)}</div>` : "";
-      return `<div style="margin-bottom:22px;padding-bottom:18px;border-bottom:1px solid #eee;">
-        <div style="font-size:12px;color:#888;">${fmtDate(r.date, lang)} · ${esc(tm.name)}${place ? " · " + esc(place) : ""}</div>
-        ${starsHtml}
-        <div style="margin-top:6px;line-height:1.7;white-space:pre-wrap;">${esc(r.personalExperience)}</div>
+      const from = r.fromAlias || r.from || "", to = r.toAlias || r.to || "";
+      const starsHtml = r.personalRating ? `<div style="color:#D9A23D;font-size:13px;margin-top:2px;">${"★".repeat(r.personalRating)}${"☆".repeat(5 - r.personalRating)}</div>` : "";
+      const experienceHtml = r.personalExperience && r.personalExperience.trim()
+        ? `<div style="margin-top:6px;line-height:1.7;white-space:pre-wrap;color:#333;">${esc(r.personalExperience)}</div>` : "";
+      return `<div style="padding:9px 0;padding-inline-start:${depth * 16}px;border-bottom:1px solid #eee;">
+        <div style="display:flex;justify-content:space-between;gap:10px;">
+          <div><strong>${esc(tm.name)}</strong> — ${esc(from)}${from && to ? " → " : ""}${esc(to)}${r.notes ? `<br><span style="color:#888;font-size:12px;">${esc(r.notes)}</span>` : ""}</div>
+          <div style="color:#666;font-size:12px;white-space:nowrap;">${r.startTime || ""}${r.endTime ? " – " + r.endTime : ""}${Number(r.costAmount) > 0 ? ` · ${esc(r.costCurrency)}${r.costAmount}` : ""}</div>
+        </div>
+        ${starsHtml}${experienceHtml}
       </div>`;
-    }).join("");
+    }
+    function journalDayHtml(dfid) {
+      return dayGroupsAt(dfid).map((g) => {
+        const rowsHtml = g.rows.map((r) => journalRowHtml(r, 0) + childrenOf(r.id).map((c) => journalRowHtml(c, 1)).join("")).join("");
+        return `<div style="margin-top:16px;"><div style="font-weight:700;margin-bottom:4px;">${fmtDate(g.date, lang)} — ${heDay(g.date, lang)}</div>${rowsHtml}</div>`;
+      }).join("");
+    }
+    function journalFrameHtml(dfid) {
+      let out = journalDayHtml(dfid);
+      childFrames(dfid).forEach((f) => {
+        out += `<div style="border:1px solid #ddd;border-radius:10px;padding:12px;margin-top:16px;">
+          <div style="font-weight:700;font-size:15px;">${esc(f.name)} <span style="font-weight:400;color:#888;font-size:12px;">(${fmtDate(f.startDate, lang)} – ${fmtDate(f.endDate, lang)})</span></div>
+          ${journalFrameHtml(f.id)}
+        </div>`;
+      });
+      return out;
+    }
 
     const statsHtml = `<div style="display:flex;flex-wrap:wrap;gap:14px;background:#F5F8F6;border-radius:10px;padding:14px 16px;margin:18px 0;font-size:13px;color:#3A4A46;">
       ${convertedTotal > 0 ? `<span>${displayCurrency} ${convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>` : ""}
@@ -2162,15 +2174,17 @@ export default function MyTripApp() {
       ${stats.avgRating != null ? `<span>★ ${stats.avgRating.toFixed(1)} ${T.summaryAvgRating}</span>` : ""}
     </div>`;
 
-    const html = `<!DOCTYPE html><html dir="${dir}" lang="${lang}"><head><meta charset="utf-8"><title>${esc((frame && frame.name) || "MyTrip Builder")} — ${esc(T.generateJournal)}</title>
-    <style>body{font-family:Arial,Helvetica,sans-serif;max-width:680px;margin:32px auto;padding:0 18px;color:#1E2A28;}
-    h1{font-family:Georgia,serif;font-size:26px;}
+    const html = `<!DOCTYPE html><html dir="${dir}" lang="${lang}"><head><meta charset="utf-8"><title>${esc((frame && frame.name) || "MyTrip Builder")}</title>
+    <style>body{font-family:Arial,Helvetica,sans-serif;max-width:720px;margin:32px auto;padding:0 18px;color:#1E2A28;}
+    h1{font-family:Georgia,serif;font-size:22px;margin-bottom:2px;}
+    h2{font-family:Georgia,serif;font-size:26px;margin-bottom:4px;}
     a{color:#256D64;}</style></head><body>
-    <h1>${esc((frame && frame.name) || T.generateJournal)}</h1>
-    ${frame ? `<div style="color:#888;font-size:13px;margin-bottom:6px;">${fmtDate(frame.startDate, lang)} – ${fmtDate(frame.endDate, lang)}</div>` : ""}
+    <h1>MyTrip Builder</h1>
+    <h2>${esc((frame && frame.name) || T.generateJournal)}</h2>
+    ${frame ? `<div style="color:#888;font-size:13px;margin-bottom:6px;">(${fmtDate(frame.startDate, lang)} – ${fmtDate(frame.endDate, lang)})</div>` : ""}
     ${statsHtml}
     ${routeUrl ? `<p><a href="${esc(routeUrl)}" target="_blank" rel="noreferrer">${esc(T.viewFullRouteMap)}</a></p>` : ""}
-    ${entriesHtml || `<p style="color:#888;">${esc(T.noJournalEntries)}</p>`}
+    ${journalFrameHtml(fid)}
     </body></html>`;
 
     const blob = new Blob([html], { type: "text/html" });
