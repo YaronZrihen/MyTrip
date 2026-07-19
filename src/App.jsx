@@ -9,7 +9,7 @@ import {
   Smartphone, Monitor, AlertTriangle, GripVertical, Check, FolderPlus, Sparkles,
   Route, Waypoints, Download, Upload, MapPin, Search, CircleCheck, Clock, ArrowDownUp, Copy, StickyNote, TrainFront,
   Bus, Motorbike, Bike, Scooter, Sailboat, ShipWheel, Anchor, Kayak, Helicopter, Caravan, Building2, Landmark, Home,
-  CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2, MoreVertical, Menu, Calendar as CalendarIcon, Undo2, Redo2, Info, ExternalLink, Phone, Save, FolderOpen, ImagePlus
+  CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2, MoreVertical, Menu, Calendar as CalendarIcon, Undo2, Redo2, Info, ExternalLink, Phone, Save, FolderOpen, ImagePlus, BookOpen
 } from "lucide-react";
 
 /* ---------------------------------------------------------------------- */
@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.20.0";
+const APP_VERSION = "10.21.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -186,6 +186,8 @@ const T_DICT = {
     wizardBack: "הקודם", wizardNext: "הבא", wizardCreate: "צור טיול",
     dragDayHint: "גרור להעברת היום למסגרת אחרת", dropDayToRoot: "שחרר כאן כדי להוציא את היום מהמסגרת", showOverallRoute: "הצג מסלול טיול כולל",
     tripSummary: "סיכום הטיול", summaryFlights: "טיסות", summaryHotels: "מלונות", summaryPois: "נק׳ עניין", summaryRestaurants: "מסעדות", summaryAvgRating: "דירוג ממוצע",
+    summaryTotal: "סה״כ", summaryKmNoFlights: "ללא טיסות", summaryNights: "לילות", summaryAttractions: "אטרקציות", summaryDayTours: "טיולי יום", summaryGuidedTours: "טיולים מודרכים",
+    generateJournal: "הפק יומן מסע", viewFullRouteMap: "הצג מפת מסלול מלאה (ללא טיסות)", noJournalEntries: "אין עדיין רשומות עם \"חוויה אישית\" בטיול הזה.",
     saveTripByName: "שמור טיול בשם", loadSavedTrip: "טען טיול שמור", tripName: "שם הטיול",
     saveTripNote: "כרגע נשמר בדפדפן הזה בלבד (לצורך בדיקות) — בעתיד יישמר לפי משתמש מחובר, נגיש מכל מכשיר.",
     saveTripSuccess: "נשמר בהצלחה", saveTripError: "השמירה נכשלה — ייתכן שאין מספיק מקום אחסון בדפדפן.",
@@ -285,6 +287,8 @@ const T_DICT = {
     wizardBack: "Back", wizardNext: "Next", wizardCreate: "Create trip",
     dragDayHint: "Drag to move this day to another frame", dropDayToRoot: "Drop here to take this day out of its frame", showOverallRoute: "Show overall trip route",
     tripSummary: "Trip summary", summaryFlights: "Flights", summaryHotels: "Hotels", summaryPois: "Points of interest", summaryRestaurants: "Restaurants", summaryAvgRating: "Average rating",
+    summaryTotal: "total", summaryKmNoFlights: "excluding flights", summaryNights: "nights", summaryAttractions: "attractions", summaryDayTours: "day tours", summaryGuidedTours: "guided tours",
+    generateJournal: "Generate travel journal", viewFullRouteMap: "View full route map (excluding flights)", noJournalEntries: "No records with \"personal experience\" yet in this trip.",
     saveTripByName: "Save trip by name", loadSavedTrip: "Load saved trip", tripName: "Trip name",
     saveTripNote: "Currently saved in this browser only (for testing) — in the future it will save per logged-in user, accessible from any device.",
     saveTripSuccess: "Saved successfully", saveTripError: "Save failed — the browser may be out of storage space.",
@@ -700,27 +704,36 @@ function frameSummaryStats(rows, frames, fid) {
   }
   const frameIds = new Set(collectFrameIds(fid));
   const relevant = rows.filter((r) => frameIds.has(r.frameId || null));
+  const FLIGHT_TYPES = ["flight", "domestic-flight"];
   const totalKm = relevant.reduce((s, r) => s + (Number(r.routeDistanceKm) || 0), 0);
+  const totalKmNoFlights = relevant.filter((r) => !FLIGHT_TYPES.includes(r.typeId)).reduce((s, r) => s + (Number(r.routeDistanceKm) || 0), 0);
   const countByType = (ids) => relevant.filter((r) => ids.includes(r.typeId)).length;
+  const hotelRows = relevant.filter((r) => ["hotel", "hostel", "apartment"].includes(r.typeId));
+  const distinctHotels = new Set(hotelRows.map((r) => (r.to || r.from || "").trim()).filter(Boolean)).size;
+  const totalNights = new Set(hotelRows.map((r) => r.date).filter(Boolean)).size;
   const ratings = relevant.filter((r) => r.personalRating).map((r) => r.personalRating);
   return {
-    totalKm,
-    flights: countByType(["flight", "domestic-flight"]),
-    hotels: countByType(["hotel", "hostel", "apartment"]),
-    pois: countByType(["poi", "attraction"]),
+    totalKm, totalKmNoFlights,
+    flights: countByType(FLIGHT_TYPES),
+    distinctHotels, totalNights,
+    pois: countByType(["poi"]),
+    attractions: countByType(["attraction"]),
+    dayTours: countByType(["day-tour"]),
+    guidedTours: countByType(["guided-tour"]),
     restaurants: countByType(["restaurant"]),
     avgRating: ratings.length ? ratings.reduce((a, b) => a + b, 0) / ratings.length : null,
   };
 }
-function frameRouteUrl(rows, frames, fid) {
+function frameRouteUrl(rows, frames, fid, excludeFlights) {
   function collectFrameIds(id) {
     let ids = [id];
     frames.filter((f) => f.parentFrameId === id).forEach((f) => { ids = ids.concat(collectFrameIds(f.id)); });
     return ids;
   }
   const frameIds = new Set(collectFrameIds(fid));
-  const relevant = rows.filter((r) => frameIds.has(r.frameId || null) && !r.parentId)
-    .sort((a, b) => (a.date + (a.startTime || "")).localeCompare(b.date + (b.startTime || "")));
+  let relevant = rows.filter((r) => frameIds.has(r.frameId || null) && !r.parentId);
+  if (excludeFlights) relevant = relevant.filter((r) => r.typeId !== "flight" && r.typeId !== "domestic-flight");
+  relevant = relevant.sort((a, b) => (a.date + (a.startTime || "")).localeCompare(b.date + (b.startTime || "")));
   return dayRouteUrl(relevant);
 }
 function dayRouteUrl(rowsInDay) {
@@ -1198,7 +1211,7 @@ function DateRangeField({ startDate, endDate, onChange, lang, T }) {
 function PlaceIconWithPreview({ row, tm, Icon, warnings, T, lang, onOpenFull }) {
   const [showPreview, setShowPreview] = useState(false);
   const [everShown, setEverShown] = useState(false);
-  const [previewPos, setPreviewPos] = useState({ top: 0, right: 0 });
+  const [previewPos, setPreviewPos] = useState({ top: 0, right: 0, left: null });
   const btnRef = useRef(null);
   const hoverTimer = useRef(null);
   const placeId = row.fromPlaceId || row.toPlaceId;
@@ -1209,9 +1222,16 @@ function PlaceIconWithPreview({ row, tm, Icon, warnings, T, lang, onOpenFull }) 
     if (btnRef.current) {
       const r = btnRef.current.getBoundingClientRect();
       const margin = 8;
-      const rawRight = window.innerWidth - r.right;
-      const maxRight = window.innerWidth - PREVIEW_WIDTH - margin;
-      setPreviewPos({ top: r.bottom + 6, right: Math.max(margin, Math.min(rawRight, maxRight)) });
+      const spaceRight = window.innerWidth - r.right;
+      const spaceLeft = r.left;
+      if (spaceRight >= PREVIEW_WIDTH + margin || spaceRight >= spaceLeft) {
+        const left = Math.max(margin, Math.min(r.left, window.innerWidth - PREVIEW_WIDTH - margin));
+        setPreviewPos({ top: r.bottom + 6, left, right: null });
+      } else {
+        const rawRight = window.innerWidth - r.right;
+        const maxRight = window.innerWidth - PREVIEW_WIDTH - margin;
+        setPreviewPos({ top: r.bottom + 6, right: Math.max(margin, Math.min(rawRight, maxRight)), left: null });
+      }
     }
   }
   function handleEnter() {
@@ -1247,7 +1267,7 @@ function PlaceIconWithPreview({ row, tm, Icon, warnings, T, lang, onOpenFull }) 
         <div className="mt-floating-backdrop" onClick={(e) => { e.stopPropagation(); setShowPreview(false); }} />
       )}
       {everShown && (
-        <div className="mt-place-preview-wrap" style={{ top: previewPos.top, right: previewPos.right, width: PREVIEW_WIDTH, display: showPreview ? "block" : "none", cursor: mapUrl ? "pointer" : "default" }}
+        <div className="mt-place-preview-wrap" style={{ top: previewPos.top, right: previewPos.right != null ? previewPos.right : undefined, left: previewPos.left != null ? previewPos.left : undefined, width: PREVIEW_WIDTH, display: showPreview ? "block" : "none", cursor: mapUrl ? "pointer" : "default" }}
           onMouseEnter={handleEnter} onMouseLeave={handleLeave} onClick={handlePreviewClick} title={mapUrl ? T.openMap : undefined}>
           <GooglePlaceDetailsCompact placeId={placeId} T={T} />
         </div>
@@ -1585,10 +1605,11 @@ function DayGroup({ g, fid, depth, ctx }) {
 }
 
 function FrameSummaryRow({ frame, ctx }) {
-  const { T, rows, frames, displayCurrency, convertAmount, frameTotals } = ctx;
+  const { T, lang, rows, frames, displayCurrency, convertAmount, frameTotals, generateTravelJournal } = ctx;
   const [expanded, setExpanded] = useState(false);
+  const [summaryCurrency, setSummaryCurrency] = useState(displayCurrency);
   const totals = frameTotals(frame.id);
-  const convertedTotal = Object.entries(totals).reduce((sum, [cur, amt]) => sum + convertAmount(amt, cur, displayCurrency), 0);
+  const convertedTotal = Object.entries(totals).reduce((sum, [cur, amt]) => sum + convertAmount(amt, cur, summaryCurrency), 0);
   const stats = frameSummaryStats(rows, frames, frame.id);
   return (
     <div className="mt-frame-summary">
@@ -1597,17 +1618,29 @@ function FrameSummaryRow({ frame, ctx }) {
         {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
       </button>
       <div className="mt-frame-summary-line">
-        {convertedTotal > 0 && <span>{displayCurrency} {convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>}
-        {stats.totalKm > 0 && <span>{stats.totalKm.toLocaleString(undefined, { maximumFractionDigits: 0 })} {T.km}</span>}
+        <span>{convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+        <select className="mt-frame-summary-currency" value={summaryCurrency} onChange={(e) => setSummaryCurrency(e.target.value)} onClick={(e) => e.stopPropagation()}>
+          {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </div>
+      <div className="mt-frame-summary-line" style={{ marginTop: 3 }}>
+        <span>{stats.totalKm.toLocaleString(undefined, { maximumFractionDigits: 0 })} {T.km} {T.summaryTotal}</span>
+        <span className="mt-hint">· {stats.totalKmNoFlights.toLocaleString(undefined, { maximumFractionDigits: 0 })} {T.km} {T.summaryKmNoFlights}</span>
       </div>
       {expanded && (
-        <div className="mt-frame-summary-grid">
-          {stats.flights > 0 && <span><Plane size={13} /> {stats.flights} {T.summaryFlights}</span>}
-          {stats.hotels > 0 && <span><BedDouble size={13} /> {stats.hotels} {T.summaryHotels}</span>}
-          {stats.pois > 0 && <span><MapPin size={13} /> {stats.pois} {T.summaryPois}</span>}
-          {stats.restaurants > 0 && <span><Utensils size={13} /> {stats.restaurants} {T.summaryRestaurants}</span>}
-          {stats.avgRating != null && <span><Star size={13} fill="currentColor" /> {stats.avgRating.toFixed(1)} {T.summaryAvgRating}</span>}
-        </div>
+        <>
+          <div className="mt-frame-summary-grid">
+            {stats.flights > 0 && <span><Plane size={13} /> {stats.flights} {T.summaryFlights}</span>}
+            {stats.distinctHotels > 0 && <span><BedDouble size={13} /> {stats.distinctHotels} {T.summaryHotels} · {stats.totalNights} {T.summaryNights}</span>}
+            {stats.attractions > 0 && <span><Landmark size={13} /> {stats.attractions} {T.summaryAttractions}</span>}
+            {stats.dayTours > 0 && <span><Sun size={13} /> {stats.dayTours} {T.summaryDayTours}</span>}
+            {stats.guidedTours > 0 && <span><Users size={13} /> {stats.guidedTours} {T.summaryGuidedTours}</span>}
+            {stats.pois > 0 && <span><MapPin size={13} /> {stats.pois} {T.summaryPois}</span>}
+            {stats.restaurants > 0 && <span><Utensils size={13} /> {stats.restaurants} {T.summaryRestaurants}</span>}
+            {stats.avgRating != null && <span><Star size={13} fill="currentColor" /> {stats.avgRating.toFixed(1)} {T.summaryAvgRating}</span>}
+          </div>
+          <button className="mt-btn ghost" style={{ marginTop: 8 }} onClick={() => generateTravelJournal(frame.id)}><BookOpen size={13} /> {T.generateJournal}</button>
+        </>
       )}
     </div>
   );
@@ -2090,6 +2123,63 @@ export default function MyTripApp() {
     <style>body{font-family:Arial,Helvetica,sans-serif;max-width:720px;margin:24px auto;padding:0 16px;color:#1E2A28;}
     h1{font-family:Georgia,serif;}</style></head><body><h1>MyTrip Builder</h1>${frameHtml(null)}</body></html>`;
   }
+  function generateTravelJournal(fid) {
+    function esc(s) { return (s || "").toString().replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+    function collectFrameIds(id) {
+      let ids = [id];
+      frames.filter((f) => f.parentFrameId === id).forEach((f) => { ids = ids.concat(collectFrameIds(f.id)); });
+      return ids;
+    }
+    const frame = frames.find((f) => f.id === fid);
+    const frameIds = new Set(collectFrameIds(fid));
+    const journalRows = rows.filter((r) => frameIds.has(r.frameId || null) && r.personalExperience && r.personalExperience.trim())
+      .sort((a, b) => (a.date + (a.startTime || "")).localeCompare(b.date + (b.startTime || "")));
+    const stats = frameSummaryStats(rows, frames, fid);
+    const totals = frameTotals(fid);
+    const convertedTotal = Object.entries(totals).reduce((sum, [cur, amt]) => sum + convertAmount(amt, cur, displayCurrency), 0);
+    const routeUrl = frameRouteUrl(rows, frames, fid, true);
+
+    const entriesHtml = journalRows.map((r) => {
+      const tm = typeMeta(r.typeId, types, T, lang);
+      const place = r.toAlias || r.to || r.fromAlias || r.from || "";
+      const starsHtml = r.personalRating ? `<div style="color:#D9A23D;font-size:14px;">${"★".repeat(r.personalRating)}${"☆".repeat(5 - r.personalRating)}</div>` : "";
+      return `<div style="margin-bottom:22px;padding-bottom:18px;border-bottom:1px solid #eee;">
+        <div style="font-size:12px;color:#888;">${fmtDate(r.date, lang)} · ${esc(tm.name)}${place ? " · " + esc(place) : ""}</div>
+        ${starsHtml}
+        <div style="margin-top:6px;line-height:1.7;white-space:pre-wrap;">${esc(r.personalExperience)}</div>
+      </div>`;
+    }).join("");
+
+    const statsHtml = `<div style="display:flex;flex-wrap:wrap;gap:14px;background:#F5F8F6;border-radius:10px;padding:14px 16px;margin:18px 0;font-size:13px;color:#3A4A46;">
+      ${convertedTotal > 0 ? `<span>${displayCurrency} ${convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>` : ""}
+      <span>${stats.totalKm.toLocaleString(undefined, { maximumFractionDigits: 0 })} ${T.km}</span>
+      ${stats.flights ? `<span>${stats.flights} ${T.summaryFlights}</span>` : ""}
+      ${stats.distinctHotels ? `<span>${stats.distinctHotels} ${T.summaryHotels} · ${stats.totalNights} ${T.summaryNights}</span>` : ""}
+      ${stats.attractions ? `<span>${stats.attractions} ${T.summaryAttractions}</span>` : ""}
+      ${stats.dayTours ? `<span>${stats.dayTours} ${T.summaryDayTours}</span>` : ""}
+      ${stats.guidedTours ? `<span>${stats.guidedTours} ${T.summaryGuidedTours}</span>` : ""}
+      ${stats.restaurants ? `<span>${stats.restaurants} ${T.summaryRestaurants}</span>` : ""}
+      ${stats.avgRating != null ? `<span>★ ${stats.avgRating.toFixed(1)} ${T.summaryAvgRating}</span>` : ""}
+    </div>`;
+
+    const html = `<!DOCTYPE html><html dir="${dir}" lang="${lang}"><head><meta charset="utf-8"><title>${esc((frame && frame.name) || "MyTrip Builder")} — ${esc(T.generateJournal)}</title>
+    <style>body{font-family:Arial,Helvetica,sans-serif;max-width:680px;margin:32px auto;padding:0 18px;color:#1E2A28;}
+    h1{font-family:Georgia,serif;font-size:26px;}
+    a{color:#256D64;}</style></head><body>
+    <h1>${esc((frame && frame.name) || T.generateJournal)}</h1>
+    ${frame ? `<div style="color:#888;font-size:13px;margin-bottom:6px;">${fmtDate(frame.startDate, lang)} – ${fmtDate(frame.endDate, lang)}</div>` : ""}
+    ${statsHtml}
+    ${routeUrl ? `<p><a href="${esc(routeUrl)}" target="_blank" rel="noreferrer">${esc(T.viewFullRouteMap)}</a></p>` : ""}
+    ${entriesHtml || `<p style="color:#888;">${esc(T.noJournalEntries)}</p>`}
+    </body></html>`;
+
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `mytrip-journal-${new Date().toISOString().slice(0, 10)}.html`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
   function exportShareableHTML() {
     const html = buildShareHTML();
     const blob = new Blob([html], { type: "text/html" });
@@ -2524,7 +2614,7 @@ export default function MyTripApp() {
     collapsedParents, setCollapsedParents, collapsedGroups, setCollapsedGroups,
     toggleFrameCollapse, openFrameModal, deleteFrame, updateFrameDates, nextDateInContext, lastDateInContext, frameTotals,
     openAddDayModal, sortDayByTime, getColWidth, startResize, displayCurrency, convertAmount, openHotelInfo,
-    frameMenuOpenId, setFrameMenuOpenId, frameMenuPos, setFrameMenuPos,
+    frameMenuOpenId, setFrameMenuOpenId, frameMenuPos, setFrameMenuPos, generateTravelJournal,
   };
 
   function renderContext(fid, depth) {
@@ -2794,7 +2884,8 @@ export default function MyTripApp() {
         .mt-star-picker button { border:none; background:none; color:#D9A23D; padding:2px; display:flex; }
         .mt-frame-summary { border-top:1px solid var(--border); padding:8px 10px; background:#FAFCFB; }
         .mt-frame-summary-toggle { display:flex; align-items:center; gap:5px; border:none; background:none; color:var(--muted); font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; padding:0; }
-        .mt-frame-summary-line { display:flex; gap:14px; margin-top:4px; font-size:13px; font-weight:700; color:var(--ink); flex-wrap:wrap; }
+        .mt-frame-summary-line { display:flex; align-items:center; gap:6px; margin-top:4px; font-size:13px; font-weight:700; color:var(--ink); flex-wrap:wrap; }
+        .mt-frame-summary-currency { border:1px solid var(--border); border-radius:6px; padding:2px 4px; font-size:11px; font-weight:600; background:var(--surface); color:var(--ink); }
         .mt-frame-summary-grid { display:flex; gap:14px; margin-top:8px; flex-wrap:wrap; font-size:12px; color:var(--muted); }
         .mt-frame-summary-grid span { display:flex; align-items:center; gap:4px; }
         .mt-field-row { display:flex; gap:9px; }
@@ -3274,22 +3365,6 @@ export default function MyTripApp() {
 
         {renderContext(null, 0)}
 
-        <div className="mt-summary">
-          <span className="mt-summary-label">{T.totalPerCurrency}:</span>
-          {Object.keys(grandTotals).length === 0 ? (
-            <span style={{ fontSize: 12.5, color: "var(--muted)" }}>—</span>
-          ) : (
-            <>
-              <span className="mt-chip mt-chip-total">{displayCurrency} {convertedGrandTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-              <select className="mt-fx-select" value={displayCurrency} onChange={(e) => setDisplayCurrency(e.target.value)}>
-                {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-              <span className="mt-fx-note">{fxIsLive ? T.fxLive : T.fxApprox}</span>
-              <span style={{ width: "100%" }} />
-              {Object.entries(grandTotals).map(([cur, amt]) => <span className="mt-chip small" key={cur}>{cur} {amt.toLocaleString()}</span>)}
-            </>
-          )}
-        </div>
         <div className="mt-note">{loggedIn ? T.mockNote : ""}</div>
       </div>
 
