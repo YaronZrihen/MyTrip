@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.36.0";
+const APP_VERSION = "10.37.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1682,8 +1682,10 @@ function DayGroup({ g, fid, depth, ctx }) {
                     <PlaceIconWithPreview row={r} tm={tm} Icon={Icon} warnings={[]} T={T} lang={lang} onOpenFull={() => openHotelInfo(r)} />
                     <strong className={warningClass(cardWarnings)} style={{ fontSize: 13.5 }} title={cardWarnings.length ? warningText(cardWarnings) : undefined}>{tm.name}</strong>
                   </div>
-                  <span className="mt-card-times" dir="ltr">{r.startTime || "—"}{r.endTime ? ` – ${r.endTime}` : ""}</span>
-                  <span className="mt-card-drag-handle" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => { e.stopPropagation(); startRowPointerDrag(e, r.id); }}><GripVertical size={15} /></span>
+                  <div className="mt-card-top-end">
+                    <span className="mt-card-times" dir="ltr">{r.startTime || "—"}{r.endTime ? ` – ${r.endTime}` : ""}</span>
+                    <span className="mt-card-drag-handle" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => { e.stopPropagation(); startRowPointerDrag(e, r.id); }}><GripVertical size={15} /></span>
+                  </div>
                 </div>
                 {(fromLabel || toLabel) && (
                   <div className="mt-card-route">
@@ -2883,6 +2885,7 @@ export default function MyTripApp() {
         .mt-brand-name { font-family:'Frank Ruhl Libre',serif; font-size:18px; font-weight:700; line-height:1; }
         .mt-brand-version { font-size:9.5px; color:var(--muted); font-weight:600; letter-spacing:.02em; }
         .mt-header-actions { display:flex; align-items:center; justify-content:space-between; gap:5px; flex-wrap:wrap; padding:5px 14px; }
+        .mt-header-actions-group { display:flex; align-items:center; gap:5px; flex-wrap:nowrap; flex-shrink:0; }
         .mt-icon-btn { border:1px solid var(--border); background:var(--surface); color:var(--ink); border-radius:8px; padding:5px 8px; display:flex; align-items:center; gap:5px; font-size:12.5px; font-weight:500; }
         .mt-toolbar { display:flex; align-items:center; justify-content:space-between; gap:5px; flex-wrap:wrap; padding:5px 14px 8px; }
         .mt-icon-btn:disabled { opacity:.35; cursor:not-allowed; }
@@ -3135,7 +3138,8 @@ export default function MyTripApp() {
         .mt-cards { display:flex; flex-direction:column; gap:9px; }
         .mt-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:11px 13px; display:flex; flex-direction:column; gap:6px; }
         .mt-card-top { display:flex; align-items:center; justify-content:space-between; }
-        .mt-card-times { font-size:13px; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums; }
+        .mt-card-top-end { display:flex; align-items:center; gap:8px; }
+        .mt-card-times { font-size:13px; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums; margin-inline-start:auto; }
         .mt-card-route { display:flex; align-items:center; gap:6px; font-size:13px; font-weight:600; flex-wrap:wrap; }
         .mt-card-arrow { color:var(--muted); font-weight:400; }
         .mt-card-bottom { display:flex; align-items:center; justify-content:space-between; margin-top:2px; }
@@ -3203,9 +3207,11 @@ export default function MyTripApp() {
         </div>
       </div>
       <div className="mt-header-actions">
-        <button className="mt-icon-btn" onClick={() => setLang(lang === "he" ? "en" : "he")}><Globe /> {T.lang}</button>
-        <button className={"mt-icon-btn" + (viewMode === "desktop" ? " active" : "")} onClick={() => setViewMode("desktop")} title={T.desktop}><Monitor /></button>
-        <button className={"mt-icon-btn" + (viewMode === "mobile" ? " active" : "")} onClick={() => setViewMode("mobile")} title={T.mobile}><Smartphone /></button>
+        <div className="mt-header-actions-group">
+          <button className="mt-icon-btn" onClick={() => setLang(lang === "he" ? "en" : "he")}><Globe /> {T.lang}</button>
+          <button className={"mt-icon-btn" + (viewMode === "desktop" ? " active" : "")} onClick={() => setViewMode("desktop")} title={T.desktop}><Monitor /></button>
+          <button className={"mt-icon-btn" + (viewMode === "mobile" ? " active" : "")} onClick={() => setViewMode("mobile")} title={T.mobile}><Smartphone /></button>
+        </div>
         {!loggedIn ? (
           <button className="mt-icon-btn" onClick={() => setLoggedIn(true)}><LogIn /> {T.login}</button>
         ) : (
