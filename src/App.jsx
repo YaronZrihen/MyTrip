@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.31.0";
+const APP_VERSION = "10.31.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -136,7 +136,7 @@ const T_DICT = {
     chronoWarning: "סדר הרשומות ביום זה אינו כרונולוגי לפי שעה", sortByTime: "מיין לפי שעה",
     addDayModalTitle: "הוספת יום חדש", addDayDate: "תאריך", confirmAdd: "הוסף",
     addDayAutoRecords: "רשומות אוטומטיות ליום", addDayHotel: "מלון", addDayTransport: "תחבורה", addDayPoi: "נקודת עניין",
-    demoLocationName: "וותיקן", demoLocationRaw: "00120 Vatican City, וותיקן",
+    demoLocationName: "וותיקן", demoLocationRaw: "Vatican City",
     demoHotelRaw: "Hilton Garden Inn Rome Airport", demoHotelAlias: "הילטון גארדן אין רומא",
     demoRestaurantRaw: "Ristorante dei Musei", demoRestaurantName: "מסעדת המוזיאון",
     verify: "אמת מול מפות", verified: "מאומת", openMap: "פתח במפה", pickFromMap: "בחר מהמפה",
@@ -243,7 +243,7 @@ const T_DICT = {
     chronoWarning: "Records on this day are not in chronological time order", sortByTime: "Sort by time",
     addDayModalTitle: "Add a new day", addDayDate: "Date", confirmAdd: "Add",
     addDayAutoRecords: "Automatic records for the day", addDayHotel: "Hotel", addDayTransport: "Transportation", addDayPoi: "Point of interest",
-    demoLocationName: "Vatican", demoLocationRaw: "00120 Vatican City",
+    demoLocationName: "Vatican", demoLocationRaw: "Vatican City",
     demoHotelRaw: "Hilton Garden Inn Rome Airport", demoHotelAlias: "Hilton Garden Inn Rome",
     demoRestaurantRaw: "Ristorante dei Musei", demoRestaurantName: "Museum Restaurant",
     verify: "Verify with Maps", verified: "Verified", openMap: "Open in Maps", pickFromMap: "Pick from map",
@@ -2551,7 +2551,9 @@ export default function MyTripApp() {
     if (addDayCtx.addTransport) {
       const idTaxi = addRow(addDayCtx.date, null, addDayCtx.fid);
       updateRow(idTaxi, {
-        typeId: "taxi", startTime: "13:45", to: hotelRaw, toAlias: hotelAlias, toLat: hotelLat, toLon: hotelLon,
+        typeId: "taxi", startTime: "13:45",
+        from: T.demoRestaurantRaw, fromAlias: T.demoRestaurantName,
+        to: hotelRaw, toAlias: hotelAlias, toLat: hotelLat, toLon: hotelLon,
       });
     }
     if (addDayCtx.addHotel) {
