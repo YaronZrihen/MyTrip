@@ -19,7 +19,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "11.0.0";
+const APP_VERSION = "11.1.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -912,8 +912,6 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
   const routeUrl = rowOwnRouteUrl(row);
   const fromVerified = row.fromVerifiedUrl && row.fromVerifiedText === row.from;
   const toVerified = row.toVerifiedUrl && row.toVerifiedText === row.to;
-  const typeBtnRef = useRef(null);
-  const [typeMenuPos, setTypeMenuPos] = useState({ top: 0, left: 0 });
   const [typeSearch, setTypeSearch] = useState("");
   const [showAddTypeForm, setShowAddTypeForm] = useState(false);
   const [distLoading, setDistLoading] = useState(false);
@@ -1014,29 +1012,11 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [row.id, row.date, row.to, row.toAlias, row.toLat, row.toLon]);
 
-  function computeTypeMenuPos() {
-    if (!typeBtnRef.current) return;
-    const r = typeBtnRef.current.getBoundingClientRect();
-    const estMenuHeight = 300;
-    const spaceBelow = window.innerHeight - r.bottom;
-    if (spaceBelow < estMenuHeight && r.top > spaceBelow) {
-      setTypeMenuPos({ bottom: window.innerHeight - r.top + 4, top: null, left: r.left });
-    } else {
-      setTypeMenuPos({ top: r.bottom + 4, bottom: null, left: r.left });
-    }
-  }
-  function toggleTypeMenu() {
-    if (typeMenuOpen === row.id) { setTypeMenuOpen(null); return; }
-    computeTypeMenuPos();
-    setTypeSearch(""); setShowAddTypeForm(false);
-    setTypeMenuOpen(row.id);
-  }
-  useEffect(() => {
-    if (typeMenuOpen !== row.id) return;
-    window.addEventListener("scroll", computeTypeMenuPos, true);
-    window.addEventListener("resize", computeTypeMenuPos);
-    return () => { window.removeEventListener("scroll", computeTypeMenuPos, true); window.removeEventListener("resize", computeTypeMenuPos); };
-  }, [typeMenuOpen === row.id]);
+  const isTypeMenuOpen = typeMenuOpen === row.id;
+  const typeMenuFloating = useFloatingMenu(isTypeMenuOpen, (open) => {
+    if (open) { setTypeSearch(""); setShowAddTypeForm(false); setTypeMenuOpen(row.id); }
+    else setTypeMenuOpen(null);
+  });
 
   function renderCell(col) {
     switch (col.key) {
@@ -1049,13 +1029,11 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
         const warnings = getRowWarning(row, T);
         return (
         <div className="mt-type-wrap">
-          <button className="mt-type-btn" ref={typeBtnRef} title={warnings.length ? warningText(warnings) : tm.name} onClick={toggleTypeMenu}>
+          <button className="mt-type-btn" ref={typeMenuFloating.refs.setReference} {...typeMenuFloating.getReferenceProps()} title={warnings.length ? warningText(warnings) : tm.name}>
             <span className={"mt-type-text " + warningClass(warnings)}>{tm.name}</span> <ChevronDown size={12} />
           </button>
-          {typeMenuOpen === row.id && (
-            <>
-              <div className="mt-floating-backdrop" onClick={() => setTypeMenuOpen(null)} />
-              <div className="mt-type-menu" style={{ top: typeMenuPos.top ?? undefined, bottom: typeMenuPos.bottom ?? undefined, left: typeMenuPos.left }}>
+          {isTypeMenuOpen && (
+            <div ref={typeMenuFloating.refs.setFloating} style={typeMenuFloating.floatingStyles} {...typeMenuFloating.getFloatingProps()} className="mt-type-menu">
                 <div className="mt-type-search-wrap">
                   <Search size={13} />
                   <input autoFocus className="mt-type-search" placeholder={T.searchTypes} value={typeSearch} onChange={(e) => setTypeSearch(e.target.value)} />
@@ -1107,7 +1085,6 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
                   <button className="mt-type-add-toggle" onClick={() => setShowAddTypeForm(true)}><Plus size={13} /> {T.newType}</button>
                 )}
               </div>
-            </>
           )}
         </div>
       );
@@ -1345,34 +1322,24 @@ function DateRangeField({ startDate, endDate, onChange, lang, T }) {
 function PlaceIconWithPreview({ row, tm, Icon, warnings, T, lang, onOpenFull }) {
   const [showPreview, setShowPreview] = useState(false);
   const [everShown, setEverShown] = useState(false);
-  const [previewPos, setPreviewPos] = useState({ top: 0, right: 0, left: null });
-  const btnRef = useRef(null);
   const hoverTimer = useRef(null);
   const placeId = row.fromPlaceId || row.toPlaceId;
   const mapUrl = row.fromVerifiedUrl || row.toVerifiedUrl;
   const PREVIEW_WIDTH = 280;
 
-  function computePos() {
-    if (btnRef.current) {
-      const r = btnRef.current.getBoundingClientRect();
-      const margin = 8;
-      const spaceRight = window.innerWidth - r.right;
-      const spaceLeft = r.left;
-      if (spaceRight >= PREVIEW_WIDTH + margin || spaceRight >= spaceLeft) {
-        const left = Math.max(margin, Math.min(r.left, window.innerWidth - PREVIEW_WIDTH - margin));
-        setPreviewPos({ top: r.bottom + 6, left, right: null });
-      } else {
-        const rawRight = window.innerWidth - r.right;
-        const maxRight = window.innerWidth - PREVIEW_WIDTH - margin;
-        setPreviewPos({ top: r.bottom + 6, right: Math.max(margin, Math.min(rawRight, maxRight)), left: null });
-      }
-    }
-  }
+  const { refs, floatingStyles } = useFloating({
+    open: showPreview,
+    onOpenChange: setShowPreview,
+    placement: "bottom-end",
+    strategy: "fixed",
+    middleware: [offset(6), flip(), shift({ padding: 8 })],
+    whileElementsMounted: autoUpdate,
+  });
+
   function handleEnter() {
     if (hoverTimer.current) clearTimeout(hoverTimer.current);
     if (!placeId || !hasGooglePlaces()) return;
     hoverTimer.current = setTimeout(() => {
-      computePos();
       setEverShown(true);
       setShowPreview(true);
     }, 300);
@@ -1385,7 +1352,6 @@ function PlaceIconWithPreview({ row, tm, Icon, warnings, T, lang, onOpenFull }) 
     e.stopPropagation();
     if (!placeId || !hasGooglePlaces()) return;
     if (hoverTimer.current) clearTimeout(hoverTimer.current);
-    computePos();
     setEverShown(true);
     setShowPreview((v) => !v);
   }
@@ -1396,12 +1362,12 @@ function PlaceIconWithPreview({ row, tm, Icon, warnings, T, lang, onOpenFull }) 
 
   return (
     <span style={{ position: "relative", display: "inline-block" }} onMouseEnter={handleEnter} onMouseLeave={handleLeave} onFocus={handleEnter} onBlur={handleLeave}>
-      <button ref={btnRef} className="mt-type-icon mt-type-icon-btn" style={{ background: tm.color }} onClick={handleClick}><Icon /></button>
+      <button ref={refs.setReference} className="mt-type-icon mt-type-icon-btn" style={{ background: tm.color }} onClick={handleClick}><Icon /></button>
       {everShown && showPreview && (
         <div className="mt-floating-backdrop" onClick={(e) => { e.stopPropagation(); setShowPreview(false); }} />
       )}
       {everShown && (
-        <div className="mt-place-preview-wrap" style={{ top: previewPos.top, right: previewPos.right != null ? previewPos.right : undefined, left: previewPos.left != null ? previewPos.left : undefined, width: PREVIEW_WIDTH, display: showPreview ? "block" : "none", cursor: mapUrl ? "pointer" : "default" }}
+        <div ref={refs.setFloating} className="mt-place-preview-wrap" style={{ ...floatingStyles, width: PREVIEW_WIDTH, display: showPreview ? "block" : "none", cursor: mapUrl ? "pointer" : "default" }}
           onMouseEnter={handleEnter} onMouseLeave={handleLeave} onClick={handlePreviewClick} title={mapUrl ? T.openMap : undefined}>
           <GooglePlaceDetailsCompact placeId={placeId} T={T} />
         </div>
@@ -1804,18 +1770,12 @@ function FrameSummaryRow({ frame, ctx }) {
 }
 
 function FrameBlock({ frame, depth, ctx, renderContext }) {
-  const { T, lang, toggleFrameCollapse, openFrameModal, deleteFrame, openAddDayModal, addRow, lastDateInContext, frameTotals, displayCurrency, convertAmount, frameMenuOpenId, setFrameMenuOpenId, frameMenuPos, setFrameMenuPos, onDropDay, dragDayKey, rows, frames } = ctx;
+  const { T, lang, toggleFrameCollapse, openFrameModal, deleteFrame, openAddDayModal, addRow, lastDateInContext, frameTotals, displayCurrency, convertAmount, frameMenuOpenId, setFrameMenuOpenId, onDropDay, dragDayKey, rows, frames } = ctx;
   const totals = frameTotals(frame.id);
   const convertedTotal = Object.entries(totals).reduce((sum, [cur, amt]) => sum + convertAmount(amt, cur, displayCurrency), 0);
   const color = FRAME_COLORS[depth % FRAME_COLORS.length];
-  const menuBtnRef = useRef(null);
   const isMenuOpen = frameMenuOpenId === frame.id;
-  function toggleMenu(e) {
-    e.stopPropagation();
-    if (isMenuOpen) { setFrameMenuOpenId(null); return; }
-    if (menuBtnRef.current) { const r = menuBtnRef.current.getBoundingClientRect(); setFrameMenuPos({ top: r.bottom + 4, left: r.left }); }
-    setFrameMenuOpenId(frame.id);
-  }
+  const menuFloating = useFloatingMenu(isMenuOpen, (open) => setFrameMenuOpenId(open ? frame.id : null));
   return (
     <div className="mt-frame-block" style={{ "--frame-color": color }}>
       <div className={"mt-frame-header" + (dragDayKey ? " droppable" : "")} data-frame-drop={frame.id} onClick={() => toggleFrameCollapse(frame.id)}
@@ -1828,7 +1788,7 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
               <span className="mt-frame-cost-inline">{displayCurrency} {convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
             )}
             <span className="mt-frame-actions" onClick={(e) => e.stopPropagation()}>
-              <button ref={menuBtnRef} onClick={toggleMenu} title={T.moreOptions}><MoreVertical size={16} /></button>
+              <button ref={menuFloating.refs.setReference} {...menuFloating.getReferenceProps()} title={T.moreOptions}><MoreVertical size={16} /></button>
             </span>
           </span>
         </div>
@@ -1837,9 +1797,7 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
         </div>
       </div>
       {isMenuOpen && (
-        <>
-          <div className="mt-floating-backdrop" onClick={() => setFrameMenuOpenId(null)} />
-          <div className="mt-floating-menu mt-kebab-menu" style={{ top: frameMenuPos.top, left: frameMenuPos.left }}>
+        <div ref={menuFloating.refs.setFloating} style={menuFloating.floatingStyles} {...menuFloating.getFloatingProps()} className="mt-floating-menu mt-kebab-menu">
             <button className="mt-share-opt" onClick={() => { openAddDayModal(frame.id); setFrameMenuOpenId(null); }}><Plus size={14} /> {T.addDay}</button>
             <button className="mt-share-opt" onClick={() => { openFrameModal(null, frame.id); setFrameMenuOpenId(null); }}><FolderPlus size={14} /> {T.addSubFrame}</button>
             <button className="mt-share-opt" onClick={() => { openFrameModal(frame); setFrameMenuOpenId(null); }}><Pencil size={14} /> {T.editFrame}</button>
@@ -1852,8 +1810,7 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
             })()}
             <div className="divider" />
             <button className="mt-share-opt" style={{ color: "var(--danger)" }} onClick={() => { deleteFrame(frame.id); setFrameMenuOpenId(null); }}><Trash2 size={14} /> {T.delete}</button>
-          </div>
-        </>
+        </div>
       )}
       {!frame.collapsed && (
         <div className="mt-frame-body">
@@ -2007,7 +1964,6 @@ export default function MyTripApp() {
   const [aiWizardAnswers, setAiWizardAnswers] = useState(AI_WIZARD_DEFAULTS);
   const [aiWizardError, setAiWizardError] = useState(false);
   const [frameMenuOpenId, setFrameMenuOpenId] = useState(null);
-  const [frameMenuPos, setFrameMenuPos] = useState({ top: 0, left: 0 });
   const [frameDraft, setFrameDraft] = useState(null);
   const [addDayCtx, setAddDayCtx] = useState(null); // { fid, date }
   const [locPicker, setLocPicker] = useState(null); // { field, query, results, loading }
@@ -2815,7 +2771,7 @@ export default function MyTripApp() {
     collapsedParents, setCollapsedParents, collapsedGroups, setCollapsedGroups,
     toggleFrameCollapse, openFrameModal, deleteFrame, updateFrameDates, nextDateInContext, lastDateInContext, frameTotals,
     openAddDayModal, sortDayByTime, getColWidth, startResize, displayCurrency, convertAmount, openHotelInfo,
-    frameMenuOpenId, setFrameMenuOpenId, frameMenuPos, setFrameMenuPos, generateTravelJournal,
+    frameMenuOpenId, setFrameMenuOpenId, generateTravelJournal,
   };
 
   function renderContext(fid, depth) {
@@ -2976,7 +2932,7 @@ export default function MyTripApp() {
         .mt-type-icon-btn:hover { filter:brightness(1.1); box-shadow:0 0 0 2px var(--teal-tint); }
         .mt-hotel-photo-demo { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; height:110px; border-radius:10px; background:linear-gradient(135deg,var(--teal-tint),var(--bg)); color:var(--teal); border:1.5px dashed var(--border); font-size:11px; text-align:center; padding:8px; }
         .mt-hotel-photo-real { width:100%; height:150px; object-fit:cover; border-radius:10px; }
-        .mt-place-preview-wrap { position:fixed; z-index:250; box-shadow:0 8px 24px rgba(20,40,35,.18); border-radius:10px; overflow:hidden; pointer-events:auto; }
+        .mt-place-preview-wrap { z-index:250; box-shadow:0 8px 24px rgba(20,40,35,.18); border-radius:10px; overflow:hidden; pointer-events:auto; }
         .mt-hotel-rating-demo { display:flex; align-items:center; gap:2px; color:#D9A23D; }
         .mt-hotel-rating-demo .mt-hint { margin-inline-start:6px; color:var(--muted); }
         .mt-type-icon svg { width:12px; height:12px; color:#fff; }
@@ -3022,7 +2978,7 @@ export default function MyTripApp() {
         .mt-chip-total { font-size:15px; padding:6px 14px; }
         .mt-fx-select { border:1px solid var(--border); border-radius:8px; padding:5px 8px; font-size:12.5px; background:#fff; color:var(--ink); }
         .mt-fx-note { font-size:10.5px; color:var(--muted); font-style:italic; }
-        .mt-type-menu { position:fixed; z-index:200; background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 12px 32px rgba(20,40,35,.18); padding:8px; min-width:210px; max-height:min(360px, 70vh); display:flex; flex-direction:column; color:var(--ink); }
+        .mt-type-menu { z-index:200; background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 12px 32px rgba(20,40,35,.18); padding:8px; min-width:210px; max-height:min(360px, 70vh); display:flex; flex-direction:column; color:var(--ink); }
         .mt-type-search-wrap { display:flex; align-items:center; gap:6px; border:1px solid var(--border); border-radius:8px; padding:6px 8px; margin-bottom:6px; background:#fff; flex-shrink:0; }
         .mt-type-search-wrap svg { color:var(--muted); flex-shrink:0; }
         .mt-type-search { border:none; outline:none; flex:1; font-size:12.5px; background:transparent; color:var(--ink); min-width:0; }
