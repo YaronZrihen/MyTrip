@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.31.1";
+const APP_VERSION = "10.32.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1622,7 +1622,7 @@ function DayGroup({ g, fid, depth, ctx }) {
         <span className="mt-group-date">{fmtDate(g.date, lang)}</span>
         <span className="mt-group-day">{heDay(g.date, lang)}</span>
         <div className="mt-group-actions" onClick={(e) => e.stopPropagation()}>
-          <button className="mt-group-add" onClick={() => openAddDayModal(fid)}>{T.addDayShort}</button>
+          <button className="mt-group-add" onClick={() => openAddDayModal(fid, g.date)}>{T.addDayShort}</button>
           {dayRoute ? (
             <a className="mt-group-add" href={dayRoute} target="_blank" rel="noreferrer"><Waypoints size={13} /> {T.dayRoute}</a>
           ) : (
@@ -2504,7 +2504,12 @@ export default function MyTripApp() {
   }
 
   /* ---------- add-day modal ---------- */
-  function openAddDayModal(fid) { setAddDayCtx({ fid, date: nextDateInContext(fid), addHotel: true, addTransport: true, addPoi: true }); }
+  function openAddDayModal(fid, afterDate) {
+    let date;
+    if (afterDate) { const d = new Date(afterDate + "T00:00:00"); d.setDate(d.getDate() + 1); date = d.toISOString().slice(0, 10); }
+    else date = nextDateInContext(fid);
+    setAddDayCtx({ fid, date, addHotel: true, addTransport: true, addPoi: true });
+  }
   function closeAddDayModal() { setAddDayCtx(null); }
   const addDayFrame = addDayCtx && addDayCtx.fid ? frames.find((f) => f.id === addDayCtx.fid) : null;
   const addDayIssue = addDayCtx && addDayFrame && (addDayCtx.date < addDayFrame.startDate || addDayCtx.date > addDayFrame.endDate) ? T.rowOutOfFrame : null;
@@ -2564,6 +2569,9 @@ export default function MyTripApp() {
         toVerifiedUrl: prevHotel ? prevHotel.verifiedUrl : "", toVerifiedText: prevHotel ? prevHotel.verifiedText : "",
         toPlaceId: prevHotel ? prevHotel.placeId : null,
       });
+    }
+    if (!addDayCtx.addHotel && !addDayCtx.addTransport && !addDayCtx.addPoi) {
+      addRow(addDayCtx.date, null, addDayCtx.fid);
     }
     closeAddDayModal();
   }
