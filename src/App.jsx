@@ -9,7 +9,7 @@ import {
   Smartphone, Monitor, AlertTriangle, GripVertical, Check, FolderPlus, Sparkles,
   Route, Waypoints, Download, Upload, MapPin, Search, CircleCheck, Clock, ArrowDownUp, Copy, StickyNote, TrainFront,
   Bus, Motorbike, Bike, Scooter, Sailboat, ShipWheel, Anchor, Kayak, Helicopter, Caravan, Building2, Landmark, Home,
-  CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2, MoreVertical, Menu, Calendar as CalendarIcon, Undo2, Redo2, Info, ExternalLink, Phone, Save, FolderOpen, ImagePlus, BookOpen
+  CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2, MoreVertical, Menu, Calendar as CalendarIcon, Undo2, Redo2, Info, ExternalLink, Phone, Save, FolderOpen, ImagePlus, BookOpen, RefreshCw
 } from "lucide-react";
 
 /* ---------------------------------------------------------------------- */
@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.34.0";
+const APP_VERSION = "10.35.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -51,6 +51,7 @@ const DEFAULT_TYPES = [
   { id: "caravan", name_he: "קראוון", name_en: "Caravan", icon: "Caravan", color: CATEGORY_COLORS["road-transport"], category: "road-transport" },
   { id: "motorcycle", name_he: "אופנוע", name_en: "Motorcycle", icon: "Motorbike", color: CATEGORY_COLORS["road-transport"], category: "road-transport" },
   { id: "bicycle", name_he: "אופניים", name_en: "Bicycle", icon: "Bike", color: CATEGORY_COLORS["road-transport"], category: "road-transport" },
+  { id: "walking", name_he: "הליכה רגלית", name_en: "Walking", icon: "Footprints", color: CATEGORY_COLORS["road-transport"], category: "road-transport" },
   { id: "scooter", name_he: "קורקינט", name_en: "Scooter", icon: "Scooter", color: CATEGORY_COLORS["road-transport"], category: "road-transport" },
 
   { id: "ferry", name_he: "מעבורת", name_en: "Ferry", icon: "Ship", color: CATEGORY_COLORS["sea-transport"], category: "sea-transport" },
@@ -114,6 +115,10 @@ const T_DICT = {
     desktop: "מחשב", mobile: "סלולר", lang: "English", editRecord: "כרטיס רשומה",
     save: "שמירה", cancel: "ביטול", delete: "מחיקה", addSub: "הוסף תת-רשומה",
     type: "סוג", from: "מוצא", to: "יעד", start: "בשעה", end: "עד שעה", overnight: "חוצה חצות",
+    requiresTicket: "דורש רכישת כרטיס כניסה", calcRoute: "חשב מסלול",
+    routeErrNoOrigin: "אין מוצא זמין לחישוב (גם לא ברשומה הקודמת)", routeErrNoDest: "אין יעד ברשומה זו",
+    routeErrGeocodeOrigin: "לא ניתן לאתר את המוצא", routeErrGeocodeDest: "לא ניתן לאתר את היעד",
+    routeErrNoRoute: "לא נמצא מסלול בין הנקודות", routeErrNetwork: "שגיאת רשת בעת החישוב",
     destination: "שם היעד", link: "קישור להזמנה", maplink: "קישור למיקום / מסלול",
     flightNo: "מספר טיסה", cost: "עלות", currency: "מטבע", notes: "הערות", frame: "מסגרת",
     noFrame: "ללא מסגרת (רמה עליונה)", selectType: "בחר...",
@@ -224,6 +229,10 @@ const T_DICT = {
     desktop: "Desktop", mobile: "Mobile", lang: "עברית", editRecord: "Record card",
     save: "Save", cancel: "Cancel", delete: "Delete", addSub: "Add sub-record",
     type: "Type", from: "Origin", to: "Destination", start: "At", end: "Until", overnight: "Crosses midnight",
+    requiresTicket: "Requires entrance ticket", calcRoute: "Calculate route",
+    routeErrNoOrigin: "No origin available for calculation (not even from the previous record)", routeErrNoDest: "This record has no destination",
+    routeErrGeocodeOrigin: "Couldn't locate the origin", routeErrGeocodeDest: "Couldn't locate the destination",
+    routeErrNoRoute: "No route found between these points", routeErrNetwork: "Network error during calculation",
     destination: "Venue", link: "Booking link", maplink: "Map / route link",
     flightNo: "Flight number", cost: "Cost", currency: "Currency", notes: "Notes", frame: "Frame",
     noFrame: "No frame (top level)", selectType: "Select...",
@@ -477,7 +486,7 @@ function rowStartPoint(row) { return (row.from && row.from.trim()) || (row.fromA
 function rowEndPoint(row) { return (row.to && row.to.trim()) || (row.toAlias && row.toAlias.trim()) || ""; }
 const TRAVEL_MODE_MAP = {
   taxi: "driving", "car-rental": "driving", caravan: "driving", motorcycle: "driving",
-  bicycle: "bicycling", scooter: "bicycling",
+  bicycle: "bicycling", scooter: "bicycling", walking: "walking",
   train: "transit", "high-speed-train": "transit", bus: "transit",
   "self-tour": "walking", "guided-tour": "walking", "day-tour": "walking",
 };
@@ -892,6 +901,8 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
   const [distLoading, setDistLoading] = useState(false);
 
   const lastRouteCalcSig = useRef(null);
+  const [routeCalcError, setRouteCalcError] = useState(null);
+  function forceRecalcRoute() { lastRouteCalcSig.current = null; setRouteCalcError(null); fetchRouteDistance(); }
   function fetchRouteDistance() {
     const ownFrom = (!noOriginNeeded(row.typeId) && row.from && row.from.trim()) ? rowStartPoint(row) : "";
     const prevFrom = prevRow ? rowStartPoint(prevRow) : "";
@@ -901,7 +912,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
     else if (prevFrom) { origin = prevFrom; originSource = "prevFrom"; }
     else { origin = prevTo; originSource = "prevTo"; }
     const dest = rowEndPoint(row);
-    if (!origin || !dest) return;
+    if (!origin || !dest) { setRouteCalcError(!origin ? T.routeErrNoOrigin : T.routeErrNoDest); return; }
     const sig = origin + "|" + dest + "|" + (row.startTime || "") + "|" + row.typeId;
     if (lastRouteCalcSig.current === sig || distLoading) return;
     lastRouteCalcSig.current = sig;
@@ -912,9 +923,10 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
     const destP = (row.toLat != null && row.toLon != null) ? Promise.resolve({ lat: row.toLat, lon: row.toLon }) : geocodeText(dest);
     Promise.all([originP, destP]).then(([a, b]) => {
       setDistLoading(false);
-      if (!a || !b) return;
+      if (!a || !b) { setRouteCalcError(!a ? `${T.routeErrGeocodeOrigin}: "${origin}"` : `${T.routeErrGeocodeDest}: "${dest}"`); return; }
       return fetchRouteInfo(a, b, row.typeId).then((info) => {
-        if (!info) return;
+        if (!info) { setRouteCalcError(T.routeErrNoRoute); return; }
+        setRouteCalcError(null);
         const patch = { routeDistanceKm: info.distanceKm, routeDurationMin: info.durationMin, toLat: b.lat, toLon: b.lon };
         if (originSource === "own") { patch.fromLat = a.lat; patch.fromLon = a.lon; }
         if (row.startTime && (!row.endTime || row.endTimeAuto) && !noOriginNeeded(row.typeId)) {
@@ -925,7 +937,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
         }
         updateRow(row.id, patch);
       });
-    }).catch(() => setDistLoading(false));
+    }).catch(() => { setDistLoading(false); setRouteCalcError(T.routeErrNetwork); });
   }
   useEffect(() => {
     fetchRouteDistance();
@@ -1097,16 +1109,18 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
       case "startTime": return <input className="mt-editable mt-time" type="time" value={row.startTime} onChange={(e) => updateRow(row.id, { startTime: e.target.value })} />;
       case "duration": return <span title={dur === null ? "" : dur} style={{ color: dur === null ? "var(--danger)" : "var(--muted)", fontSize: 12 }}>{dur === null ? "!" : dur}</span>;
       case "endTime": return <input className={"mt-editable mt-time" + (row.endTimeAuto ? " mt-computed-field" : "")} type="time" value={row.endTime} title={row.endTimeAuto ? T.computedEndTimeHint : undefined} onChange={(e) => updateRow(row.id, { endTime: e.target.value, endTimeAuto: false })} />;
-      case "route": return routeUrl ? (
+      case "route": return (
         <span className="mt-route-mini">
-          <a className="mt-link-icon" href={routeUrl} target="_blank" rel="noreferrer" title={T.routeTooltip}><Route size={14} /></a>
+          {routeUrl && <a className="mt-link-icon" href={routeUrl} target="_blank" rel="noreferrer" title={T.routeTooltip}><Route size={14} /></a>}
           {row.routeDistanceKm != null ? (
             <span className="mt-route-km">{row.routeDistanceKm.toFixed(1)} {T.km}</span>
           ) : distLoading ? (
             <span className="mt-route-km">…</span>
-          ) : null}
+          ) : (
+            <button className="mt-link-icon" title={routeCalcError || T.calcRoute} onClick={(e) => { e.stopPropagation(); forceRecalcRoute(); }}><RefreshCw size={13} /></button>
+          )}
         </span>
-      ) : <span className="mt-link-icon empty" title={T.noRoute}><Route size={14} /></span>;
+      );
       case "link": return row.link ? (
         <a className="mt-link-icon" href={row.link} target="_blank" rel="noreferrer" title={row.link}><Link2 size={14} /></a>
       ) : (
@@ -2200,8 +2214,9 @@ export default function MyTripApp() {
     routeImportStops.forEach((name) => {
       const startTime = `${String(h % 24).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
       h += 1;
+      const endTime = `${String(h % 24).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
       const id = addRow(routeImportDate, null, fid);
-      updateRow(id, { typeId: "poi", to: name, startTime });
+      updateRow(id, { typeId: "poi", to: name, startTime, endTime });
     });
     setRouteImportOpen(false);
   }
@@ -3043,6 +3058,8 @@ export default function MyTripApp() {
         .mt-loc-icons { display:flex; gap:0; }
         .mt-loc-icons .mt-btn-icon { padding:5px 5px; }
         .mt-loc-grid-input { width:100%; border:1px solid var(--border); border-radius:8px; padding:6px 8px; font-size:12.5px; font-family:inherit; background:#fff; color:var(--ink); }
+        .mt-editable:disabled, .mt-loc-grid-input:disabled, .mt-loc-alias-cell input:disabled, .mt-loc-mobile-alias-row input:disabled { background:#F0F2F1; color:var(--muted); cursor:not-allowed; border-color:#E5E9E7; }
+        .mt-btn-icon:disabled { opacity:.35; cursor:not-allowed; }
         .mt-loc-grid-input:focus { outline:none; border-color:var(--teal); }
         .mt-loc-verified-slot { display:flex; justify-content:center; min-width:18px; }
         .mt-loc-alias-cell { display:flex; align-items:center; gap:2px; }
@@ -3680,6 +3697,7 @@ export default function MyTripApp() {
                 <div className="mt-field"><label>{T.end}</label><input type="time" className={cardDraft.endTimeAuto ? "mt-computed-field" : ""} title={cardDraft.endTimeAuto ? T.computedEndTimeHint : undefined} value={cardDraft.endTime} onChange={(e) => setCardDraft({ ...cardDraft, endTime: e.target.value, endTimeAuto: false })} /></div>
               </div>
               <label className="mt-checkbox-row"><input type="checkbox" checked={!!cardDraft.overnight} onChange={(e) => setCardDraft({ ...cardDraft, overnight: e.target.checked })} />{T.overnight}</label>
+              <label className="mt-checkbox-row"><input type="checkbox" checked={cardDraft.toFee === "yes"} onChange={(e) => setCardDraft({ ...cardDraft, toFee: e.target.checked ? "yes" : null })} />{T.requiresTicket}</label>
               {cardHasTimeError && <div className="mt-error"><AlertTriangle /> {T.timeError}</div>}
               {showTzHint && <div className="mt-hint">{T.tzNote}</div>}
 
@@ -3831,22 +3849,18 @@ export default function MyTripApp() {
               <button className="mt-btn ghost" onClick={closeFrameModal}><X size={16} /></button>
             </div>
             <div className="mt-modal-body">
-              <div className="mt-field"><label>{T.frameName}</label><input value={frameDraft.name} onChange={(e) => setFrameDraft({ ...frameDraft, name: e.target.value })} /></div>
-              <div className="mt-field">
-                <label>{T.frameDateRange}</label>
-                <DateRangeField startDate={frameDraft.startDate} endDate={frameDraft.endDate} lang={lang} T={T}
-                  onChange={(s, e) => setFrameDraft({ ...frameDraft, startDate: s, endDate: e })} />
-              </div>
-              <div className="mt-field-row">
-                <button className="mt-btn ghost" style={{ width: "100%" }} onClick={fillFrameDatesAbove}><ArrowDownUp size={13} /> {T.fillDatesAbove}</button>
-                <button className="mt-btn ghost" style={{ width: "100%" }} onClick={fillFrameDatesBelow}><ArrowDownUp size={13} /> {T.fillDatesBelow}</button>
-              </div>
               <div className="mt-field">
                 <label>{T.parentFrame}</label>
                 <select value={frameDraft.parentFrameId || ""} onChange={(e) => setFrameDraft({ ...frameDraft, parentFrameId: e.target.value || null })}>
                   <option value="">{T.noFrame}</option>
                   {frameOptionsList(frameDraft.id).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
                 </select>
+              </div>
+              <div className="mt-field"><label>{T.frameName}</label><input value={frameDraft.name} onChange={(e) => setFrameDraft({ ...frameDraft, name: e.target.value })} /></div>
+              <div className="mt-field">
+                <label>{T.frameDateRange}</label>
+                <DateRangeField startDate={frameDraft.startDate} endDate={frameDraft.endDate} lang={lang} T={T}
+                  onChange={(s, e) => setFrameDraft({ ...frameDraft, startDate: s, endDate: e })} />
               </div>
               {frameIssue && <div className="mt-error"><AlertTriangle /> {frameIssue}</div>}
             </div>
