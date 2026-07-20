@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import { useFloating, autoUpdate, offset, flip, shift, useClick, useDismiss, useInteractions } from "@floating-ui/react";
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -18,7 +19,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.37.0";
+const APP_VERSION = "11.0.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -341,6 +342,19 @@ const T_DICT = {
 function getTypeHint() { return ""; }
 
 function uid() { return Math.random().toString(36).slice(2, 10); }
+function useFloatingMenu(open, onOpenChange) {
+  const { refs, floatingStyles, context } = useFloating({
+    open, onOpenChange,
+    placement: "bottom-end",
+    strategy: "fixed",
+    middleware: [offset(6), flip(), shift({ padding: 8 })],
+    whileElementsMounted: autoUpdate,
+  });
+  const click = useClick(context);
+  const dismiss = useDismiss(context);
+  const { getReferenceProps, getFloatingProps } = useInteractions([click, dismiss]);
+  return { refs, floatingStyles, getReferenceProps, getFloatingProps };
+}
 function toLocalISODate(d) {
   const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, "0"), day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
@@ -1947,12 +1961,12 @@ export default function MyTripApp() {
   const [collapsedGroups, setCollapsedGroups] = useState({});
   const [collapsedParents, setCollapsedParents] = useState({});
   const [colMenuOpen, setColMenuOpen] = useState(false);
-  const [colMenuPos, setColMenuPos] = useState({ top: 0, right: 20 });
+  const colMenu = useFloatingMenu(colMenuOpen, setColMenuOpen);
   const [newColName, setNewColName] = useState("");
   const [typeMenuOpen, setTypeMenuOpen] = useState(null);
   const [newTypeDraft, setNewTypeDraft] = useState({ name: "", icon: "Tag" });
   const [addTypeOpen, setAddTypeOpen] = useState(false);
-  const [addTypePos, setAddTypePos] = useState({ top: 0, right: 20 });
+  const addTypeMenu = useFloatingMenu(addTypeOpen, setAddTypeOpen);
   const [addTypeDraft, setAddTypeDraft] = useState({ name: "", icon: "Tag" });
   const [cardRowId, setCardRowId] = useState(null);
   const [cardDraft, setCardDraft] = useState(null);
@@ -1961,9 +1975,9 @@ export default function MyTripApp() {
   const [remindersOn, setRemindersOn] = useState(false);
   const [firedReminders, setFiredReminders] = useState({});
   const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
-  const [actionsMenuPos, setActionsMenuPos] = useState({ top: 60, right: 20 });
+  const actionsMenu = useFloatingMenu(actionsMenuOpen, setActionsMenuOpen);
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
-  const [settingsMenuPos, setSettingsMenuPos] = useState({ top: 60, right: 20 });
+  const settingsMenu = useFloatingMenu(settingsMenuOpen, setSettingsMenuOpen);
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const [aiMessages, setAiMessages] = useState([]);
   const [aiInput, setAiInput] = useState("");
@@ -2627,28 +2641,6 @@ export default function MyTripApp() {
     if (rowIdToApply) updateRow(rowIdToApply, { typeId: id });
     setNewTypeDraft({ name: "", icon: "Tag" }); setTypeMenuOpen(null);
   }
-  function clampMenuRight(rect, menuWidth) {
-    const margin = 8;
-    const raw = window.innerWidth - rect.right;
-    const maxRight = window.innerWidth - menuWidth - margin;
-    return Math.max(margin, Math.min(raw, maxRight));
-  }
-  function openColumnsMenu() {
-    if (settingsBtnRef.current) { const r = settingsBtnRef.current.getBoundingClientRect(); setColMenuPos({ top: r.bottom + 8, right: clampMenuRight(r, 220) }); }
-    setColMenuOpen(true);
-  }
-  function openAddTypeMenu() {
-    if (settingsBtnRef.current) { const r = settingsBtnRef.current.getBoundingClientRect(); setAddTypePos({ top: r.bottom + 8, right: clampMenuRight(r, 200) }); }
-    setAddTypeOpen(true);
-  }
-  function openSettingsMenu() {
-    if (settingsBtnRef.current) { const r = settingsBtnRef.current.getBoundingClientRect(); setSettingsMenuPos({ top: r.bottom + 8, right: clampMenuRight(r, 220) }); }
-    setSettingsMenuOpen((v) => !v);
-  }
-  function openActionsMenu() {
-    if (actionsBtnRef.current) { const r = actionsBtnRef.current.getBoundingClientRect(); setActionsMenuPos({ top: r.bottom + 8, right: clampMenuRight(r, 220) }); }
-    setActionsMenuOpen((v) => !v);
-  }
   function submitAddType() {
     if (!addTypeDraft.name.trim()) return;
     const id = "custom-" + uid();
@@ -2894,7 +2886,7 @@ export default function MyTripApp() {
         .mt-icon-btn svg { width:14px; height:14px; }
         .mt-avatar { width:26px; height:26px; border-radius:50%; background:var(--teal-tint); color:var(--teal-dark); display:flex; align-items:center; justify-content:center; border:1px solid var(--border); }
         .mt-toolbar-group { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
-        .mt-floating-menu { position:fixed; background:var(--surface); color:var(--ink); border:1px solid var(--border); border-radius:10px; box-shadow:0 12px 32px rgba(20,40,35,.18); padding:10px; z-index:200; max-width:92vw; max-height:70vh; overflow-y:auto; }
+        .mt-floating-menu { background:var(--surface); color:var(--ink); border:1px solid var(--border); border-radius:10px; box-shadow:0 12px 32px rgba(20,40,35,.18); padding:10px; z-index:200; max-width:92vw; max-height:70vh; overflow-y:auto; }
         .mt-floating-backdrop { position:fixed; inset:0; z-index:190; background:transparent; }
         .mt-menu-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:7px; }
         .mt-menu-head strong { font-size:12.5px; }
@@ -3220,12 +3212,12 @@ export default function MyTripApp() {
       </div>
       <div className="mt-toolbar">
         <div className="mt-toolbar-group">
-          <button className="mt-icon-btn" ref={settingsBtnRef} onClick={openSettingsMenu}><Menu /> {T.settings}</button>
+          <button className="mt-icon-btn" ref={(el) => { settingsBtnRef.current = el; settingsMenu.refs.setReference(el); }} {...settingsMenu.getReferenceProps()}><Menu /> {T.settings}</button>
         </div>
         <div className="mt-toolbar-group">
           <button className="mt-icon-btn" onClick={undo} disabled={!canUndo} title={T.undo}><Undo2 /></button>
           <button className="mt-icon-btn" onClick={redo} disabled={!canRedo} title={T.redo}><Redo2 /></button>
-          <button className="mt-icon-btn" ref={actionsBtnRef} onClick={openActionsMenu}><Menu /> {T.actions}</button>
+          <button className="mt-icon-btn" ref={(el) => { actionsBtnRef.current = el; actionsMenu.refs.setReference(el); }} {...actionsMenu.getReferenceProps()}><Menu /> {T.actions}</button>
           <input ref={importInputRef} type="file" accept="application/json,.json" style={{ display: "none" }}
             onChange={(e) => { importFromFile(e.target.files && e.target.files[0]); e.target.value = ""; }} />
           {importMsg && <span className="mt-hint" style={{ color: importMsg.ok ? "#3E8E5A" : "var(--danger)" }}>{importMsg.ok ? T.importSuccess : T.importError}</span>}
@@ -3234,24 +3226,19 @@ export default function MyTripApp() {
       </div>
 
       {settingsMenuOpen && (
-        <>
-          <div className="mt-floating-backdrop" onClick={() => setSettingsMenuOpen(false)} />
-          <div className="mt-floating-menu mt-kebab-menu" style={{ top: settingsMenuPos.top, right: settingsMenuPos.right, minWidth: 220 }}>
-            <button className="mt-share-opt" onClick={() => { setSettingsMenuOpen(false); openColumnsMenu(); }}><Settings2 size={14} /> {T.manageColumns}</button>
-            <button className="mt-share-opt" onClick={() => { setSettingsMenuOpen(false); openAddTypeMenu(); }}><Plus size={14} /> {T.addType}</button>
+        <div ref={settingsMenu.refs.setFloating} style={settingsMenu.floatingStyles} {...settingsMenu.getFloatingProps()} className="mt-floating-menu mt-kebab-menu" >
+            <button className="mt-share-opt" onClick={() => { setSettingsMenuOpen(false); colMenu.refs.setReference(settingsBtnRef.current); setColMenuOpen(true); }}><Settings2 size={14} /> {T.manageColumns}</button>
+            <button className="mt-share-opt" onClick={() => { setSettingsMenuOpen(false); addTypeMenu.refs.setReference(settingsBtnRef.current); setAddTypeOpen(true); }}><Plus size={14} /> {T.addType}</button>
             <div className="divider" />
             <button className="mt-share-opt" onClick={toggleIntroDisabled}>
               {introDisabled ? <CircleCheck size={14} style={{ color: "var(--teal)" }} /> : <span style={{ width: 14, height: 14, border: "1.5px solid var(--border)", borderRadius: 4, display: "inline-block" }} />}
               {T.disableIntro}
             </button>
-          </div>
-        </>
+        </div>
       )}
 
       {actionsMenuOpen && (
-        <>
-          <div className="mt-floating-backdrop" onClick={() => setActionsMenuOpen(false)} />
-          <div className="mt-floating-menu mt-kebab-menu" style={{ top: actionsMenuPos.top, right: actionsMenuPos.right, minWidth: 220, maxWidth: "min(240px, 92vw)" }}>
+        <div ref={actionsMenu.refs.setFloating} style={{ ...actionsMenu.floatingStyles, maxWidth: "min(240px, 92vw)" }} {...actionsMenu.getFloatingProps()} className="mt-floating-menu mt-kebab-menu">
             <button className="mt-share-opt" onClick={() => { openFrameModal(null, null); setActionsMenuOpen(false); }}><FolderPlus size={14} /> {T.newFrame}</button>
             <button className="mt-share-opt" onClick={openAiWizard}><Wand2 size={14} /> {T.newFrameWizard}</button>
             <button className="mt-share-opt" onClick={openSaveTripModal}><Save size={14} /> {T.saveTripByName}</button>
@@ -3269,8 +3256,7 @@ export default function MyTripApp() {
             <button className="mt-share-opt" onClick={() => { setAiPanelOpen(true); setActionsMenuOpen(false); }}><Wand2 size={14} /> {T.aiAssistant}</button>
             <div className="divider" />
             <button className="mt-share-opt" onClick={openRouteImport}><Route size={14} /> {T.importRoute}</button>
-          </div>
-        </>
+        </div>
       )}
       {demoNotice && (
         <>
@@ -3530,9 +3516,7 @@ export default function MyTripApp() {
       )}
 
       {colMenuOpen && (
-        <>
-          <div className="mt-floating-backdrop" onClick={() => setColMenuOpen(false)} />
-          <div className="mt-floating-menu mt-columns-menu" style={{ top: colMenuPos.top, right: colMenuPos.right }}>
+        <div ref={colMenu.refs.setFloating} style={colMenu.floatingStyles} {...colMenu.getFloatingProps()} className="mt-floating-menu mt-columns-menu">
             <div className="mt-menu-head"><strong>{T.columns}</strong><button className="mt-btn ghost" style={{ padding: "2px 6px" }} onClick={() => setColMenuOpen(false)}><X size={14} /></button></div>
             {columns.map((c) => (
               <label key={c.key}>
@@ -3546,14 +3530,11 @@ export default function MyTripApp() {
             <button className="mt-btn primary" style={{ width: "100%" }} onClick={addCustomColumn}><Plus size={13} /> {T.addColumn}</button>
             <div className="divider" />
             <button className="mt-btn ghost" style={{ width: "100%" }} onClick={resetColumnWidths}><ArrowDownUp size={13} /> {T.resetColumnWidths}</button>
-          </div>
-        </>
+        </div>
       )}
 
       {addTypeOpen && (
-        <>
-          <div className="mt-floating-backdrop" onClick={() => setAddTypeOpen(false)} />
-          <div className="mt-floating-menu" style={{ top: addTypePos.top, right: addTypePos.right, minWidth: 200 }}>
+        <div ref={addTypeMenu.refs.setFloating} style={{ ...addTypeMenu.floatingStyles, minWidth: 200 }} {...addTypeMenu.getFloatingProps()} className="mt-floating-menu">
             <div className="mt-menu-head"><strong>{T.newType}</strong><button className="mt-btn ghost" style={{ padding: "2px 6px" }} onClick={() => setAddTypeOpen(false)}><X size={14} /></button></div>
             <input type="text" placeholder={T.typeName} value={addTypeDraft.name} onChange={(e) => setAddTypeDraft({ ...addTypeDraft, name: e.target.value })} style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 6, padding: "5px 7px", fontSize: 12.5, marginBottom: 8, color: "var(--ink)", background: "#fff" }} />
             <div className="mt-icon-pick-row">
@@ -3562,8 +3543,7 @@ export default function MyTripApp() {
               ); })}
             </div>
             <button className="mt-btn primary" style={{ width: "100%" }} onClick={submitAddType}><Plus size={13} /> {T.add}</button>
-          </div>
-        </>
+        </div>
       )}
 
       <div className="mt-content">
