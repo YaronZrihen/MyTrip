@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.32.0";
+const APP_VERSION = "10.34.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -36,7 +36,6 @@ const FRAME_COLORS = ["#256D64", "#3E7CB1", "#8B6F47", "#7A5C9E", "#C1443A", "#5
 const CURRENCIES = ["₪", "$", "€", "£"];
 const CURRENCY_CODE_MAP = { "₪": "ILS", "$": "USD", "€": "EUR", "£": "GBP" };
 const FALLBACK_RATES = { ILS: 1, USD: 0.27, EUR: 0.25, GBP: 0.21 };
-const FLIGHT_LOOKUP_ENABLED = false; // needs a real flight-data provider (e.g. AeroDataBox) + API key + server proxy
 
 const CATEGORY_COLORS = {
   "public-transport": "#3E7CB1", "road-transport": "#8B6F47", "sea-transport": "#2F7A8C",
@@ -133,6 +132,9 @@ const T_DICT = {
     rowOutOfFrame: "התאריך חייב להיות בתוך טווח המסגרת שאליה הרשומה משויכת",
     routeTooltip: "פתח מסלול בגוגל מפות", dayRoute: "מסלול", addDayShort: "+ יום", noRoute: "אין מספיק נתוני מיקום",
     fetchFlightData: "משוך נתונים לפי מספר טיסה", flightApiMissing: "לצורך משיכה אוטומטית יש לחבר ספק נתוני טיסות (כגון AeroDataBox) עם מפתח API ופרוקסי בצד השרת. שדה זה מוכן לחיבור עתידי.",
+    flightNoNumber: "יש להזין מספר טיסה קודם.", flightLookupLoading: "מחפש נתוני טיסה...", flightLookupError: "לא נמצאו נתונים לטיסה זו, או שהחיבור לשרת נכשל.", flightLookupSuccess: "נתוני הטיסה עודכנו.",
+    flightAlreadyLookedUp: "כבר נמשכו נתונים לטיסה זו. שנה את מספר הטיסה כדי לבצע בדיקה חדשה.",
+    flightTerminal: "טרמינל", flightGate: "שער",
     chronoWarning: "סדר הרשומות ביום זה אינו כרונולוגי לפי שעה", sortByTime: "מיין לפי שעה",
     addDayModalTitle: "הוספת יום חדש", addDayDate: "תאריך", confirmAdd: "הוסף",
     addDayAutoRecords: "רשומות אוטומטיות ליום", addDayHotel: "מלון", addDayTransport: "תחבורה", addDayPoi: "נקודת עניין",
@@ -240,6 +242,9 @@ const T_DICT = {
     rowOutOfFrame: "The date must fall inside the frame this record belongs to",
     routeTooltip: "Open route in Google Maps", dayRoute: "Route", addDayShort: "+ Day", noRoute: "Not enough location data",
     fetchFlightData: "Fetch data by flight number", flightApiMissing: "Live lookup needs a flight-data provider (e.g. AeroDataBox) with an API key and a server-side proxy. This field is ready to be wired up later.",
+    flightNoNumber: "Enter a flight number first.", flightLookupLoading: "Looking up flight data...", flightLookupError: "No data found for this flight, or the server connection failed.", flightLookupSuccess: "Flight data updated.",
+    flightAlreadyLookedUp: "Data was already fetched for this flight. Change the flight number to look up again.",
+    flightTerminal: "Terminal", flightGate: "Gate",
     chronoWarning: "Records on this day are not in chronological time order", sortByTime: "Sort by time",
     addDayModalTitle: "Add a new day", addDayDate: "Date", confirmAdd: "Add",
     addDayAutoRecords: "Automatic records for the day", addDayHotel: "Hotel", addDayTransport: "Transportation", addDayPoi: "Point of interest",
@@ -2727,9 +2732,26 @@ export default function MyTripApp() {
     updateRow(cardRowId, cardDraft); closeCard();
   }
   function fetchFlightData() {
-    if (!FLIGHT_LOOKUP_ENABLED) { setFlightLookupMsg(T.flightApiMissing); return; }
-    // Placeholder for a real provider call, e.g.:
-    // fetch(`/api/flight-lookup?flight=${cardDraft.flightNumber}`).then(...)
+    const num = cardDraft.flightNumber && cardDraft.flightNumber.trim();
+    if (!num) { setFlightLookupMsg(T.flightNoNumber); return; }
+    if (cardDraft.flightLookedUpFor === num) { setFlightLookupMsg(T.flightAlreadyLookedUp); return; }
+    setFlightLookupMsg(T.flightLookupLoading);
+    const params = new URLSearchParams({ flight: num, date: cardDraft.date || "" });
+    fetch(`/api/flight-lookup?${params.toString()}`)
+      .then((r) => r.json().then((data) => ({ ok: r.ok, data })))
+      .then(({ ok, data }) => {
+        if (!ok || !data || data.error) { setFlightLookupMsg((data && data.error) || T.flightLookupError); return; }
+        const patch = { flightLookedUpFor: num };
+        if (data.departureAirport) patch.from = data.departureAirport;
+        if (data.arrivalAirport) patch.to = data.arrivalAirport;
+        if (data.departureTime) patch.startTime = data.departureTime;
+        if (data.arrivalTime) patch.endTime = data.arrivalTime;
+        const extras = [data.status, data.terminal ? `${T.flightTerminal} ${data.terminal}` : null, data.gate ? `${T.flightGate} ${data.gate}` : null].filter(Boolean);
+        if (extras.length) patch.notes = [cardDraft.notes, extras.join(" · ")].filter(Boolean).join(" — ");
+        setCardDraft((d) => ({ ...d, ...patch }));
+        setFlightLookupMsg(T.flightLookupSuccess);
+      })
+      .catch(() => setFlightLookupMsg(T.flightLookupError));
   }
 
   /* ---------- frame modal ---------- */
