@@ -18,7 +18,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "10.35.0";
+const APP_VERSION = "10.36.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -341,6 +341,10 @@ const T_DICT = {
 function getTypeHint() { return ""; }
 
 function uid() { return Math.random().toString(36).slice(2, 10); }
+function toLocalISODate(d) {
+  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, "0"), day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 function heDay(dateStr, lang) { if (!dateStr) return "—"; const d = new Date(dateStr + "T00:00:00"); if (isNaN(d)) return "—"; return lang === "he" ? HE_DAYS[d.getDay()] : EN_DAYS[d.getDay()]; }
 function fmtDate(dateStr, lang) { if (!dateStr) return "—"; const d = new Date(dateStr + "T00:00:00"); if (isNaN(d)) return dateStr; const dd = String(d.getDate()).padStart(2, "0"); const mm = String(d.getMonth() + 1).padStart(2, "0"); return `${dd}/${mm}/${d.getFullYear()}`; }
 function computeDuration(start, end, overnight) {
@@ -864,7 +868,7 @@ function seedDateOffset(daysFromStart) {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
   d.setDate(d.getDate() + 3 + daysFromStart);
-  return d.toISOString().slice(0, 10);
+  return toLocalISODate(d);
 }
 function initialRows() {
   const day1 = seedDateOffset(0), day2 = seedDateOffset(1), day5 = seedDateOffset(4);
@@ -1044,25 +1048,35 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
                   {typeSearch && <button className="mt-type-search-clear" onClick={() => setTypeSearch("")}><X size={12} /></button>}
                 </div>
                 <div className="mt-type-list">
-                  {groupTypesByCategory(types)
-                    .map((grp) => ({ ...grp, items: grp.items.filter((t) => typeDisplayName(t, lang).toLowerCase().includes(typeSearch.toLowerCase())) }))
-                    .filter((grp) => grp.items.length)
-                    .map((grp) => (
-                      <React.Fragment key={grp.category}>
-                        <div className="mt-type-cat-label">{CATEGORY_LABELS[lang][grp.category] || grp.category}</div>
-                        {grp.items.map((t) => { const TI = ICONS[t.icon] || Tag; const selected = t.id === row.typeId; return (
-                          <button key={t.id} className={"opt" + (selected ? " selected" : "")} onClick={() => {
-                            const patch = { typeId: t.id };
-                            if (noOriginNeeded(t.id)) { patch.from = ""; patch.fromAlias = ""; patch.fromLat = null; patch.fromLon = null; patch.fromVerifiedUrl = ""; patch.fromVerifiedText = ""; patch.fromPlaceId = null; }
-                            updateRow(row.id, patch); setTypeMenuOpen(null);
-                          }}>
-                            <span className="mt-type-icon" style={{ background: t.color, width: 20, height: 20 }}><TI size={11} /></span>
-                            <span style={{ flex: 1 }}>{typeDisplayName(t, lang)}</span>
-                            {selected && <Check size={13} />}
-                          </button>
-                        ); })}
-                      </React.Fragment>
-                    ))}
+                  {(() => {
+                    const renderOpt = (t) => { const TI = ICONS[t.icon] || Tag; const selected = t.id === row.typeId; return (
+                      <button key={t.id} className={"opt" + (selected ? " selected" : "")} onClick={() => {
+                        const patch = { typeId: t.id };
+                        if (noOriginNeeded(t.id)) { patch.from = ""; patch.fromAlias = ""; patch.fromLat = null; patch.fromLon = null; patch.fromVerifiedUrl = ""; patch.fromVerifiedText = ""; patch.fromPlaceId = null; }
+                        updateRow(row.id, patch); setTypeMenuOpen(null);
+                      }}>
+                        <span className="mt-type-icon" style={{ background: t.color, width: 20, height: 20 }}><TI size={11} /></span>
+                        <span style={{ flex: 1 }}>{typeDisplayName(t, lang)}</span>
+                        {selected && <Check size={13} />}
+                      </button>
+                    ); };
+                    const walkingType = types.find((t) => t.id === "walking");
+                    const restTypes = types.filter((t) => t.id !== "walking");
+                    return (
+                      <>
+                        {walkingType && typeDisplayName(walkingType, lang).toLowerCase().includes(typeSearch.toLowerCase()) && renderOpt(walkingType)}
+                        {groupTypesByCategory(restTypes)
+                          .map((grp) => ({ ...grp, items: grp.items.filter((t) => typeDisplayName(t, lang).toLowerCase().includes(typeSearch.toLowerCase())) }))
+                          .filter((grp) => grp.items.length)
+                          .map((grp) => (
+                            <React.Fragment key={grp.category}>
+                              <div className="mt-type-cat-label">{CATEGORY_LABELS[lang][grp.category] || grp.category}</div>
+                              {grp.items.map(renderOpt)}
+                            </React.Fragment>
+                          ))}
+                      </>
+                    );
+                  })()}
                 </div>
                 <div className="divider" />
                 {showAddTypeForm ? (
@@ -1668,7 +1682,7 @@ function DayGroup({ g, fid, depth, ctx }) {
                     <PlaceIconWithPreview row={r} tm={tm} Icon={Icon} warnings={[]} T={T} lang={lang} onOpenFull={() => openHotelInfo(r)} />
                     <strong className={warningClass(cardWarnings)} style={{ fontSize: 13.5 }} title={cardWarnings.length ? warningText(cardWarnings) : undefined}>{tm.name}</strong>
                   </div>
-                  <span className="mt-card-times">{r.startTime || "—"}{r.endTime ? ` – ${r.endTime}` : ""}</span>
+                  <span className="mt-card-times" dir="ltr">{r.startTime || "—"}{r.endTime ? ` – ${r.endTime}` : ""}</span>
                   <span className="mt-card-drag-handle" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => { e.stopPropagation(); startRowPointerDrag(e, r.id); }}><GripVertical size={15} /></span>
                 </div>
                 {(fromLabel || toLabel) && (
@@ -2170,7 +2184,7 @@ export default function MyTripApp() {
     const endD = new Date(a.returnDate + "T00:00:00");
     d.setDate(d.getDate() + 1);
     while (d < endD) {
-      const dateStr = d.toISOString().slice(0, 10);
+      const dateStr = toLocalISODate(d);
       const h1 = addRow(dateStr, null, nf.id);
       updateRow(h1, { typeId: "hotel", startTime: "08:00", to: a.destination || "", link: bookingLink });
       const h2 = addRow(dateStr, null, nf.id);
@@ -2318,7 +2332,7 @@ export default function MyTripApp() {
     const blob = new Blob([html], { type: "text/html" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `mytrip-journal-${new Date().toISOString().slice(0, 10)}.html`;
+    a.href = url; a.download = `mytrip-journal-${toLocalISODate(new Date())}.html`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
@@ -2327,7 +2341,7 @@ export default function MyTripApp() {
     const blob = new Blob([html], { type: "text/html" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `mytrip-share-${new Date().toISOString().slice(0, 10)}.html`;
+    a.href = url; a.download = `mytrip-share-${toLocalISODate(new Date())}.html`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
@@ -2337,7 +2351,7 @@ export default function MyTripApp() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `mytrip-export-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `mytrip-export-${toLocalISODate(new Date())}.json`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
@@ -2379,7 +2393,7 @@ export default function MyTripApp() {
     const groups = dayGroupsAt(fid);
     if (groups.length) return groups[groups.length - 1].date;
     const frame = fid ? frames.find((f) => f.id === fid) : null;
-    return frame ? frame.startDate : new Date().toISOString().slice(0, 10);
+    return frame ? frame.startDate : toLocalISODate(new Date());
   }
   function nextDateInContext(fid) {
     const frame = fid ? frames.find((f) => f.id === fid) : null;
@@ -2388,9 +2402,9 @@ export default function MyTripApp() {
     let maxDate = groups.length ? groups[groups.length - 1].date : null;
     kids.forEach((k) => { if (k.endDate && (!maxDate || k.endDate > maxDate)) maxDate = k.endDate; });
     let base;
-    if (maxDate) { const d = new Date(maxDate + "T00:00:00"); d.setDate(d.getDate() + 1); base = d.toISOString().slice(0, 10); }
+    if (maxDate) { const d = new Date(maxDate + "T00:00:00"); d.setDate(d.getDate() + 1); base = toLocalISODate(d); }
     else if (frame) base = frame.startDate;
-    else base = new Date().toISOString().slice(0, 10);
+    else base = toLocalISODate(new Date());
     if (frame) { if (base > frame.endDate) base = frame.endDate; if (base < frame.startDate) base = frame.startDate; }
     return base;
   }
@@ -2401,9 +2415,9 @@ export default function MyTripApp() {
     let minDate = groups.length ? groups[0].date : null;
     kids.forEach((k) => { if (k.startDate && (!minDate || k.startDate < minDate)) minDate = k.startDate; });
     let base;
-    if (minDate) { const d = new Date(minDate + "T00:00:00"); d.setDate(d.getDate() - 1); base = d.toISOString().slice(0, 10); }
+    if (minDate) { const d = new Date(minDate + "T00:00:00"); d.setDate(d.getDate() - 1); base = toLocalISODate(d); }
     else if (frame) base = frame.startDate;
-    else base = new Date().toISOString().slice(0, 10);
+    else base = toLocalISODate(new Date());
     if (frame) { if (base < frame.startDate) base = frame.startDate; if (base > frame.endDate) base = frame.endDate; }
     return base;
   }
@@ -2436,7 +2450,7 @@ export default function MyTripApp() {
   function deleteRow(id) { setRows((prev) => prev.filter((r) => r.id !== id && r.parentId !== id)); }
   function addRow(date, parentId = null, frameId = null) {
     const nr = {
-      id: uid(), parentId, frameId, date: date || new Date().toISOString().slice(0, 10),
+      id: uid(), parentId, frameId, date: date || toLocalISODate(new Date()),
       typeId: "unset", from: "", to: "", startTime: "", endTime: "", overnight: false,
       destination: "", link: "", mapLink: "", flightNumber: "", costAmount: 0, costCurrency: "₪", fromAlias: "", toAlias: "",
       notes: "", fromVerifiedUrl: "", fromVerifiedText: "", toVerifiedUrl: "", toVerifiedText: "",
@@ -2526,7 +2540,7 @@ export default function MyTripApp() {
   /* ---------- add-day modal ---------- */
   function openAddDayModal(fid, afterDate) {
     let date;
-    if (afterDate) { const d = new Date(afterDate + "T00:00:00"); d.setDate(d.getDate() + 1); date = d.toISOString().slice(0, 10); }
+    if (afterDate) { const d = new Date(afterDate + "T00:00:00"); d.setDate(d.getDate() + 1); date = toLocalISODate(d); }
     else date = nextDateInContext(fid);
     setAddDayCtx({ fid, date, addHotel: true, addTransport: true, addPoi: true });
   }
@@ -3133,6 +3147,7 @@ export default function MyTripApp() {
         .mt-note { font-size:11px; color:var(--muted); margin-top:4px; }
 
         @media (max-width: 640px) {
+          .mt-place-preview-wrap { top:50% !important; left:50% !important; right:auto !important; transform:translate(-50%, -50%) !important; max-width:90vw; }
           .mt-header-row1 { padding:8px 10px 4px; }
           .mt-header-actions { padding:4px 10px; }
           .mt-toolbar { padding:4px 10px 8px; gap:5px; }
@@ -3682,7 +3697,8 @@ export default function MyTripApp() {
                     else setCardDraft({ ...cardDraft, typeId: newType });
                   }}>
                     <option value="unset">{T.selectType}</option>
-                    {groupTypesByCategory(types).map((grp) => (
+                    {types.filter((t) => t.id === "walking").map((t) => <option key={t.id} value={t.id}>{typeDisplayName(t, lang)}</option>)}
+                    {groupTypesByCategory(types.filter((t) => t.id !== "walking")).map((grp) => (
                       <optgroup key={grp.category} label={CATEGORY_LABELS[lang][grp.category] || grp.category}>
                         {grp.items.map((t) => <option key={t.id} value={t.id}>{typeDisplayName(t, lang)}</option>)}
                       </optgroup>
@@ -3697,7 +3713,6 @@ export default function MyTripApp() {
                 <div className="mt-field"><label>{T.end}</label><input type="time" className={cardDraft.endTimeAuto ? "mt-computed-field" : ""} title={cardDraft.endTimeAuto ? T.computedEndTimeHint : undefined} value={cardDraft.endTime} onChange={(e) => setCardDraft({ ...cardDraft, endTime: e.target.value, endTimeAuto: false })} /></div>
               </div>
               <label className="mt-checkbox-row"><input type="checkbox" checked={!!cardDraft.overnight} onChange={(e) => setCardDraft({ ...cardDraft, overnight: e.target.checked })} />{T.overnight}</label>
-              <label className="mt-checkbox-row"><input type="checkbox" checked={cardDraft.toFee === "yes"} onChange={(e) => setCardDraft({ ...cardDraft, toFee: e.target.checked ? "yes" : null })} />{T.requiresTicket}</label>
               {cardHasTimeError && <div className="mt-error"><AlertTriangle /> {T.timeError}</div>}
               {showTzHint && <div className="mt-hint">{T.tzNote}</div>}
 
@@ -3762,6 +3777,8 @@ export default function MyTripApp() {
                 </span>
               </div>
               )}
+
+              <label className="mt-checkbox-row"><input type="checkbox" checked={cardDraft.toFee === "yes"} onChange={(e) => setCardDraft({ ...cardDraft, toFee: e.target.checked ? "yes" : null })} />{T.requiresTicket}</label>
 
               <div className="mt-weather-row">
                 <span className="mt-link-icon mt-weather-icon-btn" title={T.weatherAtArrival}>
