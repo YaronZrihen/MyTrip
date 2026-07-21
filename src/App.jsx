@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "11.17.0";
+const APP_VERSION = "11.18.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1653,13 +1653,6 @@ function DayGroup({ g, fid, depth, ctx }) {
         <span className="mt-day-drag-handle" title={T.dragDayHint} ref={setDayDragNodeRef} onClick={(e) => e.stopPropagation()}
           {...dayDragListeners} {...dayDragAttrs}><GripVertical size={13} /></span>
         <span className="chev">{collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}</span>
-        <span className="mt-day-badge">
-          <span className="mt-day-badge-top" />
-          <span className="mt-day-badge-body">
-            <span className="mt-day-badge-num">{dayOfMonth(g.date)}</span>
-            <span className="mt-day-badge-weekday">{heDay(g.date, lang)}</span>
-          </span>
-        </span>
         <div className="mt-group-actions" onClick={(e) => e.stopPropagation()}>
           <button className="mt-group-add" onClick={() => openAddDayModal(fid, g.date)}>{T.addDayShort}</button>
           {dayRoute ? (
@@ -1668,6 +1661,13 @@ function DayGroup({ g, fid, depth, ctx }) {
             <span className="mt-group-add disabled" title={T.noRoute}><Waypoints size={13} /> {T.dayRoute}</span>
           )}
         </div>
+        <span className="mt-day-badge">
+          <span className="mt-day-badge-top" />
+          <span className="mt-day-badge-body">
+            <span className="mt-day-badge-num">{dayOfMonth(g.date)}</span>
+            <span className="mt-day-badge-weekday">{heDay(g.date, lang)}</span>
+          </span>
+        </span>
       </div>
       {!chronoOk && (
         <div className="mt-chrono-warning">
@@ -2921,12 +2921,12 @@ export default function MyTripApp() {
         .mt-frame-add-row { margin-top:10px; padding:6px 4px; }
         .mt-group { margin-top:14px; }
         .mt-group-header { display:flex; align-items:center; gap:7px; padding:6px 4px; cursor:pointer; user-select:none; flex-wrap:wrap; }
-        .mt-day-badge { display:flex; flex-direction:column; align-items:center; border-radius:8px; overflow:hidden; flex-shrink:0; width:46px; box-shadow:0 1px 3px rgba(0,0,0,.15); }
+        .mt-day-badge { display:flex; flex-direction:column; align-items:center; border-radius:8px; overflow:hidden; flex-shrink:0; width:42px; margin-inline-start:auto; box-shadow:0 1px 3px rgba(0,0,0,.15); }
         .mt-day-badge-top { background:var(--teal); width:100%; height:8px; flex-shrink:0; }
-        .mt-day-badge-body { background:var(--surface); width:100%; display:flex; flex-direction:column; align-items:center; padding:2px 0 4px; }
-        .mt-day-badge-num { font-size:19px; font-weight:800; font-family:'Frank Ruhl Libre',serif; color:var(--ink); line-height:1.15; }
-        .mt-day-badge-weekday { font-size:9px; font-weight:700; color:var(--muted); }
-        .mt-group-actions { margin-inline-start:auto; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+        .mt-day-badge-body { background:var(--surface); width:100%; display:flex; flex-direction:column; align-items:center; padding:3px 0; }
+        .mt-day-badge-num { font-size:17px; font-weight:800; font-family:'Frank Ruhl Libre',serif; color:var(--ink); line-height:1; }
+        .mt-day-badge-weekday { font-size:8px; font-weight:700; color:var(--muted); line-height:1.3; }
+        .mt-group-actions { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
         .mt-group-add { font-size:12px; color:var(--teal); display:flex; align-items:center; gap:3px; background:none; border:none; font-weight:600; text-decoration:none; }
         .mt-group-add:hover { text-decoration:underline; }
         .mt-group-add.disabled { color:var(--border); cursor:default; }
