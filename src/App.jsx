@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "11.15.0";
+const APP_VERSION = "11.17.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -373,11 +373,6 @@ function formatDayCount(n, lang) {
   return n === 1 ? "1 day" : `${n} days`;
 }
 function dayOfMonth(dateStr) { const d = new Date(dateStr + "T00:00:00"); return isNaN(d) ? "—" : d.getDate(); }
-function monthAbbrev(dateStr, lang) {
-  const d = new Date(dateStr + "T00:00:00");
-  if (isNaN(d)) return "";
-  return d.toLocaleDateString(lang === "he" ? "he-IL" : "en-US", { month: "short" }).replace(".", "");
-}
 function computeDuration(start, end, overnight) {
   if (!start || !end) return "—";
   const [sh, sm] = start.split(":").map(Number); const [eh, em] = end.split(":").map(Number);
@@ -1447,26 +1442,11 @@ function PopoverInfoIcon({ icon: IconComp, color, trigger, children }) {
 
 function PlaceInfoModal({ row, onClose, T }) {
   const placeId = row.fromPlaceId || row.toPlaceId;
-  const warnings = getRowWarning(row, T);
   return (
     <div className="mt-modal-backdrop" onClick={onClose}>
       <div className="mt-modal" style={{ maxWidth: 360 }} onClick={(e) => e.stopPropagation()}>
         <div className="mt-modal-body" style={{ padding: placeId ? 0 : undefined }}>
           <GooglePlaceDetailsFull placeId={placeId} T={T} />
-          {(warnings.length > 0 || row.link || row.fromVerifiedUrl || row.toVerifiedUrl) && (
-            <div className="mt-trip-check-section">
-              {(row.fromVerifiedUrl || row.toVerifiedUrl) && (
-                <a className="mt-btn ghost" style={{ width: "100%", justifyContent: "center" }} target="_blank" rel="noreferrer" href={row.fromVerifiedUrl || row.toVerifiedUrl}><MapPin size={13} /> {T.viewOnMap}</a>
-              )}
-              {row.link && (
-                <a className="mt-btn ghost" style={{ width: "100%", justifyContent: "center" }} target="_blank" rel="noreferrer" href={row.link}><Link2 size={13} /> {T.bookingLink}</a>
-              )}
-              {warnings.length > 0 && <div className="mt-section-label">{T.tripScheduleCheck}</div>}
-              {warnings.map((w, i) => (
-                <div key={i} className="mt-error" style={w.type === "fee" ? { background: "#FBEEDD", color: "#B5651D" } : undefined}><AlertTriangle size={13} /> {w.text}</div>
-              ))}
-            </div>
-          )}
         </div>
       </div>
     </div>
@@ -1674,11 +1654,11 @@ function DayGroup({ g, fid, depth, ctx }) {
           {...dayDragListeners} {...dayDragAttrs}><GripVertical size={13} /></span>
         <span className="chev">{collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}</span>
         <span className="mt-day-badge">
-          <span className="mt-day-badge-top">
+          <span className="mt-day-badge-top" />
+          <span className="mt-day-badge-body">
             <span className="mt-day-badge-num">{dayOfMonth(g.date)}</span>
-            <span className="mt-day-badge-mon">{monthAbbrev(g.date, lang)}</span>
+            <span className="mt-day-badge-weekday">{heDay(g.date, lang)}</span>
           </span>
-          <span className="mt-day-badge-weekday">{heDay(g.date, lang)}</span>
         </span>
         <div className="mt-group-actions" onClick={(e) => e.stopPropagation()}>
           <button className="mt-group-add" onClick={() => openAddDayModal(fid, g.date)}>{T.addDayShort}</button>
@@ -2941,11 +2921,11 @@ export default function MyTripApp() {
         .mt-frame-add-row { margin-top:10px; padding:6px 4px; }
         .mt-group { margin-top:14px; }
         .mt-group-header { display:flex; align-items:center; gap:7px; padding:6px 4px; cursor:pointer; user-select:none; flex-wrap:wrap; }
-        .mt-day-badge { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:5px 10px; border-radius:9px; background:var(--teal-tint); color:var(--teal-dark); flex-shrink:0; line-height:1.3; min-width:56px; }
-        .mt-day-badge-top { display:flex; align-items:baseline; gap:4px; }
-        .mt-day-badge-num { font-size:15px; font-weight:800; font-family:'Frank Ruhl Libre',serif; }
-        .mt-day-badge-mon { font-size:9px; font-weight:700; text-transform:uppercase; opacity:.8; }
-        .mt-day-badge-weekday { font-size:9.5px; font-weight:600; margin-top:1px; }
+        .mt-day-badge { display:flex; flex-direction:column; align-items:center; border-radius:8px; overflow:hidden; flex-shrink:0; width:46px; box-shadow:0 1px 3px rgba(0,0,0,.15); }
+        .mt-day-badge-top { background:var(--teal); width:100%; height:8px; flex-shrink:0; }
+        .mt-day-badge-body { background:var(--surface); width:100%; display:flex; flex-direction:column; align-items:center; padding:2px 0 4px; }
+        .mt-day-badge-num { font-size:19px; font-weight:800; font-family:'Frank Ruhl Libre',serif; color:var(--ink); line-height:1.15; }
+        .mt-day-badge-weekday { font-size:9px; font-weight:700; color:var(--muted); }
         .mt-group-actions { margin-inline-start:auto; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
         .mt-group-add { font-size:12px; color:var(--teal); display:flex; align-items:center; gap:3px; background:none; border:none; font-weight:600; text-decoration:none; }
         .mt-group-add:hover { text-decoration:underline; }
