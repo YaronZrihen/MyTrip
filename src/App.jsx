@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "11.14.0";
+const APP_VERSION = "11.15.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1451,7 +1451,6 @@ function PlaceInfoModal({ row, onClose, T }) {
   return (
     <div className="mt-modal-backdrop" onClick={onClose}>
       <div className="mt-modal" style={{ maxWidth: 360 }} onClick={(e) => e.stopPropagation()}>
-        <div className="mt-modal-header"><span className="mt-modal-title">{T.placeInfo}</span><button className="mt-btn ghost" onClick={onClose}><X size={16} /></button></div>
         <div className="mt-modal-body" style={{ padding: placeId ? 0 : undefined }}>
           <GooglePlaceDetailsFull placeId={placeId} T={T} />
           {(warnings.length > 0 || row.link || row.fromVerifiedUrl || row.toVerifiedUrl) && (
