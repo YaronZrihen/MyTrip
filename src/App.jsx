@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "11.2.1";
+const APP_VERSION = "11.3.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -148,6 +148,7 @@ const T_DICT = {
     demoLocationName: "וותיקן", demoLocationRaw: "Vatican City",
     demoHotelRaw: "Hilton Garden Inn Rome Airport", demoHotelAlias: "הילטון גארדן אין רומא",
     demoRestaurantRaw: "Ristorante dei Musei", demoRestaurantName: "מסעדת המוזיאון",
+    pickSavedHotel: "בחר ממלונות שמורים", noSavedHotels: "אין עדיין מלונות שמורים — הם יישמרו אוטומטית ככל שתשתמש בהם.",
     verify: "אמת מול מפות", verified: "מאומת", openMap: "פתח במפה", pickFromMap: "בחר מהמפה",
     fromAlias: "כינוי למוצא", toAlias: "כינוי ליעד", aliasHint: "יוצג בעמודה במקום הטקסט המלא. מתמלא אוטומטית בשם מקוצר בעת אימות מיקום (לפי הכתובת שנמצאה) — ניתן תמיד לשנות ידנית.",
     flightAliasPlaceholder: "לדוגמה: תל אביב (TLV)", copyPrevDest: "העתק יעד משורה קודמת",
@@ -262,6 +263,7 @@ const T_DICT = {
     demoLocationName: "Vatican", demoLocationRaw: "Vatican City",
     demoHotelRaw: "Hilton Garden Inn Rome Airport", demoHotelAlias: "Hilton Garden Inn Rome",
     demoRestaurantRaw: "Ristorante dei Musei", demoRestaurantName: "Museum Restaurant",
+    pickSavedHotel: "Pick from saved hotels", noSavedHotels: "No saved hotels yet — they'll be remembered automatically as you use them.",
     verify: "Verify with Maps", verified: "Verified", openMap: "Open in Maps", pickFromMap: "Pick from map",
     fromAlias: "Origin nickname", toAlias: "Destination nickname", aliasHint: "Shown in the table instead of the full text. Auto-filled with a short name when you verify a location (based on the matched address) — you can always edit it manually.",
     flightAliasPlaceholder: "e.g. Tel Aviv (TLV)", copyPrevDest: "Copy previous row's destination",
@@ -1185,6 +1187,13 @@ function FrameInlineDatePicker({ frame, ctx }) {
   const [tempStart, setTempStart] = useState(frame.startDate);
   const [tempEnd, setTempEnd] = useState(frame.endDate);
   const [issue, setIssue] = useState(null);
+  const { refs, floatingStyles } = useFloating({
+    open, onOpenChange: setOpen,
+    placement: "bottom-start",
+    strategy: "fixed",
+    middleware: [offset(6), flip(), shift({ padding: 8 })],
+    whileElementsMounted: autoUpdate,
+  });
 
   function openPicker(e) {
     e.stopPropagation();
@@ -1217,13 +1226,13 @@ function FrameInlineDatePicker({ frame, ctx }) {
 
   return (
     <span style={{ position: "relative" }}>
-      <button type="button" className="mt-frame-date-inline mt-frame-date-btn" onClick={openPicker}>
+      <button ref={refs.setReference} type="button" className="mt-frame-date-inline mt-frame-date-btn" onClick={openPicker}>
         {fmtDate(frame.startDate, lang)} – {fmtDate(frame.endDate, lang)}
       </button>
       {open && (
         <>
           <div className="mt-floating-backdrop" onClick={(e) => { e.stopPropagation(); setOpen(false); }} />
-          <div className="mt-floating-menu mt-daterange-cal" dir="ltr" onClick={(e) => e.stopPropagation()}>
+          <div ref={refs.setFloating} style={floatingStyles} className="mt-floating-menu mt-daterange-cal" dir="ltr" onClick={(e) => e.stopPropagation()}>
             <div className="mt-cal-header">
               <button type="button" onClick={() => shiftMonth(-1)}><ChevronLeft size={16} /></button>
               <strong>{monthLabel}</strong>
@@ -1261,7 +1270,13 @@ function DateRangeField({ startDate, endDate, onChange, lang, T }) {
   const [viewMonth, setViewMonth] = useState(() => { const d = startDate ? new Date(startDate + "T00:00:00") : new Date(); d.setDate(1); return d; });
   const [tempStart, setTempStart] = useState(startDate || "");
   const [tempEnd, setTempEnd] = useState(endDate || "");
-  const btnRef = useRef(null);
+  const { refs, floatingStyles } = useFloating({
+    open, onOpenChange: setOpen,
+    placement: "bottom-start",
+    strategy: "fixed",
+    middleware: [offset(6), flip(), shift({ padding: 8 })],
+    whileElementsMounted: autoUpdate,
+  });
   function toggleOpen() {
     if (!open) { const d = tempStart ? new Date(tempStart + "T00:00:00") : new Date(); d.setDate(1); setViewMonth(d); }
     setOpen((v) => !v);
@@ -1286,14 +1301,14 @@ function DateRangeField({ startDate, endDate, onChange, lang, T }) {
   const monthLabel = viewMonth.toLocaleDateString(lang === "he" ? "he-IL" : "en-US", { month: "long", year: "numeric" });
   return (
     <div style={{ position: "relative" }}>
-      <button ref={btnRef} type="button" className="mt-daterange-btn" onClick={toggleOpen}>
+      <button ref={refs.setReference} type="button" className="mt-daterange-btn" onClick={toggleOpen}>
         <CalendarIcon size={14} />
         <span>{startDate ? fmtDate(startDate, lang) : "—"} – {endDate ? fmtDate(endDate, lang) : "—"}</span>
       </button>
       {open && (
         <>
           <div className="mt-floating-backdrop" onClick={() => setOpen(false)} />
-          <div className="mt-floating-menu mt-daterange-cal" dir="ltr">
+          <div ref={refs.setFloating} style={floatingStyles} className="mt-floating-menu mt-daterange-cal" dir="ltr">
             <div className="mt-cal-header">
               <button type="button" onClick={() => shiftMonth(-1)}><ChevronLeft size={16} /></button>
               <strong>{monthLabel}</strong>
@@ -1690,6 +1705,7 @@ function DayGroup({ g, fid, depth, ctx }) {
       )}
       {!collapsed && (effectiveMobile ? (
         <div className="mt-cards">
+          <div className="mt-flow-line" />
           {allRowsHere.map((r, ri) => (
             <MobileRowCard key={r.id} r={r} prevRow={ri > 0 ? allRowsHere[ri - 1] : null} types={types} lang={lang} T={T} ctx={ctx} />
           ))}
@@ -1940,6 +1956,8 @@ export default function MyTripApp() {
   const [cardRowId, setCardRowId] = useState(null);
   const [cardDraft, setCardDraft] = useState(null);
   const [flightLookupMsg, setFlightLookupMsg] = useState("");
+  const [savedHotelsOpen, setSavedHotelsOpen] = useState(false);
+  const savedHotelsMenu = useFloatingMenu(savedHotelsOpen, setSavedHotelsOpen);
   const [weatherData, setWeatherData] = useState(null);
   const [remindersOn, setRemindersOn] = useState(false);
   const [firedReminders, setFiredReminders] = useState({});
@@ -2706,8 +2724,35 @@ export default function MyTripApp() {
   }
   const cardHasTimeError = cardDraft && cardDraft.startTime && cardDraft.endTime && computeDuration(cardDraft.startTime, cardDraft.endTime, cardDraft.overnight) === null;
   const cardFrameIssue = cardDraft ? rowFrameIssue(cardDraft, frames, T) : null;
+  const SAVED_HOTELS_KEY = "mytrip_saved_hotels";
+  function getSavedHotels() {
+    try { return JSON.parse(localStorage.getItem(SAVED_HOTELS_KEY) || "[]"); } catch (e) { return []; }
+  }
+  function saveHotelToMemory(info) {
+    if (!info || !info.name) return;
+    try {
+      const list = getSavedHotels();
+      const key = info.placeId || info.name;
+      const filtered = list.filter((h) => (h.placeId || h.name) !== key);
+      filtered.unshift(info);
+      localStorage.setItem(SAVED_HOTELS_KEY, JSON.stringify(filtered.slice(0, 20)));
+    } catch (e) {}
+  }
   function saveCard() {
     if (!cardDraft.date || cardHasTimeError || cardFrameIssue) return;
+    if (isAccommodationType(cardDraft.typeId)) {
+      const name = cardDraft.to || cardDraft.from;
+      if (name) {
+        saveHotelToMemory({
+          name, alias: cardDraft.toAlias || cardDraft.fromAlias || "",
+          lat: cardDraft.toLat != null ? cardDraft.toLat : cardDraft.fromLat,
+          lon: cardDraft.toLon != null ? cardDraft.toLon : cardDraft.fromLon,
+          placeId: cardDraft.toPlaceId || cardDraft.fromPlaceId || null,
+          verifiedUrl: cardDraft.toVerifiedUrl || cardDraft.fromVerifiedUrl || "",
+          verifiedText: cardDraft.toVerifiedText || cardDraft.fromVerifiedText || "",
+        });
+      }
+    }
     updateRow(cardRowId, cardDraft); closeCard();
   }
   function fetchFlightData() {
@@ -3040,7 +3085,8 @@ export default function MyTripApp() {
         .mt-loc-alias-cell input:focus { outline:none; border-color:var(--teal); }
         .mt-info-icon-btn { border:none; background:none; color:var(--muted); display:inline-flex; padding:1px; vertical-align:middle; }
         .mt-info-icon-btn:hover { color:var(--teal); }
-        .mt-info-popup { z-index:260; background:var(--surface); border:1px solid var(--border); border-radius:8px; box-shadow:0 8px 24px rgba(20,40,35,.18); padding:9px 11px; font-size:12px; max-width:230px; color:var(--ink); line-height:1.5; }
+        .mt-info-popup { z-index:260; background:var(--surface); border:1px solid var(--border); border-radius:8px; box-shadow:0 8px 24px rgba(20,40,35,.18); padding:9px 11px; font-size:12px; max-width:300px; color:var(--ink); line-height:1.5; }
+        .mt-info-popup-widget { margin:-9px -11px 0; overflow:hidden; border-radius:8px 8px 0 0; }
         .mt-info-popup a { color:var(--teal); font-weight:600; }
         .mt-star-picker { display:flex; gap:3px; }
         .mt-star-picker button { border:none; background:none; color:#D9A23D; padding:2px; display:flex; }
@@ -3084,8 +3130,9 @@ export default function MyTripApp() {
         .mt-loc-results { display:flex; flex-direction:column; gap:5px; max-height:220px; overflow-y:auto; }
         .mt-loc-result { text-align:start; border:1px solid var(--border); border-radius:8px; padding:7px 9px; font-size:12px; background:#fff; }
         .mt-loc-result:hover { background:var(--teal-tint); border-color:var(--teal); }
-        .mt-cards { display:flex; flex-direction:column; gap:9px; }
-        .mt-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:11px 13px; display:flex; flex-direction:column; gap:6px; }
+        .mt-cards { display:flex; flex-direction:column; gap:9px; position:relative; }
+        .mt-flow-line { position:absolute; top:15px; bottom:15px; right:26px; width:2px; background:var(--teal); opacity:.3; z-index:0; }
+        .mt-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:11px 13px; display:flex; flex-direction:column; gap:6px; position:relative; z-index:1; }
         .mt-card-top { display:flex; align-items:center; justify-content:space-between; }
         .mt-card-top-end { display:flex; align-items:center; gap:8px; }
         .mt-card-times { font-size:13px; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums; margin-inline-start:auto; }
@@ -3661,6 +3708,26 @@ export default function MyTripApp() {
               {cardHasTimeError && <div className="mt-error"><AlertTriangle /> {T.timeError}</div>}
               {showTzHint && <div className="mt-hint">{T.tzNote}</div>}
 
+              {isAccommodationType(cardDraft.typeId) && (
+                <div style={{ position: "relative", marginBottom: 4 }}>
+                  <button type="button" className="mt-btn ghost" ref={savedHotelsMenu.refs.setReference} {...savedHotelsMenu.getReferenceProps()}><BedDouble size={13} /> {T.pickSavedHotel}</button>
+                  {savedHotelsOpen && (
+                    <div ref={savedHotelsMenu.refs.setFloating} style={savedHotelsMenu.floatingStyles} {...savedHotelsMenu.getFloatingProps()} className="mt-floating-menu" >
+                      {getSavedHotels().length === 0 ? (
+                        <div className="mt-hint" style={{ padding: 8 }}>{T.noSavedHotels}</div>
+                      ) : getSavedHotels().map((h) => (
+                        <button key={h.placeId || h.name} className="mt-share-opt" onClick={() => {
+                          setCardDraft((d) => ({ ...d, to: h.name, toAlias: h.alias, toLat: h.lat, toLon: h.lon, toPlaceId: h.placeId, toVerifiedUrl: h.verifiedUrl, toVerifiedText: h.verifiedText }));
+                          setSavedHotelsOpen(false);
+                        }}>
+                          <BedDouble size={13} /> <span style={{ flex: 1, textAlign: "start" }}>{h.alias || h.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {effectiveMobile ? (
                 <div className="mt-loc-mobile">
                   <div className="mt-loc-mobile-row">
@@ -3670,7 +3737,12 @@ export default function MyTripApp() {
                       <button className="mt-btn ghost mt-btn-icon" title={T.copyPrevDest} disabled={noOriginNeeded(cardDraft.typeId) || !prevRowForCard || !prevRowForCard.to} onClick={copyPrevDestinationToFrom}><Copy size={13} /></button>
                       <button className="mt-btn ghost mt-btn-icon" disabled={noOriginNeeded(cardDraft.typeId)} title={T.verify} onClick={() => openLocationPicker("from")}><MapPin size={13} /></button>
                     </span>
-                    {fromVerifiedCard && <PopoverInfoIcon icon={CircleCheck} color="#3E8E5A"><div>{T.verified}</div><a href={cardDraft.fromVerifiedUrl} target="_blank" rel="noreferrer">{T.openMap}</a></PopoverInfoIcon>}
+                    {fromVerifiedCard && (
+                    <PopoverInfoIcon icon={CircleCheck} color="#3E8E5A">
+                      {cardDraft.fromPlaceId ? <div className="mt-info-popup-widget"><GooglePlaceDetailsCompact placeId={cardDraft.fromPlaceId} T={T} /></div> : <div>{T.verified}</div>}
+                      <a href={cardDraft.fromVerifiedUrl} target="_blank" rel="noreferrer" style={{ display: "block", padding: "6px 10px" }}>{T.openMap}</a>
+                    </PopoverInfoIcon>
+                  )}
                   </div>
                   <div className="mt-loc-mobile-alias-row">
                     <input dir="auto" disabled={noOriginNeeded(cardDraft.typeId)} value={cardDraft.fromAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "fromAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, fromAlias: e.target.value })} />
@@ -3684,7 +3756,12 @@ export default function MyTripApp() {
                       <button className="mt-btn ghost mt-btn-icon" title={T.copyFromOrigin} disabled={!cardDraft.from} onClick={() => setCardDraft({ ...cardDraft, to: cardDraft.from })}><Copy size={13} /></button>
                       <button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openLocationPicker("to")}><MapPin size={13} /></button>
                     </span>
-                    {toVerifiedCard && <PopoverInfoIcon icon={CircleCheck} color="#3E8E5A"><div>{T.verified}</div><a href={cardDraft.toVerifiedUrl} target="_blank" rel="noreferrer">{T.openMap}</a></PopoverInfoIcon>}
+                    {toVerifiedCard && (
+                    <PopoverInfoIcon icon={CircleCheck} color="#3E8E5A">
+                      {cardDraft.toPlaceId ? <div className="mt-info-popup-widget"><GooglePlaceDetailsCompact placeId={cardDraft.toPlaceId} T={T} /></div> : <div>{T.verified}</div>}
+                      <a href={cardDraft.toVerifiedUrl} target="_blank" rel="noreferrer" style={{ display: "block", padding: "6px 10px" }}>{T.openMap}</a>
+                    </PopoverInfoIcon>
+                  )}
                   </div>
                   <div className="mt-loc-mobile-alias-row">
                     <input dir="auto" value={cardDraft.toAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "toAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, toAlias: e.target.value })} />
@@ -3703,7 +3780,12 @@ export default function MyTripApp() {
                   <button className="mt-btn ghost mt-btn-icon" disabled={noOriginNeeded(cardDraft.typeId)} title={T.verify} onClick={() => openLocationPicker("from")}><MapPin size={13} /></button>
                 </span>
                 <input className="mt-loc-grid-input" dir="auto" disabled={noOriginNeeded(cardDraft.typeId)} title={noOriginNeeded(cardDraft.typeId) ? T.noOriginHint : undefined} value={cardDraft.from} placeholder={getTypeHint(cardDraft.typeId, "from", lang)} onChange={(e) => setCardDraft({ ...cardDraft, from: e.target.value })} />
-                <span className="mt-loc-verified-slot">{fromVerifiedCard && <PopoverInfoIcon icon={CircleCheck} color="#3E8E5A"><div>{T.verified}</div><a href={cardDraft.fromVerifiedUrl} target="_blank" rel="noreferrer">{T.openMap}</a></PopoverInfoIcon>}</span>
+                <span className="mt-loc-verified-slot">{fromVerifiedCard && (
+                    <PopoverInfoIcon icon={CircleCheck} color="#3E8E5A">
+                      {cardDraft.fromPlaceId ? <div className="mt-info-popup-widget"><GooglePlaceDetailsCompact placeId={cardDraft.fromPlaceId} T={T} /></div> : <div>{T.verified}</div>}
+                      <a href={cardDraft.fromVerifiedUrl} target="_blank" rel="noreferrer" style={{ display: "block", padding: "6px 10px" }}>{T.openMap}</a>
+                    </PopoverInfoIcon>
+                  )}</span>
                 <span className="mt-loc-alias-cell">
                   <input dir="auto" disabled={noOriginNeeded(cardDraft.typeId)} value={cardDraft.fromAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "fromAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, fromAlias: e.target.value })} />
                   <PopoverInfoIcon icon={Info} trigger="hover">{T.aliasHint}</PopoverInfoIcon>
@@ -3715,7 +3797,12 @@ export default function MyTripApp() {
                   <button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openLocationPicker("to")}><MapPin size={13} /></button>
                 </span>
                 <input className="mt-loc-grid-input" dir="auto" value={cardDraft.to} placeholder={getTypeHint(cardDraft.typeId, "to", lang)} onChange={(e) => setCardDraft({ ...cardDraft, to: e.target.value })} />
-                <span className="mt-loc-verified-slot">{toVerifiedCard && <PopoverInfoIcon icon={CircleCheck} color="#3E8E5A"><div>{T.verified}</div><a href={cardDraft.toVerifiedUrl} target="_blank" rel="noreferrer">{T.openMap}</a></PopoverInfoIcon>}</span>
+                <span className="mt-loc-verified-slot">{toVerifiedCard && (
+                    <PopoverInfoIcon icon={CircleCheck} color="#3E8E5A">
+                      {cardDraft.toPlaceId ? <div className="mt-info-popup-widget"><GooglePlaceDetailsCompact placeId={cardDraft.toPlaceId} T={T} /></div> : <div>{T.verified}</div>}
+                      <a href={cardDraft.toVerifiedUrl} target="_blank" rel="noreferrer" style={{ display: "block", padding: "6px 10px" }}>{T.openMap}</a>
+                    </PopoverInfoIcon>
+                  )}</span>
                 <span className="mt-loc-alias-cell">
                   <input dir="auto" value={cardDraft.toAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "toAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, toAlias: e.target.value })} />
                   <PopoverInfoIcon icon={Info} trigger="hover">{T.aliasHint}</PopoverInfoIcon>
