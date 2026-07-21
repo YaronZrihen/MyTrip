@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "11.2.0";
+const APP_VERSION = "11.2.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1444,23 +1444,23 @@ function GooglePlaceDetailsFull({ placeId, T }) {
 
 function PopoverInfoIcon({ icon: IconComp, color, trigger, children }) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState({ top: 0, left: 0 });
-  const btnRef = useRef(null);
-  function computePos() { if (btnRef.current) { const r = btnRef.current.getBoundingClientRect(); setPos({ top: r.bottom + 4, left: r.left }); } }
-  function toggle(e) {
-    e.stopPropagation();
-    if (!open) computePos();
-    setOpen((v) => !v);
-  }
-  function handleEnter() { if (trigger === "hover") { computePos(); setOpen(true); } }
+  const { refs, floatingStyles } = useFloating({
+    open, onOpenChange: setOpen,
+    placement: "bottom-start",
+    strategy: "fixed",
+    middleware: [offset(4), flip(), shift({ padding: 8 })],
+    whileElementsMounted: autoUpdate,
+  });
+  function toggle(e) { e.stopPropagation(); setOpen((v) => !v); }
+  function handleEnter() { if (trigger === "hover") setOpen(true); }
   function handleLeave() { if (trigger === "hover") setOpen(false); }
   return (
     <span style={{ display: "inline-flex", verticalAlign: "middle", marginInlineStart: 4 }} onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
-      <button ref={btnRef} type="button" className="mt-info-icon-btn" style={color ? { color } : undefined} onClick={toggle}><IconComp size={13} /></button>
+      <button ref={refs.setReference} type="button" className="mt-info-icon-btn" style={color ? { color } : undefined} onClick={toggle}><IconComp size={13} /></button>
       {open && (
         <>
           <div className="mt-floating-backdrop" onClick={(e) => { e.stopPropagation(); setOpen(false); }} style={trigger === "hover" ? { pointerEvents: "none" } : undefined} />
-          <div className="mt-info-popup" style={{ top: pos.top, left: pos.left }} onClick={(e) => e.stopPropagation()}>{children}</div>
+          <div ref={refs.setFloating} style={floatingStyles} className="mt-info-popup" onClick={(e) => e.stopPropagation()}>{children}</div>
         </>
       )}
     </span>
@@ -3040,7 +3040,7 @@ export default function MyTripApp() {
         .mt-loc-alias-cell input:focus { outline:none; border-color:var(--teal); }
         .mt-info-icon-btn { border:none; background:none; color:var(--muted); display:inline-flex; padding:1px; vertical-align:middle; }
         .mt-info-icon-btn:hover { color:var(--teal); }
-        .mt-info-popup { position:fixed; z-index:260; background:var(--surface); border:1px solid var(--border); border-radius:8px; box-shadow:0 8px 24px rgba(20,40,35,.18); padding:9px 11px; font-size:12px; max-width:230px; color:var(--ink); line-height:1.5; }
+        .mt-info-popup { z-index:260; background:var(--surface); border:1px solid var(--border); border-radius:8px; box-shadow:0 8px 24px rgba(20,40,35,.18); padding:9px 11px; font-size:12px; max-width:230px; color:var(--ink); line-height:1.5; }
         .mt-info-popup a { color:var(--teal); font-weight:600; }
         .mt-star-picker { display:flex; gap:3px; }
         .mt-star-picker button { border:none; background:none; color:#D9A23D; padding:2px; display:flex; }
