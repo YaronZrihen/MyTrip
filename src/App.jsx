@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "11.12.0";
+const APP_VERSION = "11.13.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -111,7 +111,7 @@ const DEFAULT_COLUMNS = [
 const T_DICT = {
   he: {
     appName: "MyTrip Builder", addRow: "הוסף רשומה", addDay: "הוסף יום", newFrame: "מסגרת חדשה",
-    catNewFrame: "מסגרות", catSaveExport: "שמירה, ייבוא וייצוא", catSharing: "שיתוף", catTools: "כלים",
+    catNewFrame: "מסגרות", catSaveExport: "שמירה, ייבוא וייצוא", catSharing: "שיתוף", catTools: "כלים", catViews: "תצוגות",
     showHeader: "הצג את התפריט העליון", hideHeader: "הסתר את התפריט העליון",
     columns: "עמודות", addColumn: "הוסף עמודה", addType: "הוסף תיאור", resetColumnWidths: "איפוס רוחב עמודות (גרור את קצה כותרת העמודה לשינוי ידני)", actions: "פעולות", on: "פעיל", settings: "הגדרות", manageColumns: "ניהול עמודות", undo: "בטל פעולה אחרונה", redo: "חזור על פעולה", disableIntro: "בטל הצגת אנימציית פתיחה",
     exportFile: "שמור לקובץ", importFile: "ייבוא מקובץ", importSuccess: "הייבוא הצליח", importError: "הקובץ אינו תקין",
@@ -228,7 +228,7 @@ const T_DICT = {
   },
   en: {
     appName: "MyTrip Builder", addRow: "Add record", addDay: "Add day", newFrame: "New frame",
-    catNewFrame: "Frames", catSaveExport: "Save, Import & Export", catSharing: "Sharing", catTools: "Tools",
+    catNewFrame: "Frames", catSaveExport: "Save, Import & Export", catSharing: "Sharing", catTools: "Tools", catViews: "Views",
     showHeader: "Show top menu", hideHeader: "Hide top menu",
     columns: "Columns", addColumn: "Add column", addType: "Add description", resetColumnWidths: "Reset column widths (drag a header's edge to resize manually)", actions: "Actions", on: "On", settings: "Settings", manageColumns: "Manage columns", undo: "Undo last action", redo: "Redo action", disableIntro: "Disable the opening animation",
     exportFile: "Save to file", importFile: "Import from file", importSuccess: "Import successful", importError: "This file isn't valid",
@@ -378,7 +378,6 @@ function monthAbbrev(dateStr, lang) {
   if (isNaN(d)) return "";
   return d.toLocaleDateString(lang === "he" ? "he-IL" : "en-US", { month: "short" }).replace(".", "");
 }
-function yearOf(dateStr) { const d = new Date(dateStr + "T00:00:00"); return isNaN(d) ? "" : d.getFullYear(); }
 function computeDuration(start, end, overnight) {
   if (!start || !end) return "—";
   const [sh, sm] = start.split(":").map(Number); const [eh, em] = end.split(":").map(Number);
@@ -1364,7 +1363,6 @@ function PlaceIconWithPreview({ row, tm, Icon, warnings, T, lang }) {
   const [everShown, setEverShown] = useState(false);
   const hoverTimer = useRef(null);
   const placeId = row.fromPlaceId || row.toPlaceId;
-  const mapUrl = row.fromVerifiedUrl || row.toVerifiedUrl;
   const PREVIEW_WIDTH = 320;
 
   const { refs, floatingStyles } = useFloating({
@@ -1403,12 +1401,9 @@ function PlaceIconWithPreview({ row, tm, Icon, warnings, T, lang }) {
         <div className="mt-floating-backdrop" onClick={(e) => { e.stopPropagation(); setShowPreview(false); }} />
       )}
       {everShown && (
-        <div ref={refs.setFloating} className="mt-place-preview-wrap" style={{ ...floatingStyles, width: PREVIEW_WIDTH, display: showPreview ? "block" : "none" }}
+        <div ref={refs.setFloating} className="mt-place-preview-wrap" style={{ ...floatingStyles, zIndex: 250, width: PREVIEW_WIDTH, display: showPreview ? "block" : "none" }}
           onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
           <GooglePlaceDetailsFull placeId={placeId} T={T} />
-          {mapUrl && (
-            <a href={mapUrl} target="_blank" rel="noreferrer" className="mt-place-preview-more" onClick={(e) => e.stopPropagation()}>{T.openMap}</a>
-          )}
         </div>
       )}
     </span>
@@ -1720,12 +1715,11 @@ function DayGroup({ g, fid, depth, ctx }) {
           {...dayDragListeners} {...dayDragAttrs}><GripVertical size={13} /></span>
         <span className="chev">{collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}</span>
         <span className="mt-day-badge">
-          <span className="mt-day-badge-num">{dayOfMonth(g.date)}</span>
-          <span className="mt-day-badge-mon">{monthAbbrev(g.date, lang)}</span>
-        </span>
-        <span className="mt-group-day-wrap">
-          <span className="mt-group-day">{heDay(g.date, lang)}</span>
-          <span className="mt-group-year">{yearOf(g.date)}</span>
+          <span className="mt-day-badge-top">
+            <span className="mt-day-badge-num">{dayOfMonth(g.date)}</span>
+            <span className="mt-day-badge-mon">{monthAbbrev(g.date, lang)}</span>
+          </span>
+          <span className="mt-day-badge-weekday">{heDay(g.date, lang)}</span>
         </span>
         <div className="mt-group-actions" onClick={(e) => e.stopPropagation()}>
           <button className="mt-group-add" onClick={() => openAddDayModal(fid, g.date)}>{T.addDayShort}</button>
@@ -2988,12 +2982,11 @@ export default function MyTripApp() {
         .mt-frame-add-row { margin-top:10px; padding:6px 4px; }
         .mt-group { margin-top:14px; }
         .mt-group-header { display:flex; align-items:center; gap:7px; padding:6px 4px; cursor:pointer; user-select:none; flex-wrap:wrap; }
-        .mt-day-badge { display:flex; flex-direction:column; align-items:center; justify-content:center; width:34px; height:34px; border-radius:9px; background:var(--teal); color:#fff; flex-shrink:0; line-height:1; }
-        .mt-day-badge-num { font-size:14px; font-weight:800; font-family:'Frank Ruhl Libre',serif; }
-        .mt-day-badge-mon { font-size:7.5px; font-weight:700; text-transform:uppercase; opacity:.85; margin-top:1px; }
-        .mt-group-day-wrap { display:flex; flex-direction:column; gap:2px; }
-        .mt-group-day { background:var(--teal-tint); color:var(--teal-dark); font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; width:fit-content; }
-        .mt-group-year { font-size:10.5px; color:var(--muted); font-weight:600; }
+        .mt-day-badge { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:5px 10px; border-radius:9px; background:var(--teal-tint); color:var(--teal-dark); flex-shrink:0; line-height:1.3; min-width:56px; }
+        .mt-day-badge-top { display:flex; align-items:baseline; gap:4px; }
+        .mt-day-badge-num { font-size:15px; font-weight:800; font-family:'Frank Ruhl Libre',serif; }
+        .mt-day-badge-mon { font-size:9px; font-weight:700; text-transform:uppercase; opacity:.8; }
+        .mt-day-badge-weekday { font-size:9.5px; font-weight:600; margin-top:1px; }
         .mt-group-actions { margin-inline-start:auto; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
         .mt-group-add { font-size:12px; color:var(--teal); display:flex; align-items:center; gap:3px; background:none; border:none; font-weight:600; text-decoration:none; }
         .mt-group-add:hover { text-decoration:underline; }
@@ -3036,8 +3029,6 @@ export default function MyTripApp() {
         .mt-hotel-photo-demo { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; height:110px; border-radius:10px; background:linear-gradient(135deg,var(--teal-tint),var(--bg)); color:var(--teal); border:1.5px dashed var(--border); font-size:11px; text-align:center; padding:8px; }
         .mt-hotel-photo-real { width:100%; height:150px; object-fit:cover; border-radius:10px; }
         .mt-place-preview-wrap { z-index:250; box-shadow:0 8px 24px rgba(20,40,35,.18); border-radius:10px; overflow:hidden; pointer-events:auto; background:var(--surface); }
-        .mt-place-preview-more { width:100%; border:none; border-top:1px solid var(--border); background:var(--teal-tint); color:var(--teal-dark); font-weight:700; font-size:12.5px; padding:9px; cursor:pointer; }
-        .mt-place-preview-more:hover { background:var(--teal); color:#fff; }
         .mt-hotel-rating-demo { display:flex; align-items:center; gap:2px; color:#D9A23D; }
         .mt-hotel-rating-demo .mt-hint { margin-inline-start:6px; color:var(--muted); }
         .mt-type-icon svg { width:12px; height:12px; color:#fff; }
@@ -3093,7 +3084,7 @@ export default function MyTripApp() {
         .mt-type-add-toggle { width:100%; display:flex; align-items:center; justify-content:center; gap:6px; padding:8px; border-radius:7px; background:none; border:none; font-size:12px; color:var(--teal); font-weight:600; flex-shrink:0; }
         .mt-type-add-toggle:hover { background:var(--bg); }
         .mt-type-cat-label { font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-weight:700; padding:8px 8px 3px; }
-        .mt-action-cat-label { font-size:14px; font-weight:700; color:var(--teal-dark); text-align:end; padding:10px 8px 4px; }
+        .mt-action-cat-label { font-size:14px; font-weight:700; color:var(--teal-dark); text-align:start; padding:10px 8px 4px; }
         .mt-type-menu button.opt { width:100%; display:flex; align-items:center; gap:8px; padding:7px 8px; border-radius:7px; background:none; border:none; font-size:12.5px; text-align:start; color:var(--ink); }
         .mt-type-menu button.opt.selected { background:var(--teal-tint); font-weight:600; color:var(--teal-dark); }
         .mt-type-menu button.opt.selected svg:last-child { color:var(--teal); }
@@ -3272,9 +3263,6 @@ export default function MyTripApp() {
       <div className="mt-header-actions">
         <div className="mt-header-actions-group">
           <button className="mt-icon-btn" onClick={() => setLang(lang === "he" ? "en" : "he")}><Globe /> {T.lang}</button>
-          <button className={"mt-icon-btn" + (viewMode === "desktop" ? " active" : "")} onClick={() => setViewMode("desktop")} title={T.desktop}><Monitor /></button>
-          <button className={"mt-icon-btn" + (viewMode === "mobile" ? " active" : "")} onClick={() => setViewMode("mobile")} title={T.mobile}><Smartphone /></button>
-          <button className={"mt-icon-btn" + (viewMode === "flow" ? " active" : "")} onClick={() => setViewMode("flow")} title={T.flowView}><Workflow /></button>
         </div>
         {!loggedIn ? (
           <button className="mt-icon-btn" onClick={() => setLoggedIn(true)}><LogIn /> {T.login}</button>
@@ -3301,6 +3289,17 @@ export default function MyTripApp() {
 
       {settingsMenuOpen && (
         <div ref={settingsMenu.refs.setFloating} style={settingsMenu.floatingStyles} {...settingsMenu.getFloatingProps()} className="mt-floating-menu mt-kebab-menu" >
+            <div className="mt-action-cat-label">{T.catViews}</div>
+            <button className="mt-share-opt" onClick={() => { setViewMode("desktop"); setSettingsMenuOpen(false); }}>
+              <Monitor size={14} /> {T.desktop}{viewMode === "desktop" && <Check size={13} style={{ marginInlineStart: "auto" }} />}
+            </button>
+            <button className="mt-share-opt" onClick={() => { setViewMode("mobile"); setSettingsMenuOpen(false); }}>
+              <Smartphone size={14} /> {T.mobile}{viewMode === "mobile" && <Check size={13} style={{ marginInlineStart: "auto" }} />}
+            </button>
+            <button className="mt-share-opt" onClick={() => { setViewMode("flow"); setSettingsMenuOpen(false); }}>
+              <Workflow size={14} /> {T.flowView}{viewMode === "flow" && <Check size={13} style={{ marginInlineStart: "auto" }} />}
+            </button>
+            <div className="divider" />
             <button className="mt-share-opt" onClick={() => { setSettingsMenuOpen(false); colMenu.refs.setReference(settingsBtnRef.current); setColMenuOpen(true); }}><Settings2 size={14} /> {T.manageColumns}</button>
             <button className="mt-share-opt" onClick={() => { setSettingsMenuOpen(false); addTypeMenu.refs.setReference(settingsBtnRef.current); setAddTypeOpen(true); }}><Plus size={14} /> {T.addType}</button>
             <div className="divider" />
