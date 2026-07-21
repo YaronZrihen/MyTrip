@@ -11,7 +11,7 @@ import {
   Smartphone, Monitor, AlertTriangle, GripVertical, Check, FolderPlus, Sparkles,
   Route, Waypoints, Download, Upload, MapPin, Search, CircleCheck, Clock, ArrowDownUp, Copy, StickyNote, TrainFront,
   Bus, Motorbike, Bike, Scooter, Sailboat, ShipWheel, Anchor, Kayak, Helicopter, Caravan, Building2, Landmark, Home,
-  CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2, MoreVertical, Menu, Calendar as CalendarIcon, Undo2, Redo2, Info, ExternalLink, Phone, Save, FolderOpen, ImagePlus, BookOpen, RefreshCw
+  CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2, MoreVertical, Menu, Calendar as CalendarIcon, Undo2, Redo2, Info, ExternalLink, Phone, Save, FolderOpen, ImagePlus, BookOpen, RefreshCw, Workflow, ArrowLeft, ArrowRight
 } from "lucide-react";
 
 /* ---------------------------------------------------------------------- */
@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "11.10.0";
+const APP_VERSION = "11.12.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -111,12 +111,12 @@ const DEFAULT_COLUMNS = [
 const T_DICT = {
   he: {
     appName: "MyTrip Builder", addRow: "הוסף רשומה", addDay: "הוסף יום", newFrame: "מסגרת חדשה",
-    catNewFrame: "מסגרת חדשה", catMyTrip: "הטיול שלי", catFiles: "קבצים", catSharing: "שיתוף", catTools: "כלים",
+    catNewFrame: "מסגרות", catSaveExport: "שמירה, ייבוא וייצוא", catSharing: "שיתוף", catTools: "כלים",
     showHeader: "הצג את התפריט העליון", hideHeader: "הסתר את התפריט העליון",
     columns: "עמודות", addColumn: "הוסף עמודה", addType: "הוסף תיאור", resetColumnWidths: "איפוס רוחב עמודות (גרור את קצה כותרת העמודה לשינוי ידני)", actions: "פעולות", on: "פעיל", settings: "הגדרות", manageColumns: "ניהול עמודות", undo: "בטל פעולה אחרונה", redo: "חזור על פעולה", disableIntro: "בטל הצגת אנימציית פתיחה",
     exportFile: "שמור לקובץ", importFile: "ייבוא מקובץ", importSuccess: "הייבוא הצליח", importError: "הקובץ אינו תקין",
     login: "התחברות עם Google", logout: "יציאה",
-    desktop: "מחשב", mobile: "סלולר", lang: "English", editRecord: "כרטיס רשומה",
+    desktop: "מחשב", mobile: "סלולר", flowView: "תצוגת זרימה", lang: "English", editRecord: "כרטיס רשומה",
     save: "שמירה", cancel: "ביטול", delete: "מחיקה", addSub: "הוסף תת-רשומה",
     type: "סוג", from: "מוצא", to: "יעד", start: "בשעה", end: "עד שעה", overnight: "חוצה חצות",
     requiresTicket: "דורש רכישת כרטיס כניסה", calcRoute: "חשב מסלול",
@@ -228,12 +228,12 @@ const T_DICT = {
   },
   en: {
     appName: "MyTrip Builder", addRow: "Add record", addDay: "Add day", newFrame: "New frame",
-    catNewFrame: "New Frame", catMyTrip: "My Trip", catFiles: "Files", catSharing: "Sharing", catTools: "Tools",
+    catNewFrame: "Frames", catSaveExport: "Save, Import & Export", catSharing: "Sharing", catTools: "Tools",
     showHeader: "Show top menu", hideHeader: "Hide top menu",
     columns: "Columns", addColumn: "Add column", addType: "Add description", resetColumnWidths: "Reset column widths (drag a header's edge to resize manually)", actions: "Actions", on: "On", settings: "Settings", manageColumns: "Manage columns", undo: "Undo last action", redo: "Redo action", disableIntro: "Disable the opening animation",
     exportFile: "Save to file", importFile: "Import from file", importSuccess: "Import successful", importError: "This file isn't valid",
     login: "Sign in with Google", logout: "Sign out",
-    desktop: "Desktop", mobile: "Mobile", lang: "עברית", editRecord: "Record card",
+    desktop: "Desktop", mobile: "Mobile", flowView: "Flow view", lang: "עברית", editRecord: "Record card",
     save: "Save", cancel: "Cancel", delete: "Delete", addSub: "Add sub-record",
     type: "Type", from: "Origin", to: "Destination", start: "At", end: "Until", overnight: "Crosses midnight",
     requiresTicket: "Requires entrance ticket", calcRoute: "Calculate route",
@@ -372,6 +372,13 @@ function formatDayCount(n, lang) {
   if (lang === "he") return n === 1 ? "יום 1" : `${n} ימים`;
   return n === 1 ? "1 day" : `${n} days`;
 }
+function dayOfMonth(dateStr) { const d = new Date(dateStr + "T00:00:00"); return isNaN(d) ? "—" : d.getDate(); }
+function monthAbbrev(dateStr, lang) {
+  const d = new Date(dateStr + "T00:00:00");
+  if (isNaN(d)) return "";
+  return d.toLocaleDateString(lang === "he" ? "he-IL" : "en-US", { month: "short" }).replace(".", "");
+}
+function yearOf(dateStr) { const d = new Date(dateStr + "T00:00:00"); return isNaN(d) ? "" : d.getFullYear(); }
 function computeDuration(start, end, overnight) {
   if (!start || !end) return "—";
   const [sh, sm] = start.split(":").map(Number); const [eh, em] = end.split(":").map(Number);
@@ -1034,7 +1041,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
       case "date": return depth === 0 ? fmtDate(row.date, lang) : "";
       case "day": return depth === 0 ? heDay(row.date, lang) : "";
       case "icon": {
-        return <PlaceIconWithPreview row={row} tm={tm} Icon={Icon} warnings={[]} T={T} lang={lang} onOpenFull={() => openHotelInfo(row)} />;
+        return <PlaceIconWithPreview row={row} tm={tm} Icon={Icon} warnings={[]} T={T} lang={lang} />;
       }
       case "type": {
         const warnings = getRowWarning(row, T);
@@ -1352,13 +1359,13 @@ function DateRangeField({ startDate, endDate, onChange, lang, T }) {
   );
 }
 
-function PlaceIconWithPreview({ row, tm, Icon, warnings, T, lang, onOpenFull }) {
+function PlaceIconWithPreview({ row, tm, Icon, warnings, T, lang }) {
   const [showPreview, setShowPreview] = useState(false);
   const [everShown, setEverShown] = useState(false);
   const hoverTimer = useRef(null);
   const placeId = row.fromPlaceId || row.toPlaceId;
   const mapUrl = row.fromVerifiedUrl || row.toVerifiedUrl;
-  const PREVIEW_WIDTH = 280;
+  const PREVIEW_WIDTH = 320;
 
   const { refs, floatingStyles } = useFloating({
     open: showPreview,
@@ -1388,15 +1395,6 @@ function PlaceIconWithPreview({ row, tm, Icon, warnings, T, lang, onOpenFull }) 
     setEverShown(true);
     setShowPreview((v) => !v);
   }
-  function handlePreviewClick(e) {
-    e.stopPropagation();
-    if (mapUrl) window.open(mapUrl, "_blank", "noopener,noreferrer");
-  }
-  function handleMoreDetails(e) {
-    e.stopPropagation();
-    setShowPreview(false);
-    if (onOpenFull) onOpenFull();
-  }
 
   return (
     <span style={{ position: "relative", display: "inline-block" }} onMouseEnter={handleEnter} onMouseLeave={handleLeave} onFocus={handleEnter} onBlur={handleLeave}>
@@ -1407,10 +1405,10 @@ function PlaceIconWithPreview({ row, tm, Icon, warnings, T, lang, onOpenFull }) 
       {everShown && (
         <div ref={refs.setFloating} className="mt-place-preview-wrap" style={{ ...floatingStyles, width: PREVIEW_WIDTH, display: showPreview ? "block" : "none" }}
           onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
-          <div style={{ cursor: mapUrl ? "pointer" : "default" }} onClick={handlePreviewClick} title={mapUrl ? T.openMap : undefined}>
-            <GooglePlaceDetailsCompact placeId={placeId} T={T} />
-          </div>
-          {onOpenFull && <button type="button" className="mt-place-preview-more" onClick={handleMoreDetails}>{T.moreDetails}</button>}
+          <GooglePlaceDetailsFull placeId={placeId} T={T} />
+          {mapUrl && (
+            <a href={mapUrl} target="_blank" rel="noreferrer" className="mt-place-preview-more" onClick={(e) => e.stopPropagation()}>{T.openMap}</a>
+          )}
         </div>
       )}
     </span>
@@ -1452,18 +1450,6 @@ function GooglePlaceContentConfig() {
       <gmp-place-open-now-status></gmp-place-open-now-status>
       <gmp-place-attribution light-scheme-color="gray" dark-scheme-color="white"></gmp-place-attribution>
     </gmp-place-content-config>
-  );
-}
-function GooglePlaceDetailsCompact({ placeId, T }) {
-  const state = useGoogleMapsReady();
-  if (!placeId) return null;
-  if (state === "error") return <div className="mt-hint" style={{ padding: 10 }}>{T.googleUiKitError}</div>;
-  if (state === "loading") return <div className="mt-hint" style={{ padding: 10 }}>{T.locSearching}</div>;
-  return (
-    <gmp-place-details-compact truncation-preferred style={{ width: "280px", border: "none", padding: 0, margin: 0 }}>
-      <gmp-place-details-place-request place={placeId}></gmp-place-details-place-request>
-      <GooglePlaceContentConfig />
-    </gmp-place-details-compact>
   );
 }
 function GooglePlaceDetailsFull({ placeId, T }) {
@@ -1657,6 +1643,31 @@ function MobileCardMeta({ row, prevRow, ctx }) {
   );
 }
 
+function FlowView({ rows, types, lang, T, ctx }) {
+  const { openCard } = ctx;
+  const ArrowIcon = lang === "he" ? ArrowLeft : ArrowRight;
+  if (!rows.length) return <div className="mt-flow-empty">{T.noRows}</div>;
+  return (
+    <div className="mt-flow-view">
+      {rows.map((r, i) => {
+        const tm = typeMeta(r.typeId, types, T, lang);
+        const Icon = ICONS[tm.icon] || Tag;
+        const label = r.toAlias || r.to || r.fromAlias || r.from || "";
+        return (
+          <React.Fragment key={r.id}>
+            <button type="button" className="mt-flow-node" onClick={() => openCard(r)} title={tm.name}>
+              <span className="mt-flow-icon" style={{ background: tm.color }}><Icon size={18} /></span>
+              {r.startTime && <span className="mt-flow-time">{r.startTime}</span>}
+              {label && <span className="mt-flow-label" dir="auto">{truncateChars(label, 12)}</span>}
+            </button>
+            {i < rows.length - 1 && <span className="mt-flow-arrow"><ArrowIcon size={16} /></span>}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
 function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
   const { openCard, openHotelInfo, dragId } = ctx;
   const tm = typeMeta(r.typeId, types, T, lang); const Icon = ICONS[tm.icon] || Tag;
@@ -1668,7 +1679,7 @@ function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
     <div ref={(el) => { setDragNodeRef(el); setDropNodeRef(el); }} className={"mt-card" + (isRowOver ? " mt-drop-hover" : "")} style={{ opacity: dragId === r.id ? 0.4 : 1 }} onClick={() => openCard(r)}>
       <div className="mt-card-top">
         <div className="mt-type-chip">
-          <PlaceIconWithPreview row={r} tm={tm} Icon={Icon} warnings={[]} T={T} lang={lang} onOpenFull={() => openHotelInfo(r)} />
+          <PlaceIconWithPreview row={r} tm={tm} Icon={Icon} warnings={[]} T={T} lang={lang} />
           <strong className={warningClass(cardWarnings)} style={{ fontSize: 13.5 }} title={cardWarnings.length ? warningText(cardWarnings) : undefined}>{tm.name}</strong>
         </div>
         <div className="mt-card-top-end">
@@ -1692,7 +1703,7 @@ function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
 }
 
 function DayGroup({ g, fid, depth, ctx }) {
-  const { T, lang, effectiveMobile, collapsedGroups, setCollapsedGroups, collapsedParents, setCollapsedParents,
+  const { T, lang, effectiveMobile, viewMode, collapsedGroups, setCollapsedGroups, collapsedParents, setCollapsedParents,
     addRow, openCard, types, visibleColumns, openAddDayModal, rows, sortDayByTime, getColWidth, startResize, dragDayKey, setDragDayKey, dragId, openHotelInfo } = ctx;
   const gk = (fid || "root") + "__" + g.date;
   const { attributes: dayDragAttrs, listeners: dayDragListeners, setNodeRef: setDayDragNodeRef } = useDraggable({ id: "day:" + gk, data: { type: "day", gk } });
@@ -1708,8 +1719,14 @@ function DayGroup({ g, fid, depth, ctx }) {
         <span className="mt-day-drag-handle" title={T.dragDayHint} ref={setDayDragNodeRef} onClick={(e) => e.stopPropagation()}
           {...dayDragListeners} {...dayDragAttrs}><GripVertical size={13} /></span>
         <span className="chev">{collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}</span>
-        <span className="mt-group-date">{fmtDate(g.date, lang)}</span>
-        <span className="mt-group-day">{heDay(g.date, lang)}</span>
+        <span className="mt-day-badge">
+          <span className="mt-day-badge-num">{dayOfMonth(g.date)}</span>
+          <span className="mt-day-badge-mon">{monthAbbrev(g.date, lang)}</span>
+        </span>
+        <span className="mt-group-day-wrap">
+          <span className="mt-group-day">{heDay(g.date, lang)}</span>
+          <span className="mt-group-year">{yearOf(g.date)}</span>
+        </span>
         <div className="mt-group-actions" onClick={(e) => e.stopPropagation()}>
           <button className="mt-group-add" onClick={() => openAddDayModal(fid, g.date)}>{T.addDayShort}</button>
           {dayRoute ? (
@@ -1725,9 +1742,10 @@ function DayGroup({ g, fid, depth, ctx }) {
           <button className="mt-btn ghost" style={{ marginInlineStart: "auto" }} onClick={() => sortDayByTime(fid, g.date)}><ArrowDownUp size={12} /> {T.sortByTime}</button>
         </div>
       )}
-      {!collapsed && (effectiveMobile ? (
+      {!collapsed && (viewMode === "flow" ? (
+        <FlowView rows={allRowsHere} types={types} lang={lang} T={T} ctx={ctx} />
+      ) : effectiveMobile ? (
         <div className="mt-cards">
-          <div className="mt-flow-line" />
           {allRowsHere.map((r, ri) => (
             <MobileRowCard key={r.id} r={r} prevRow={ri > 0 ? allRowsHere[ri - 1] : null} types={types} lang={lang} T={T} ctx={ctx} />
           ))}
@@ -2833,7 +2851,7 @@ export default function MyTripApp() {
 
   /* ---------- recursive render ---------- */
   const ctx = {
-    T, lang, types, visibleColumns, effectiveMobile, rows, frames,
+    T, lang, types, visibleColumns, effectiveMobile, viewMode, rows, frames,
     updateRow, deleteRow, openCard, addRow, dragId, setDragId, onDropRow, dragDayKey, setDragDayKey, onDropDay,
     typeMenuOpen, setTypeMenuOpen, newTypeDraft, setNewTypeDraft, addCustomType,
     collapsedParents, setCollapsedParents, collapsedGroups, setCollapsedGroups,
@@ -2894,6 +2912,7 @@ export default function MyTripApp() {
         .mytrip-app input[type=date]::-webkit-calendar-picker-indicator, .mytrip-app input[type=time]::-webkit-calendar-picker-indicator { opacity:1; cursor:pointer; }
         .mt-sticky-top { position:sticky; top:0; z-index:30; background:var(--surface); border-bottom:1px solid var(--border); }
         .mt-header-row1 { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 14px 4px; }
+        .mt-header-row1-start { display:flex; align-items:center; gap:8px; }
         .mt-header-brand-group { display:flex; align-items:center; gap:6px; }
         .mt-brand-mark { width:30px; height:30px; border-radius:8px; background:var(--teal); display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; }
         .mt-brand-mark::after { content:''; position:absolute; width:44px; height:44px; border:2px solid rgba(255,255,255,.35); border-radius:50%; top:-14px; inset-inline-start:-8px; }
@@ -2937,7 +2956,7 @@ export default function MyTripApp() {
         .mt-frame-header { display:flex; flex-direction:column; padding:10px 12px; cursor:pointer; user-select:none; background:#FBFDFC; border-radius:11px 11px 0 0; }
         .mt-frame-header-top { display:flex; align-items:center; gap:9px; }
         .mt-frame-header-dates { margin-top:5px; padding-inline-start:24px; }
-        .mt-frame-name { font-weight:700; font-size:15px; font-family:'Heebo',sans-serif; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:24px; flex-shrink:1; }
+        .mt-frame-name { font-weight:700; font-size:15px; font-family:'Frank Ruhl Libre',serif; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:24px; flex-shrink:1; }
         .mt-frame-date-inline { font-size:12.5px; font-weight:600; color:var(--muted); font-family:'Heebo',sans-serif; white-space:nowrap; flex-shrink:0; font-variant-numeric:tabular-nums; display:flex; align-items:center; gap:5px; }
         .mt-frame-date-btn { border:none; background:none; padding:0; cursor:pointer; display:flex; align-items:center; gap:5px; color:inherit; }
         .mt-frame-date-btn:hover { color:var(--teal-dark); text-decoration:underline; }
@@ -2969,8 +2988,12 @@ export default function MyTripApp() {
         .mt-frame-add-row { margin-top:10px; padding:6px 4px; }
         .mt-group { margin-top:14px; }
         .mt-group-header { display:flex; align-items:center; gap:7px; padding:6px 4px; cursor:pointer; user-select:none; flex-wrap:wrap; }
-        .mt-group-date { font-weight:700; font-size:13.5px; }
-        .mt-group-day { background:var(--teal-tint); color:var(--teal-dark); font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; }
+        .mt-day-badge { display:flex; flex-direction:column; align-items:center; justify-content:center; width:34px; height:34px; border-radius:9px; background:var(--teal); color:#fff; flex-shrink:0; line-height:1; }
+        .mt-day-badge-num { font-size:14px; font-weight:800; font-family:'Frank Ruhl Libre',serif; }
+        .mt-day-badge-mon { font-size:7.5px; font-weight:700; text-transform:uppercase; opacity:.85; margin-top:1px; }
+        .mt-group-day-wrap { display:flex; flex-direction:column; gap:2px; }
+        .mt-group-day { background:var(--teal-tint); color:var(--teal-dark); font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; width:fit-content; }
+        .mt-group-year { font-size:10.5px; color:var(--muted); font-weight:600; }
         .mt-group-actions { margin-inline-start:auto; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
         .mt-group-add { font-size:12px; color:var(--teal); display:flex; align-items:center; gap:3px; background:none; border:none; font-weight:600; text-decoration:none; }
         .mt-group-add:hover { text-decoration:underline; }
@@ -2978,6 +3001,14 @@ export default function MyTripApp() {
         .mt-group-add-bottom { display:flex; margin-top:6px; padding:6px 4px; }
         .mt-chrono-warning { display:flex; align-items:center; gap:7px; background:#FBEAE8; color:var(--danger); font-size:11.5px; padding:6px 10px; border-radius:8px; margin:0 4px 8px; }
         .mt-table-wrap { width:100%; overflow-x:auto; border-radius:10px; }
+        .mt-flow-view { display:flex; align-items:flex-start; gap:4px; flex-wrap:wrap; padding:16px 8px; background:var(--surface); border-radius:10px; border:1px solid var(--border); }
+        .mt-flow-node { display:flex; flex-direction:column; align-items:center; gap:4px; border:none; background:none; padding:4px; border-radius:8px; min-width:60px; max-width:80px; }
+        .mt-flow-node:hover { background:var(--teal-tint); }
+        .mt-flow-icon { width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#fff; flex-shrink:0; }
+        .mt-flow-time { font-size:10.5px; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums; }
+        .mt-flow-label { font-size:9.5px; color:var(--muted); text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:78px; }
+        .mt-flow-arrow { display:flex; align-items:center; color:var(--border); flex-shrink:0; margin-top:15px; }
+        .mt-flow-empty { padding:20px; text-align:center; color:var(--muted); font-size:13px; }
         table.mt-table { width:100%; table-layout:fixed; border-collapse:separate; border-spacing:0; background:var(--surface); border-radius:10px; overflow:hidden; border:1px solid var(--border); }
         .mt-table thead th { text-align:start; font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); font-weight:600; padding:6px 10px; background:#FAFCFB; border-bottom:1px solid var(--border); white-space:nowrap; position:relative; overflow:hidden; text-overflow:ellipsis; }
         .mt-table th.from, .mt-table th.to { padding-inline-start:10px; }
@@ -3062,6 +3093,7 @@ export default function MyTripApp() {
         .mt-type-add-toggle { width:100%; display:flex; align-items:center; justify-content:center; gap:6px; padding:8px; border-radius:7px; background:none; border:none; font-size:12px; color:var(--teal); font-weight:600; flex-shrink:0; }
         .mt-type-add-toggle:hover { background:var(--bg); }
         .mt-type-cat-label { font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-weight:700; padding:8px 8px 3px; }
+        .mt-action-cat-label { font-size:14px; font-weight:700; color:var(--teal-dark); text-align:end; padding:10px 8px 4px; }
         .mt-type-menu button.opt { width:100%; display:flex; align-items:center; gap:8px; padding:7px 8px; border-radius:7px; background:none; border:none; font-size:12.5px; text-align:start; color:var(--ink); }
         .mt-type-menu button.opt.selected { background:var(--teal-tint); font-weight:600; color:var(--teal-dark); }
         .mt-type-menu button.opt.selected svg:last-child { color:var(--teal); }
@@ -3160,7 +3192,6 @@ export default function MyTripApp() {
         .mt-loc-result { text-align:start; border:1px solid var(--border); border-radius:8px; padding:7px 9px; font-size:12px; background:#fff; }
         .mt-loc-result:hover { background:var(--teal-tint); border-color:var(--teal); }
         .mt-cards { display:flex; flex-direction:column; gap:9px; position:relative; }
-        .mt-flow-line { position:absolute; top:15px; bottom:15px; right:26px; width:2px; background:var(--teal); opacity:.3; z-index:0; }
         .mt-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:11px 13px; display:flex; flex-direction:column; gap:6px; position:relative; z-index:1; }
         .mt-card-top { display:flex; align-items:center; justify-content:space-between; }
         .mt-card-top-end { display:flex; align-items:center; gap:8px; }
@@ -3225,14 +3256,16 @@ export default function MyTripApp() {
 
       <div className="mt-sticky-top">
       <div className="mt-header-row1">
-        <span className="mt-brand-version">v{APP_VERSION}</span>
+        <div className="mt-header-row1-start">
+          <span className="mt-brand-version">v{APP_VERSION}</span>
+          <button className="mt-icon-btn mt-header-collapse-btn" onClick={() => setHeaderCollapsed((v) => !v)} title={headerCollapsed ? T.showHeader : T.hideHeader}>
+            {headerCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+          </button>
+        </div>
         <div className="mt-header-brand-group">
           <span className="mt-brand-name">{T.appName}</span>
           <div className="mt-brand-mark"><Plane /></div>
         </div>
-        <button className="mt-icon-btn mt-header-collapse-btn" onClick={() => setHeaderCollapsed((v) => !v)} title={headerCollapsed ? T.showHeader : T.hideHeader}>
-          {headerCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-        </button>
       </div>
       {!headerCollapsed && (
       <>
@@ -3241,6 +3274,7 @@ export default function MyTripApp() {
           <button className="mt-icon-btn" onClick={() => setLang(lang === "he" ? "en" : "he")}><Globe /> {T.lang}</button>
           <button className={"mt-icon-btn" + (viewMode === "desktop" ? " active" : "")} onClick={() => setViewMode("desktop")} title={T.desktop}><Monitor /></button>
           <button className={"mt-icon-btn" + (viewMode === "mobile" ? " active" : "")} onClick={() => setViewMode("mobile")} title={T.mobile}><Smartphone /></button>
+          <button className={"mt-icon-btn" + (viewMode === "flow" ? " active" : "")} onClick={() => setViewMode("flow")} title={T.flowView}><Workflow /></button>
         </div>
         {!loggedIn ? (
           <button className="mt-icon-btn" onClick={() => setLoggedIn(true)}><LogIn /> {T.login}</button>
@@ -3279,22 +3313,21 @@ export default function MyTripApp() {
 
       {actionsMenuOpen && (
         <div ref={actionsMenu.refs.setFloating} style={{ ...actionsMenu.floatingStyles, maxWidth: "min(240px, 92vw)" }} {...actionsMenu.getFloatingProps()} className="mt-floating-menu mt-kebab-menu">
-            <div className="mt-type-cat-label">{T.catNewFrame}</div>
+            <div className="mt-action-cat-label">{T.catNewFrame}</div>
             <button className="mt-share-opt" onClick={() => { openFrameModal(null, null); setActionsMenuOpen(false); }}><FolderPlus size={14} /> {T.newFrame}</button>
             <button className="mt-share-opt" onClick={openAiWizard}><Wand2 size={14} /> {T.newFrameWizard}</button>
-            <div className="mt-type-cat-label">{T.catMyTrip}</div>
+            <div className="mt-action-cat-label">{T.catSaveExport}</div>
             <button className="mt-share-opt" onClick={openSaveTripModal}><Save size={14} /> {T.saveTripByName}</button>
             <button className="mt-share-opt" onClick={openLoadTripModal}><FolderOpen size={14} /> {T.loadSavedTrip}</button>
-            <div className="mt-type-cat-label">{T.catFiles}</div>
             <button className="mt-share-opt" onClick={() => { exportToFile(); setActionsMenuOpen(false); }}><Download size={14} /> {T.exportFile}</button>
             <button className="mt-share-opt" onClick={() => { importInputRef.current && importInputRef.current.click(); setActionsMenuOpen(false); }}><Upload size={14} /> {T.importFile}</button>
             <button className="mt-share-opt" onClick={() => { exportToPDF(); setActionsMenuOpen(false); }}><Printer size={14} /> {T.exportPdf}</button>
             <button className="mt-share-opt" onClick={openRouteImport}><Route size={14} /> {T.importRoute}</button>
-            <div className="mt-type-cat-label">{T.catSharing}</div>
+            <div className="mt-action-cat-label">{T.catSharing}</div>
             <button className="mt-share-opt disabled" onClick={() => { showDemoNotice(T.demoNeedsAccounts); setActionsMenuOpen(false); }}><UserPlus size={14} /> {T.shareWithUser}</button>
             <button className="mt-share-opt disabled" onClick={() => { showDemoNotice(T.demoNeedsAccounts); setActionsMenuOpen(false); }}><Users size={14} /> {T.shareEditAccess}</button>
             <button className="mt-share-opt" onClick={() => { exportShareableHTML(); setActionsMenuOpen(false); }}><Share2 size={14} /> {T.shareExportHtml}</button>
-            <div className="mt-type-cat-label">{T.catTools}</div>
+            <div className="mt-action-cat-label">{T.catTools}</div>
             <button className="mt-share-opt" onClick={() => { toggleReminders(); setActionsMenuOpen(false); }}><Bell size={14} /> {T.reminders}{remindersOn ? ` (${T.on})` : ""}</button>
             <button className="mt-share-opt" onClick={() => { setAiPanelOpen(true); setActionsMenuOpen(false); }}><Wand2 size={14} /> {T.aiAssistant}</button>
         </div>
@@ -3612,7 +3645,7 @@ export default function MyTripApp() {
       {addDayCtx && (
         <div className="mt-modal-backdrop" onClick={closeAddDayModal}>
           <div className="mt-modal narrow" onClick={(e) => e.stopPropagation()}>
-            <div className="mt-modal-header"><span className="mt-modal-title" style={{ fontFamily: "inherit" }}>{T.addDayModalTitle}</span><button className="mt-btn ghost" onClick={closeAddDayModal}><X size={16} /></button></div>
+            <div className="mt-modal-header"><span className="mt-modal-title">{T.addDayModalTitle}</span><button className="mt-btn ghost" onClick={closeAddDayModal}><X size={16} /></button></div>
             <div className="mt-modal-body">
               <div className="mt-field"><label>{T.addDayDate}</label><DateField value={addDayCtx.date} onChange={(e) => setAddDayCtx({ ...addDayCtx, date: e.target.value })} /></div>
               {addDayIssue && <div className="mt-error"><AlertTriangle /> {addDayIssue}</div>}
@@ -3776,7 +3809,7 @@ export default function MyTripApp() {
                     </span>
                     {fromVerifiedCard && (
                     <PopoverInfoIcon icon={CircleCheck} color="#3E8E5A">
-                      {cardDraft.fromPlaceId ? <div className="mt-info-popup-widget"><GooglePlaceDetailsCompact placeId={cardDraft.fromPlaceId} T={T} /></div> : <div>{T.verified}</div>}
+                      {cardDraft.fromPlaceId ? <div className="mt-info-popup-widget"><GooglePlaceDetailsFull placeId={cardDraft.fromPlaceId} T={T} /></div> : <div>{T.verified}</div>}
                       <a href={cardDraft.fromVerifiedUrl} target="_blank" rel="noreferrer" style={{ display: "block", padding: "6px 10px" }}>{T.openMap}</a>
                     </PopoverInfoIcon>
                   )}
@@ -3795,7 +3828,7 @@ export default function MyTripApp() {
                     </span>
                     {toVerifiedCard && (
                     <PopoverInfoIcon icon={CircleCheck} color="#3E8E5A">
-                      {cardDraft.toPlaceId ? <div className="mt-info-popup-widget"><GooglePlaceDetailsCompact placeId={cardDraft.toPlaceId} T={T} /></div> : <div>{T.verified}</div>}
+                      {cardDraft.toPlaceId ? <div className="mt-info-popup-widget"><GooglePlaceDetailsFull placeId={cardDraft.toPlaceId} T={T} /></div> : <div>{T.verified}</div>}
                       <a href={cardDraft.toVerifiedUrl} target="_blank" rel="noreferrer" style={{ display: "block", padding: "6px 10px" }}>{T.openMap}</a>
                     </PopoverInfoIcon>
                   )}
@@ -3819,7 +3852,7 @@ export default function MyTripApp() {
                 <input className="mt-loc-grid-input" dir="auto" disabled={noOriginNeeded(cardDraft.typeId)} title={noOriginNeeded(cardDraft.typeId) ? T.noOriginHint : undefined} value={cardDraft.from} placeholder={getTypeHint(cardDraft.typeId, "from", lang)} onChange={(e) => setCardDraft({ ...cardDraft, from: e.target.value })} />
                 <span className="mt-loc-verified-slot">{fromVerifiedCard && (
                     <PopoverInfoIcon icon={CircleCheck} color="#3E8E5A">
-                      {cardDraft.fromPlaceId ? <div className="mt-info-popup-widget"><GooglePlaceDetailsCompact placeId={cardDraft.fromPlaceId} T={T} /></div> : <div>{T.verified}</div>}
+                      {cardDraft.fromPlaceId ? <div className="mt-info-popup-widget"><GooglePlaceDetailsFull placeId={cardDraft.fromPlaceId} T={T} /></div> : <div>{T.verified}</div>}
                       <a href={cardDraft.fromVerifiedUrl} target="_blank" rel="noreferrer" style={{ display: "block", padding: "6px 10px" }}>{T.openMap}</a>
                     </PopoverInfoIcon>
                   )}</span>
@@ -3836,7 +3869,7 @@ export default function MyTripApp() {
                 <input className="mt-loc-grid-input" dir="auto" value={cardDraft.to} placeholder={getTypeHint(cardDraft.typeId, "to", lang)} onChange={(e) => setCardDraft({ ...cardDraft, to: e.target.value })} />
                 <span className="mt-loc-verified-slot">{toVerifiedCard && (
                     <PopoverInfoIcon icon={CircleCheck} color="#3E8E5A">
-                      {cardDraft.toPlaceId ? <div className="mt-info-popup-widget"><GooglePlaceDetailsCompact placeId={cardDraft.toPlaceId} T={T} /></div> : <div>{T.verified}</div>}
+                      {cardDraft.toPlaceId ? <div className="mt-info-popup-widget"><GooglePlaceDetailsFull placeId={cardDraft.toPlaceId} T={T} /></div> : <div>{T.verified}</div>}
                       <a href={cardDraft.toVerifiedUrl} target="_blank" rel="noreferrer" style={{ display: "block", padding: "6px 10px" }}>{T.openMap}</a>
                     </PopoverInfoIcon>
                   )}</span>
