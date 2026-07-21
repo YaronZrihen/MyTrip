@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "11.3.1";
+const APP_VERSION = "11.10.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -111,6 +111,8 @@ const DEFAULT_COLUMNS = [
 const T_DICT = {
   he: {
     appName: "MyTrip Builder", addRow: "הוסף רשומה", addDay: "הוסף יום", newFrame: "מסגרת חדשה",
+    catNewFrame: "מסגרת חדשה", catMyTrip: "הטיול שלי", catFiles: "קבצים", catSharing: "שיתוף", catTools: "כלים",
+    showHeader: "הצג את התפריט העליון", hideHeader: "הסתר את התפריט העליון",
     columns: "עמודות", addColumn: "הוסף עמודה", addType: "הוסף תיאור", resetColumnWidths: "איפוס רוחב עמודות (גרור את קצה כותרת העמודה לשינוי ידני)", actions: "פעולות", on: "פעיל", settings: "הגדרות", manageColumns: "ניהול עמודות", undo: "בטל פעולה אחרונה", redo: "חזור על פעולה", disableIntro: "בטל הצגת אנימציית פתיחה",
     exportFile: "שמור לקובץ", importFile: "ייבוא מקובץ", importSuccess: "הייבוא הצליח", importError: "הקובץ אינו תקין",
     login: "התחברות עם Google", logout: "יציאה",
@@ -149,7 +151,7 @@ const T_DICT = {
     demoHotelRaw: "Hilton Garden Inn Rome Airport", demoHotelAlias: "הילטון גארדן אין רומא",
     demoRestaurantRaw: "Ristorante dei Musei", demoRestaurantName: "מסעדת המוזיאון",
     pickSavedHotel: "בחר ממלונות שמורים", noSavedHotels: "אין עדיין מלונות שמורים — הם יישמרו אוטומטית ככל שתשתמש בהם.",
-    verify: "אמת מול מפות", verified: "מאומת", openMap: "פתח במפה", pickFromMap: "בחר מהמפה",
+    verify: "אמת מול מפות", verified: "מאומת", openMap: "פתח במפה", pickFromMap: "בחר מהמפה", moreDetails: "עוד פרטים",
     fromAlias: "כינוי למוצא", toAlias: "כינוי ליעד", aliasHint: "יוצג בעמודה במקום הטקסט המלא. מתמלא אוטומטית בשם מקוצר בעת אימות מיקום (לפי הכתובת שנמצאה) — ניתן תמיד לשנות ידנית.",
     flightAliasPlaceholder: "לדוגמה: תל אביב (TLV)", copyPrevDest: "העתק יעד משורה קודמת",
     km: "ק\"מ", min: "דק'", calculatingDistance: "מחשב מרחק...",
@@ -226,6 +228,8 @@ const T_DICT = {
   },
   en: {
     appName: "MyTrip Builder", addRow: "Add record", addDay: "Add day", newFrame: "New frame",
+    catNewFrame: "New Frame", catMyTrip: "My Trip", catFiles: "Files", catSharing: "Sharing", catTools: "Tools",
+    showHeader: "Show top menu", hideHeader: "Hide top menu",
     columns: "Columns", addColumn: "Add column", addType: "Add description", resetColumnWidths: "Reset column widths (drag a header's edge to resize manually)", actions: "Actions", on: "On", settings: "Settings", manageColumns: "Manage columns", undo: "Undo last action", redo: "Redo action", disableIntro: "Disable the opening animation",
     exportFile: "Save to file", importFile: "Import from file", importSuccess: "Import successful", importError: "This file isn't valid",
     login: "Sign in with Google", logout: "Sign out",
@@ -264,7 +268,7 @@ const T_DICT = {
     demoHotelRaw: "Hilton Garden Inn Rome Airport", demoHotelAlias: "Hilton Garden Inn Rome",
     demoRestaurantRaw: "Ristorante dei Musei", demoRestaurantName: "Museum Restaurant",
     pickSavedHotel: "Pick from saved hotels", noSavedHotels: "No saved hotels yet — they'll be remembered automatically as you use them.",
-    verify: "Verify with Maps", verified: "Verified", openMap: "Open in Maps", pickFromMap: "Pick from map",
+    verify: "Verify with Maps", verified: "Verified", openMap: "Open in Maps", pickFromMap: "Pick from map", moreDetails: "More details",
     fromAlias: "Origin nickname", toAlias: "Destination nickname", aliasHint: "Shown in the table instead of the full text. Auto-filled with a short name when you verify a location (based on the matched address) — you can always edit it manually.",
     flightAliasPlaceholder: "e.g. Tel Aviv (TLV)", copyPrevDest: "Copy previous row's destination",
     km: "km", min: "min", calculatingDistance: "Calculating distance...",
@@ -364,6 +368,10 @@ function toLocalISODate(d) {
 }
 function heDay(dateStr, lang) { if (!dateStr) return "—"; const d = new Date(dateStr + "T00:00:00"); if (isNaN(d)) return "—"; return lang === "he" ? HE_DAYS[d.getDay()] : EN_DAYS[d.getDay()]; }
 function fmtDate(dateStr, lang) { if (!dateStr) return "—"; const d = new Date(dateStr + "T00:00:00"); if (isNaN(d)) return dateStr; const dd = String(d.getDate()).padStart(2, "0"); const mm = String(d.getMonth() + 1).padStart(2, "0"); return `${dd}/${mm}/${d.getFullYear()}`; }
+function formatDayCount(n, lang) {
+  if (lang === "he") return n === 1 ? "יום 1" : `${n} ימים`;
+  return n === 1 ? "1 day" : `${n} days`;
+}
 function computeDuration(start, end, overnight) {
   if (!start || !end) return "—";
   const [sh, sm] = start.split(":").map(Number); const [eh, em] = end.split(":").map(Number);
@@ -1224,15 +1232,18 @@ function FrameInlineDatePicker({ frame, ctx }) {
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
   const monthLabel = viewMonth.toLocaleDateString(lang === "he" ? "he-IL" : "en-US", { month: "long", year: "numeric" });
 
+  const dayCount = Math.round((new Date(frame.endDate + "T00:00:00") - new Date(frame.startDate + "T00:00:00")) / 86400000) + 1;
+
   return (
     <span style={{ position: "relative" }}>
       <button ref={refs.setReference} type="button" className="mt-frame-date-inline mt-frame-date-btn" onClick={openPicker}>
-        {fmtDate(frame.startDate, lang)} – {fmtDate(frame.endDate, lang)}
+        <CalendarIcon size={13} />
+        <span>{dayCount > 0 ? `${formatDayCount(dayCount, lang)} · ` : ""}{fmtDate(frame.startDate, lang)} – {fmtDate(frame.endDate, lang)}</span>
       </button>
       {open && (
         <>
-          <div className="mt-floating-backdrop" onClick={(e) => { e.stopPropagation(); setOpen(false); }} />
-          <div ref={refs.setFloating} style={floatingStyles} className="mt-floating-menu mt-daterange-cal" dir="ltr" onClick={(e) => e.stopPropagation()}>
+          <div className="mt-floating-backdrop" style={{ zIndex: 190 }} onClick={(e) => { e.stopPropagation(); setOpen(false); }} />
+          <div ref={refs.setFloating} style={{ ...floatingStyles, zIndex: 200 }} className="mt-floating-menu mt-daterange-cal" dir="ltr" onClick={(e) => e.stopPropagation()}>
             <div className="mt-cal-header">
               <button type="button" onClick={() => shiftMonth(-1)}><ChevronLeft size={16} /></button>
               <strong>{monthLabel}</strong>
@@ -1260,8 +1271,11 @@ function FrameInlineDatePicker({ frame, ctx }) {
 
 function DateField({ value, onChange }) {
   return (
-    <input type="date" value={value} onChange={onChange}
-      onClick={(e) => { if (e.target.showPicker) { try { e.target.showPicker(); } catch (err) {} } }} />
+    <div className="mt-datefield">
+      <CalendarIcon size={14} />
+      <input type="date" value={value} onChange={onChange}
+        onClick={(e) => { if (e.target.showPicker) { try { e.target.showPicker(); } catch (err) {} } }} />
+    </div>
   );
 }
 
@@ -1378,6 +1392,11 @@ function PlaceIconWithPreview({ row, tm, Icon, warnings, T, lang, onOpenFull }) 
     e.stopPropagation();
     if (mapUrl) window.open(mapUrl, "_blank", "noopener,noreferrer");
   }
+  function handleMoreDetails(e) {
+    e.stopPropagation();
+    setShowPreview(false);
+    if (onOpenFull) onOpenFull();
+  }
 
   return (
     <span style={{ position: "relative", display: "inline-block" }} onMouseEnter={handleEnter} onMouseLeave={handleLeave} onFocus={handleEnter} onBlur={handleLeave}>
@@ -1386,9 +1405,12 @@ function PlaceIconWithPreview({ row, tm, Icon, warnings, T, lang, onOpenFull }) 
         <div className="mt-floating-backdrop" onClick={(e) => { e.stopPropagation(); setShowPreview(false); }} />
       )}
       {everShown && (
-        <div ref={refs.setFloating} className="mt-place-preview-wrap" style={{ ...floatingStyles, width: PREVIEW_WIDTH, display: showPreview ? "block" : "none", cursor: mapUrl ? "pointer" : "default" }}
-          onMouseEnter={handleEnter} onMouseLeave={handleLeave} onClick={handlePreviewClick} title={mapUrl ? T.openMap : undefined}>
-          <GooglePlaceDetailsCompact placeId={placeId} T={T} />
+        <div ref={refs.setFloating} className="mt-place-preview-wrap" style={{ ...floatingStyles, width: PREVIEW_WIDTH, display: showPreview ? "block" : "none" }}
+          onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
+          <div style={{ cursor: mapUrl ? "pointer" : "default" }} onClick={handlePreviewClick} title={mapUrl ? T.openMap : undefined}>
+            <GooglePlaceDetailsCompact placeId={placeId} T={T} />
+          </div>
+          {onOpenFull && <button type="button" className="mt-place-preview-more" onClick={handleMoreDetails}>{T.moreDetails}</button>}
         </div>
       )}
     </span>
@@ -1941,6 +1963,7 @@ export default function MyTripApp() {
   const importInputRef = useRef(null);
   const [lang, setLang] = useState("he");
   const [viewMode, setViewMode] = useState("auto");
+  const [headerCollapsed, setHeaderCollapsed] = useState(false);
   const [narrowScreen, setNarrowScreen] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState({});
@@ -2880,6 +2903,7 @@ export default function MyTripApp() {
         .mt-header-actions { display:flex; align-items:center; justify-content:space-between; gap:5px; flex-wrap:wrap; padding:5px 14px; }
         .mt-header-actions-group { display:flex; align-items:center; gap:5px; flex-wrap:nowrap; flex-shrink:0; }
         .mt-icon-btn { border:1px solid var(--border); background:var(--surface); color:var(--ink); border-radius:8px; padding:5px 8px; display:flex; align-items:center; gap:5px; font-size:12.5px; font-weight:500; }
+        .mt-header-collapse-btn { padding:5px; }
         .mt-toolbar { display:flex; align-items:center; justify-content:space-between; gap:5px; flex-wrap:wrap; padding:5px 14px 8px; }
         .mt-icon-btn:disabled { opacity:.35; cursor:not-allowed; }
         .mt-icon-btn:hover { background:var(--teal-tint); border-color:var(--teal); }
@@ -2912,16 +2936,19 @@ export default function MyTripApp() {
         .mt-frame-block { border:1px solid var(--border); border-inline-start:4px solid var(--frame-color,var(--teal)); border-radius:12px; margin-top:16px; background:var(--surface); }
         .mt-frame-header { display:flex; flex-direction:column; padding:10px 12px; cursor:pointer; user-select:none; background:#FBFDFC; border-radius:11px 11px 0 0; }
         .mt-frame-header-top { display:flex; align-items:center; gap:9px; }
-        .mt-frame-header-dates { margin-top:1px; text-align:right; }
+        .mt-frame-header-dates { margin-top:5px; padding-inline-start:24px; }
         .mt-frame-name { font-weight:700; font-size:15px; font-family:'Heebo',sans-serif; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:24px; flex-shrink:1; }
-        .mt-frame-date-inline { font-size:13.5px; font-weight:700; color:var(--ink); font-family:'Heebo',sans-serif; white-space:nowrap; flex-shrink:0; font-variant-numeric:tabular-nums; }
-        .mt-frame-date-btn { border:none; background:none; padding:0; cursor:pointer; }
-        .mt-frame-date-btn:hover { text-decoration:underline; }
+        .mt-frame-date-inline { font-size:12.5px; font-weight:600; color:var(--muted); font-family:'Heebo',sans-serif; white-space:nowrap; flex-shrink:0; font-variant-numeric:tabular-nums; display:flex; align-items:center; gap:5px; }
+        .mt-frame-date-btn { border:none; background:none; padding:0; cursor:pointer; display:flex; align-items:center; gap:5px; color:inherit; }
+        .mt-frame-date-btn:hover { color:var(--teal-dark); text-decoration:underline; }
         .mt-frame-cost-inline { font-size:12.5px; font-weight:700; color:var(--amber); white-space:nowrap; flex-shrink:0; }
         .mt-frame-end-group { display:flex; align-items:center; gap:8px; margin-inline-start:auto; flex-shrink:0; }
         .mt-frame-actions { display:flex; gap:2px; flex-shrink:0; }
         .mt-kebab-menu { min-width:180px; }
         .mt-daterange-btn { display:flex; align-items:center; gap:7px; width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:13px; background:#fff; color:var(--ink); }
+        .mt-datefield { display:flex; align-items:center; gap:7px; width:100%; border:1px solid var(--border); border-radius:8px; padding:6px 10px; background:#fff; color:var(--teal-dark); }
+        .mt-datefield input[type="date"] { border:none; background:none; padding:0; font-size:13px; color:var(--ink); flex:1; font-family:inherit; position:relative; }
+        .mt-datefield input[type="date"]::-webkit-calendar-picker-indicator { -webkit-appearance:none; appearance:none; position:absolute; inset:0; width:100%; height:100%; margin:0; padding:0; background:transparent; cursor:pointer; opacity:0; }
         .mt-daterange-btn:hover { border-color:var(--teal); }
         .mt-daterange-btn svg { color:var(--muted); flex-shrink:0; }
         .mt-daterange-cal { padding:10px; min-width:230px; }
@@ -2977,7 +3004,9 @@ export default function MyTripApp() {
         .mt-type-icon-btn:hover { filter:brightness(1.1); box-shadow:0 0 0 2px var(--teal-tint); }
         .mt-hotel-photo-demo { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; height:110px; border-radius:10px; background:linear-gradient(135deg,var(--teal-tint),var(--bg)); color:var(--teal); border:1.5px dashed var(--border); font-size:11px; text-align:center; padding:8px; }
         .mt-hotel-photo-real { width:100%; height:150px; object-fit:cover; border-radius:10px; }
-        .mt-place-preview-wrap { z-index:250; box-shadow:0 8px 24px rgba(20,40,35,.18); border-radius:10px; overflow:hidden; pointer-events:auto; }
+        .mt-place-preview-wrap { z-index:250; box-shadow:0 8px 24px rgba(20,40,35,.18); border-radius:10px; overflow:hidden; pointer-events:auto; background:var(--surface); }
+        .mt-place-preview-more { width:100%; border:none; border-top:1px solid var(--border); background:var(--teal-tint); color:var(--teal-dark); font-weight:700; font-size:12.5px; padding:9px; cursor:pointer; }
+        .mt-place-preview-more:hover { background:var(--teal); color:#fff; }
         .mt-hotel-rating-demo { display:flex; align-items:center; gap:2px; color:#D9A23D; }
         .mt-hotel-rating-demo .mt-hint { margin-inline-start:6px; color:var(--muted); }
         .mt-type-icon svg { width:12px; height:12px; color:#fff; }
@@ -3201,7 +3230,12 @@ export default function MyTripApp() {
           <span className="mt-brand-name">{T.appName}</span>
           <div className="mt-brand-mark"><Plane /></div>
         </div>
+        <button className="mt-icon-btn mt-header-collapse-btn" onClick={() => setHeaderCollapsed((v) => !v)} title={headerCollapsed ? T.showHeader : T.hideHeader}>
+          {headerCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+        </button>
       </div>
+      {!headerCollapsed && (
+      <>
       <div className="mt-header-actions">
         <div className="mt-header-actions-group">
           <button className="mt-icon-btn" onClick={() => setLang(lang === "he" ? "en" : "he")}><Globe /> {T.lang}</button>
@@ -3227,6 +3261,8 @@ export default function MyTripApp() {
           {importMsg && <span className="mt-hint" style={{ color: importMsg.ok ? "#3E8E5A" : "var(--danger)" }}>{importMsg.ok ? T.importSuccess : T.importError}</span>}
         </div>
       </div>
+      </>
+      )}
       </div>
 
       {settingsMenuOpen && (
@@ -3243,23 +3279,24 @@ export default function MyTripApp() {
 
       {actionsMenuOpen && (
         <div ref={actionsMenu.refs.setFloating} style={{ ...actionsMenu.floatingStyles, maxWidth: "min(240px, 92vw)" }} {...actionsMenu.getFloatingProps()} className="mt-floating-menu mt-kebab-menu">
+            <div className="mt-type-cat-label">{T.catNewFrame}</div>
             <button className="mt-share-opt" onClick={() => { openFrameModal(null, null); setActionsMenuOpen(false); }}><FolderPlus size={14} /> {T.newFrame}</button>
             <button className="mt-share-opt" onClick={openAiWizard}><Wand2 size={14} /> {T.newFrameWizard}</button>
+            <div className="mt-type-cat-label">{T.catMyTrip}</div>
             <button className="mt-share-opt" onClick={openSaveTripModal}><Save size={14} /> {T.saveTripByName}</button>
             <button className="mt-share-opt" onClick={openLoadTripModal}><FolderOpen size={14} /> {T.loadSavedTrip}</button>
-            <div className="divider" />
+            <div className="mt-type-cat-label">{T.catFiles}</div>
             <button className="mt-share-opt" onClick={() => { exportToFile(); setActionsMenuOpen(false); }}><Download size={14} /> {T.exportFile}</button>
             <button className="mt-share-opt" onClick={() => { importInputRef.current && importInputRef.current.click(); setActionsMenuOpen(false); }}><Upload size={14} /> {T.importFile}</button>
             <button className="mt-share-opt" onClick={() => { exportToPDF(); setActionsMenuOpen(false); }}><Printer size={14} /> {T.exportPdf}</button>
-            <button className="mt-share-opt" onClick={() => { toggleReminders(); setActionsMenuOpen(false); }}><Bell size={14} /> {T.reminders}{remindersOn ? ` (${T.on})` : ""}</button>
-            <div className="divider" />
+            <button className="mt-share-opt" onClick={openRouteImport}><Route size={14} /> {T.importRoute}</button>
+            <div className="mt-type-cat-label">{T.catSharing}</div>
             <button className="mt-share-opt disabled" onClick={() => { showDemoNotice(T.demoNeedsAccounts); setActionsMenuOpen(false); }}><UserPlus size={14} /> {T.shareWithUser}</button>
             <button className="mt-share-opt disabled" onClick={() => { showDemoNotice(T.demoNeedsAccounts); setActionsMenuOpen(false); }}><Users size={14} /> {T.shareEditAccess}</button>
             <button className="mt-share-opt" onClick={() => { exportShareableHTML(); setActionsMenuOpen(false); }}><Share2 size={14} /> {T.shareExportHtml}</button>
-            <div className="divider" />
+            <div className="mt-type-cat-label">{T.catTools}</div>
+            <button className="mt-share-opt" onClick={() => { toggleReminders(); setActionsMenuOpen(false); }}><Bell size={14} /> {T.reminders}{remindersOn ? ` (${T.on})` : ""}</button>
             <button className="mt-share-opt" onClick={() => { setAiPanelOpen(true); setActionsMenuOpen(false); }}><Wand2 size={14} /> {T.aiAssistant}</button>
-            <div className="divider" />
-            <button className="mt-share-opt" onClick={openRouteImport}><Route size={14} /> {T.importRoute}</button>
         </div>
       )}
       {demoNotice && (
