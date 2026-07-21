@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "11.13.0";
+const APP_VERSION = "11.14.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -111,7 +111,7 @@ const DEFAULT_COLUMNS = [
 const T_DICT = {
   he: {
     appName: "MyTrip Builder", addRow: "הוסף רשומה", addDay: "הוסף יום", newFrame: "מסגרת חדשה",
-    catNewFrame: "מסגרות", catSaveExport: "שמירה, ייבוא וייצוא", catSharing: "שיתוף", catTools: "כלים", catViews: "תצוגות",
+    catNewFrame: "מסגרות", catSaveExport: "שמירה, ייבוא וייצוא", catSharing: "שיתוף", catTools: "כלים", catViews: "תצוגות", catGeneral: "כללי",
     showHeader: "הצג את התפריט העליון", hideHeader: "הסתר את התפריט העליון",
     columns: "עמודות", addColumn: "הוסף עמודה", addType: "הוסף תיאור", resetColumnWidths: "איפוס רוחב עמודות (גרור את קצה כותרת העמודה לשינוי ידני)", actions: "פעולות", on: "פעיל", settings: "הגדרות", manageColumns: "ניהול עמודות", undo: "בטל פעולה אחרונה", redo: "חזור על פעולה", disableIntro: "בטל הצגת אנימציית פתיחה",
     exportFile: "שמור לקובץ", importFile: "ייבוא מקובץ", importSuccess: "הייבוא הצליח", importError: "הקובץ אינו תקין",
@@ -228,7 +228,7 @@ const T_DICT = {
   },
   en: {
     appName: "MyTrip Builder", addRow: "Add record", addDay: "Add day", newFrame: "New frame",
-    catNewFrame: "Frames", catSaveExport: "Save, Import & Export", catSharing: "Sharing", catTools: "Tools", catViews: "Views",
+    catNewFrame: "Frames", catSaveExport: "Save, Import & Export", catSharing: "Sharing", catTools: "Tools", catViews: "Views", catGeneral: "General",
     showHeader: "Show top menu", hideHeader: "Hide top menu",
     columns: "Columns", addColumn: "Add column", addType: "Add description", resetColumnWidths: "Reset column widths (drag a header's edge to resize manually)", actions: "Actions", on: "On", settings: "Settings", manageColumns: "Manage columns", undo: "Undo last action", redo: "Redo action", disableIntro: "Disable the opening animation",
     exportFile: "Save to file", importFile: "Import from file", importSuccess: "Import successful", importError: "This file isn't valid",
@@ -1040,7 +1040,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
       case "date": return depth === 0 ? fmtDate(row.date, lang) : "";
       case "day": return depth === 0 ? heDay(row.date, lang) : "";
       case "icon": {
-        return <PlaceIconWithPreview row={row} tm={tm} Icon={Icon} warnings={[]} T={T} lang={lang} />;
+        return <PlaceIconWithPreview row={row} tm={tm} Icon={Icon} onOpenFull={() => openHotelInfo(row)} />;
       }
       case "type": {
         const warnings = getRowWarning(row, T);
@@ -1358,55 +1358,15 @@ function DateRangeField({ startDate, endDate, onChange, lang, T }) {
   );
 }
 
-function PlaceIconWithPreview({ row, tm, Icon, warnings, T, lang }) {
-  const [showPreview, setShowPreview] = useState(false);
-  const [everShown, setEverShown] = useState(false);
-  const hoverTimer = useRef(null);
+function PlaceIconWithPreview({ row, tm, Icon, onOpenFull }) {
   const placeId = row.fromPlaceId || row.toPlaceId;
-  const PREVIEW_WIDTH = 320;
-
-  const { refs, floatingStyles } = useFloating({
-    open: showPreview,
-    onOpenChange: setShowPreview,
-    placement: "bottom-end",
-    strategy: "fixed",
-    middleware: [offset(6), flip(), shift({ padding: 8 })],
-    whileElementsMounted: autoUpdate,
-  });
-
-  function handleEnter() {
-    if (hoverTimer.current) clearTimeout(hoverTimer.current);
-    if (!placeId || !hasGooglePlaces()) return;
-    hoverTimer.current = setTimeout(() => {
-      setEverShown(true);
-      setShowPreview(true);
-    }, 300);
-  }
-  function handleLeave() {
-    if (hoverTimer.current) clearTimeout(hoverTimer.current);
-    setShowPreview(false);
-  }
   function handleClick(e) {
     e.stopPropagation();
     if (!placeId || !hasGooglePlaces()) return;
-    if (hoverTimer.current) clearTimeout(hoverTimer.current);
-    setEverShown(true);
-    setShowPreview((v) => !v);
+    onOpenFull();
   }
-
   return (
-    <span style={{ position: "relative", display: "inline-block" }} onMouseEnter={handleEnter} onMouseLeave={handleLeave} onFocus={handleEnter} onBlur={handleLeave}>
-      <button ref={refs.setReference} className="mt-type-icon mt-type-icon-btn" style={{ background: tm.color }} onClick={handleClick}><Icon /></button>
-      {everShown && showPreview && (
-        <div className="mt-floating-backdrop" onClick={(e) => { e.stopPropagation(); setShowPreview(false); }} />
-      )}
-      {everShown && (
-        <div ref={refs.setFloating} className="mt-place-preview-wrap" style={{ ...floatingStyles, zIndex: 250, width: PREVIEW_WIDTH, display: showPreview ? "block" : "none" }}
-          onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
-          <GooglePlaceDetailsFull placeId={placeId} T={T} />
-        </div>
-      )}
-    </span>
+    <button className="mt-type-icon mt-type-icon-btn" style={{ background: tm.color }} onClick={handleClick}><Icon /></button>
   );
 }
 
@@ -1674,7 +1634,7 @@ function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
     <div ref={(el) => { setDragNodeRef(el); setDropNodeRef(el); }} className={"mt-card" + (isRowOver ? " mt-drop-hover" : "")} style={{ opacity: dragId === r.id ? 0.4 : 1 }} onClick={() => openCard(r)}>
       <div className="mt-card-top">
         <div className="mt-type-chip">
-          <PlaceIconWithPreview row={r} tm={tm} Icon={Icon} warnings={[]} T={T} lang={lang} />
+          <PlaceIconWithPreview row={r} tm={tm} Icon={Icon} onOpenFull={() => openHotelInfo(r)} />
           <strong className={warningClass(cardWarnings)} style={{ fontSize: 13.5 }} title={cardWarnings.length ? warningText(cardWarnings) : undefined}>{tm.name}</strong>
         </div>
         <div className="mt-card-top-end">
@@ -3028,7 +2988,6 @@ export default function MyTripApp() {
         .mt-type-icon-btn:hover { filter:brightness(1.1); box-shadow:0 0 0 2px var(--teal-tint); }
         .mt-hotel-photo-demo { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; height:110px; border-radius:10px; background:linear-gradient(135deg,var(--teal-tint),var(--bg)); color:var(--teal); border:1.5px dashed var(--border); font-size:11px; text-align:center; padding:8px; }
         .mt-hotel-photo-real { width:100%; height:150px; object-fit:cover; border-radius:10px; }
-        .mt-place-preview-wrap { z-index:250; box-shadow:0 8px 24px rgba(20,40,35,.18); border-radius:10px; overflow:hidden; pointer-events:auto; background:var(--surface); }
         .mt-hotel-rating-demo { display:flex; align-items:center; gap:2px; color:#D9A23D; }
         .mt-hotel-rating-demo .mt-hint { margin-inline-start:6px; color:var(--muted); }
         .mt-type-icon svg { width:12px; height:12px; color:#fff; }
@@ -3198,7 +3157,6 @@ export default function MyTripApp() {
         .mt-note { font-size:11px; color:var(--muted); margin-top:4px; }
 
         @media (max-width: 640px) {
-          .mt-place-preview-wrap { top:50% !important; left:50% !important; right:auto !important; transform:translate(-50%, -50%) !important; max-width:90vw; }
           .mt-header-row1 { padding:8px 10px 4px; }
           .mt-header-actions { padding:4px 10px; }
           .mt-toolbar { padding:4px 10px 8px; gap:5px; }
@@ -3300,6 +3258,7 @@ export default function MyTripApp() {
               <Workflow size={14} /> {T.flowView}{viewMode === "flow" && <Check size={13} style={{ marginInlineStart: "auto" }} />}
             </button>
             <div className="divider" />
+            <div className="mt-action-cat-label">{T.catGeneral}</div>
             <button className="mt-share-opt" onClick={() => { setSettingsMenuOpen(false); colMenu.refs.setReference(settingsBtnRef.current); setColMenuOpen(true); }}><Settings2 size={14} /> {T.manageColumns}</button>
             <button className="mt-share-opt" onClick={() => { setSettingsMenuOpen(false); addTypeMenu.refs.setReference(settingsBtnRef.current); setAddTypeOpen(true); }}><Plus size={14} /> {T.addType}</button>
             <div className="divider" />
