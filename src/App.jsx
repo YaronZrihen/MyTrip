@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useFloating, autoUpdate, offset, flip, shift, useClick, useDismiss, useInteractions } from "@floating-ui/react";
+import { DndContext, useDraggable, useDroppable, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -19,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "11.1.0";
+const APP_VERSION = "11.2.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1152,11 +1153,14 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
     }
   }
 
+  const { attributes: dragAttrs, listeners: dragListeners, setNodeRef: setDragNodeRef } = useDraggable({ id: row.id, data: { type: "row" } });
+  const { setNodeRef: setDropNodeRef, isOver: isRowOver } = useDroppable({ id: row.id, data: { type: "row" } });
+
   return (
-    <tr className={depth > 0 ? "is-sub" : ""} draggable onDragStart={() => setDragId(row.id)} onDragOver={(e) => e.preventDefault()} onDrop={() => onDropRow(row.id)} style={{ opacity: dragId === row.id ? 0.4 : 1 }}>
+    <tr ref={(el) => { setDragNodeRef(el); setDropNodeRef(el); }} className={(depth > 0 ? "is-sub" : "") + (isRowOver ? " mt-drop-hover" : "")} style={{ opacity: dragId === row.id ? 0.4 : 1 }}>
       <td className="handle">
         <div className="mt-handle-wrap" style={{ paddingInlineStart: depth * 14 }}>
-          <span className="mt-drag-handle" title={T.dragHint}><GripVertical size={13} /></span>
+          <span className="mt-drag-handle" title={T.dragHint} {...dragListeners} {...dragAttrs}><GripVertical size={13} /></span>
           <span className="mt-handle-chevron-slot">
             {hasChildren && <button onClick={toggleCollapse} style={{ border: "none", background: "none", display: "flex", color: "var(--muted)" }}>{collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}</button>}
           </span>
@@ -1616,10 +1620,45 @@ function MobileCardMeta({ row, prevRow, ctx }) {
   );
 }
 
+function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
+  const { openCard, openHotelInfo, dragId } = ctx;
+  const tm = typeMeta(r.typeId, types, T, lang); const Icon = ICONS[tm.icon] || Tag;
+  const fromLabel = r.fromAlias || r.from, toLabel = r.toAlias || r.to;
+  const cardWarnings = getRowWarning(r, T);
+  const { attributes: dragAttrs, listeners: dragListeners, setNodeRef: setDragNodeRef } = useDraggable({ id: r.id, data: { type: "row" } });
+  const { setNodeRef: setDropNodeRef, isOver: isRowOver } = useDroppable({ id: r.id, data: { type: "row" } });
+  return (
+    <div ref={(el) => { setDragNodeRef(el); setDropNodeRef(el); }} className={"mt-card" + (isRowOver ? " mt-drop-hover" : "")} style={{ opacity: dragId === r.id ? 0.4 : 1 }} onClick={() => openCard(r)}>
+      <div className="mt-card-top">
+        <div className="mt-type-chip">
+          <PlaceIconWithPreview row={r} tm={tm} Icon={Icon} warnings={[]} T={T} lang={lang} onOpenFull={() => openHotelInfo(r)} />
+          <strong className={warningClass(cardWarnings)} style={{ fontSize: 13.5 }} title={cardWarnings.length ? warningText(cardWarnings) : undefined}>{tm.name}</strong>
+        </div>
+        <div className="mt-card-top-end">
+          <span className="mt-card-times" dir="ltr">{r.startTime || "—"}{r.endTime ? ` – ${r.endTime}` : ""}</span>
+          <span className="mt-card-drag-handle" onClick={(e) => e.stopPropagation()} {...dragListeners} {...dragAttrs}><GripVertical size={15} /></span>
+        </div>
+      </div>
+      {(fromLabel || toLabel) && (
+        <div className="mt-card-route">
+          <span dir="auto" title={fromLabel || ""}>{truncateChars(fromLabel, 18) || "—"}</span>
+          {fromLabel && toLabel && <span className="mt-card-arrow">←</span>}
+          {toLabel && <span dir="auto" title={toLabel}>{truncateChars(toLabel, 18)}</span>}
+        </div>
+      )}
+      <div className="mt-card-bottom">
+        <MobileCardMeta row={r} prevRow={prevRow} ctx={ctx} />
+        {Number(r.costAmount) > 0 && <span className="mt-cost">{r.costCurrency}{r.costAmount}</span>}
+      </div>
+    </div>
+  );
+}
+
 function DayGroup({ g, fid, depth, ctx }) {
   const { T, lang, effectiveMobile, collapsedGroups, setCollapsedGroups, collapsedParents, setCollapsedParents,
-    addRow, openCard, types, visibleColumns, openAddDayModal, rows, sortDayByTime, getColWidth, startResize, dragDayKey, setDragDayKey, startDayPointerDrag, dragId, startRowPointerDrag, openHotelInfo } = ctx;
+    addRow, openCard, types, visibleColumns, openAddDayModal, rows, sortDayByTime, getColWidth, startResize, dragDayKey, setDragDayKey, dragId, openHotelInfo } = ctx;
   const gk = (fid || "root") + "__" + g.date;
+  const { attributes: dayDragAttrs, listeners: dayDragListeners, setNodeRef: setDayDragNodeRef } = useDraggable({ id: "day:" + gk, data: { type: "day", gk } });
   const collapsed = !!collapsedGroups[gk];
   const childrenOf = (pid) => childrenOfPure(rows, pid);
   const allRowsHere = g.rows.flatMap((r) => [r, ...childrenOf(r.id)]);
@@ -1629,8 +1668,8 @@ function DayGroup({ g, fid, depth, ctx }) {
   return (
     <div className="mt-group">
       <div className={"mt-group-header" + (dragDayKey === gk ? " dragging" : "")} onClick={() => setCollapsedGroups((p) => ({ ...p, [gk]: !p[gk] }))}>
-        <span className="mt-day-drag-handle" title={T.dragDayHint} onClick={(e) => e.stopPropagation()}
-          onPointerDown={(e) => startDayPointerDrag(e, gk)}><GripVertical size={13} /></span>
+        <span className="mt-day-drag-handle" title={T.dragDayHint} ref={setDayDragNodeRef} onClick={(e) => e.stopPropagation()}
+          {...dayDragListeners} {...dayDragAttrs}><GripVertical size={13} /></span>
         <span className="chev">{collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}</span>
         <span className="mt-group-date">{fmtDate(g.date, lang)}</span>
         <span className="mt-group-day">{heDay(g.date, lang)}</span>
@@ -1651,36 +1690,9 @@ function DayGroup({ g, fid, depth, ctx }) {
       )}
       {!collapsed && (effectiveMobile ? (
         <div className="mt-cards">
-          {allRowsHere.map((r, ri) => {
-            const tm = typeMeta(r.typeId, types, T, lang); const Icon = ICONS[tm.icon] || Tag;
-            const fromLabel = r.fromAlias || r.from, toLabel = r.toAlias || r.to;
-            const cardWarnings = getRowWarning(r, T);
-            return (
-              <div className="mt-card" key={r.id} data-row-drop={r.id} style={{ opacity: dragId === r.id ? 0.4 : 1 }} onClick={() => openCard(r)}>
-                <div className="mt-card-top">
-                  <div className="mt-type-chip">
-                    <PlaceIconWithPreview row={r} tm={tm} Icon={Icon} warnings={[]} T={T} lang={lang} onOpenFull={() => openHotelInfo(r)} />
-                    <strong className={warningClass(cardWarnings)} style={{ fontSize: 13.5 }} title={cardWarnings.length ? warningText(cardWarnings) : undefined}>{tm.name}</strong>
-                  </div>
-                  <div className="mt-card-top-end">
-                    <span className="mt-card-times" dir="ltr">{r.startTime || "—"}{r.endTime ? ` – ${r.endTime}` : ""}</span>
-                    <span className="mt-card-drag-handle" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => { e.stopPropagation(); startRowPointerDrag(e, r.id); }}><GripVertical size={15} /></span>
-                  </div>
-                </div>
-                {(fromLabel || toLabel) && (
-                  <div className="mt-card-route">
-                    <span dir="auto" title={fromLabel || ""}>{truncateChars(fromLabel, 18) || "—"}</span>
-                    {fromLabel && toLabel && <span className="mt-card-arrow">←</span>}
-                    {toLabel && <span dir="auto" title={toLabel}>{truncateChars(toLabel, 18)}</span>}
-                  </div>
-                )}
-                <div className="mt-card-bottom">
-                  <MobileCardMeta row={r} prevRow={ri > 0 ? allRowsHere[ri - 1] : null} ctx={ctx} />
-                  {Number(r.costAmount) > 0 && <span className="mt-cost">{r.costCurrency}{r.costAmount}</span>}
-                </div>
-              </div>
-            );
-          })}
+          {allRowsHere.map((r, ri) => (
+            <MobileRowCard key={r.id} r={r} prevRow={ri > 0 ? allRowsHere[ri - 1] : null} types={types} lang={lang} T={T} ctx={ctx} />
+          ))}
           <button className="mt-group-add mt-group-add-bottom" onClick={() => addRow(g.date, null, fid)}><Plus size={13} /> {T.addRow}</button>
         </div>
       ) : (
@@ -1776,10 +1788,10 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
   const color = FRAME_COLORS[depth % FRAME_COLORS.length];
   const isMenuOpen = frameMenuOpenId === frame.id;
   const menuFloating = useFloatingMenu(isMenuOpen, (open) => setFrameMenuOpenId(open ? frame.id : null));
+  const { setNodeRef: setFrameDropRef, isOver: isFrameOver } = useDroppable({ id: "frame:" + frame.id, data: { type: "frame", fid: frame.id } });
   return (
     <div className="mt-frame-block" style={{ "--frame-color": color }}>
-      <div className={"mt-frame-header" + (dragDayKey ? " droppable" : "")} data-frame-drop={frame.id} onClick={() => toggleFrameCollapse(frame.id)}
-        onDragOver={(e) => dragDayKey && e.preventDefault()} onDrop={() => onDropDay(frame.id)}>
+      <div ref={setFrameDropRef} className={"mt-frame-header" + (dragDayKey ? " droppable" : "") + (isFrameOver ? " mt-drop-hover" : "")} onClick={() => toggleFrameCollapse(frame.id)}>
         <div className="mt-frame-header-top">
           <span className="chev">{frame.collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}</span>
           <span className="mt-frame-name">{frame.name}</span>
@@ -1976,7 +1988,6 @@ export default function MyTripApp() {
   const actionsBtnRef = useRef(null);
   const addTypeBtnRef = useRef(null);
   const settingsBtnRef = useRef(null);
-  const pointerDragRef = useRef(null);
   const dir = lang === "he" ? "rtl" : "ltr";
   const T = T_DICT[lang];
   useEffect(() => { document.title = "MyTrip Builder"; }, []);
@@ -2443,70 +2454,59 @@ export default function MyTripApp() {
       return result;
     });
   }
-  function onDropRow(targetId) {
-    if (!dragId || dragId === targetId) return;
+  function onDropRow(sourceId, targetId) {
+    if (!sourceId || sourceId === targetId) return;
     setRows((prev) => {
-      const from = prev.find((r) => r.id === dragId), to = prev.find((r) => r.id === targetId);
+      const from = prev.find((r) => r.id === sourceId), to = prev.find((r) => r.id === targetId);
       if (!from || !to) return prev;
       const needsMove = from.date !== to.date || (from.frameId || null) !== (to.frameId || null) || from.parentId !== to.parentId;
       let arr = prev.map((r) => {
-        if (r.id === dragId) return needsMove ? { ...r, date: to.date, frameId: to.frameId, parentId: to.parentId } : r;
-        if (needsMove && r.parentId === dragId) return { ...r, date: to.date, frameId: to.frameId };
+        if (r.id === sourceId) return needsMove ? { ...r, date: to.date, frameId: to.frameId, parentId: to.parentId } : r;
+        if (needsMove && r.parentId === sourceId) return { ...r, date: to.date, frameId: to.frameId };
         return r;
       });
-      const fi = arr.findIndex((r) => r.id === dragId);
+      const fi = arr.findIndex((r) => r.id === sourceId);
       const [moved] = arr.splice(fi, 1);
       const ti = arr.findIndex((r) => r.id === targetId);
       arr.splice(ti, 0, moved);
       return arr;
     });
-    setDragId(null);
   }
-  function onDropDay(targetFid) {
-    if (!dragDayKey) return;
-    const sep = dragDayKey.indexOf("__");
-    const fidPart = dragDayKey.slice(0, sep), datePart = dragDayKey.slice(sep + 2);
+  function onDropDay(dayKey, targetFid) {
+    if (!dayKey) return;
+    const sep = dayKey.indexOf("__");
+    const fidPart = dayKey.slice(0, sep), datePart = dayKey.slice(sep + 2);
     const sourceFid = fidPart === "root" ? null : fidPart;
-    if ((sourceFid || null) === (targetFid || null)) { setDragDayKey(null); return; }
+    if ((sourceFid || null) === (targetFid || null)) return;
     setRows((prev) => prev.map((r) => (((r.frameId || null) === (sourceFid || null)) && r.date === datePart) ? { ...r, frameId: targetFid } : r));
+  }
+  const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  const { setNodeRef: setRootDropRef, isOver: isRootOver } = useDroppable({ id: "root-zone", data: { type: "root" } });
+  function handleDndStart(event) {
+    const t = event.active.data.current && event.active.data.current.type;
+    if (t === "row") setDragId(event.active.id);
+    else if (t === "day") setDragDayKey(event.active.data.current.gk);
+    document.body.classList.add("mt-dragging-active");
+  }
+  function handleDndEnd(event) {
+    const { active, over } = event;
+    document.body.classList.remove("mt-dragging-active");
+    const activeType = active.data.current && active.data.current.type;
+    if (over) {
+      if (activeType === "row") onDropRow(active.id, over.id);
+      else if (activeType === "day") {
+        const overType = over.data.current && over.data.current.type;
+        if (overType === "frame") onDropDay(active.data.current.gk, over.data.current.fid);
+        else if (overType === "root") onDropDay(active.data.current.gk, null);
+      }
+    }
+    setDragId(null);
     setDragDayKey(null);
   }
-
-  function handlePointerDragEnd(e) {
-    window.removeEventListener("pointermove", handlePointerDragMove);
-    window.removeEventListener("pointerup", handlePointerDragEnd);
+  function handleDndCancel() {
     document.body.classList.remove("mt-dragging-active");
-    const info = pointerDragRef.current;
-    pointerDragRef.current = null;
-    if (!info) return;
-    const el = document.elementFromPoint(e.clientX, e.clientY);
-    if (!el) { setDragId(null); setDragDayKey(null); return; }
-    if (info.type === "row") {
-      const targetEl = el.closest("[data-row-drop]");
-      if (targetEl) onDropRow(targetEl.getAttribute("data-row-drop"));
-      else setDragId(null);
-    } else {
-      const targetEl = el.closest("[data-frame-drop]");
-      if (targetEl) { const v = targetEl.getAttribute("data-frame-drop"); onDropDay(v === "root" ? null : v); }
-      else setDragDayKey(null);
-    }
-  }
-  function handlePointerDragMove(e) { /* visual feedback intentionally minimal */ }
-  function startRowPointerDrag(e, rowId) {
-    e.preventDefault();
-    setDragId(rowId);
-    pointerDragRef.current = { type: "row" };
-    document.body.classList.add("mt-dragging-active");
-    window.addEventListener("pointermove", handlePointerDragMove);
-    window.addEventListener("pointerup", handlePointerDragEnd);
-  }
-  function startDayPointerDrag(e, dayKey) {
-    e.preventDefault();
-    setDragDayKey(dayKey);
-    pointerDragRef.current = { type: "day" };
-    document.body.classList.add("mt-dragging-active");
-    window.addEventListener("pointermove", handlePointerDragMove);
-    window.addEventListener("pointerup", handlePointerDragEnd);
+    setDragId(null);
+    setDragDayKey(null);
   }
 
   /* ---------- add-day modal ---------- */
@@ -2766,7 +2766,7 @@ export default function MyTripApp() {
   /* ---------- recursive render ---------- */
   const ctx = {
     T, lang, types, visibleColumns, effectiveMobile, rows, frames,
-    updateRow, deleteRow, openCard, addRow, dragId, setDragId, onDropRow, dragDayKey, setDragDayKey, onDropDay, startRowPointerDrag, startDayPointerDrag,
+    updateRow, deleteRow, openCard, addRow, dragId, setDragId, onDropRow, dragDayKey, setDragDayKey, onDropDay,
     typeMenuOpen, setTypeMenuOpen, newTypeDraft, setNewTypeDraft, addCustomType,
     collapsedParents, setCollapsedParents, collapsedGroups, setCollapsedGroups,
     toggleFrameCollapse, openFrameModal, deleteFrame, updateFrameDates, nextDateInContext, lastDateInContext, frameTotals,
@@ -2969,6 +2969,7 @@ export default function MyTripApp() {
         .mt-group-header.dragging { opacity:.4; }
         .mt-frame-header.droppable { outline:2px dashed var(--teal); outline-offset:-2px; }
         .mt-root-drop-zone { border:2px dashed var(--teal); border-radius:10px; padding:14px; text-align:center; color:var(--teal-dark); font-size:12.5px; font-weight:600; background:var(--teal-tint); margin-bottom:10px; }
+        .mt-drop-hover { outline:2px dashed var(--teal); outline-offset:-2px; background:var(--teal-tint); }
         .mt-drag-handle:hover { color:var(--teal-dark); }
         .mt-empty { padding:16px; text-align:center; color:var(--muted); font-size:12.5px; background:var(--surface); border:1px dashed var(--border); border-radius:12px; }
         .mt-summary { margin-top:20px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
@@ -3502,6 +3503,7 @@ export default function MyTripApp() {
         </div>
       )}
 
+      <DndContext sensors={dndSensors} onDragStart={handleDndStart} onDragEnd={handleDndEnd} onDragCancel={handleDndCancel}>
       <div className="mt-content">
         {showSuggestion && (
           <div className="mt-suggest">
@@ -3513,13 +3515,14 @@ export default function MyTripApp() {
         )}
 
         {dragDayKey && dragDayKey.slice(0, dragDayKey.indexOf("__")) !== "root" && (
-          <div className="mt-root-drop-zone" data-frame-drop="root" onDragOver={(e) => e.preventDefault()} onDrop={() => onDropDay(null)}>{T.dropDayToRoot}</div>
+          <div ref={setRootDropRef} className={"mt-root-drop-zone" + (isRootOver ? " mt-drop-hover" : "")}>{T.dropDayToRoot}</div>
         )}
 
         {renderContext(null, 0)}
 
         <div className="mt-note">{loggedIn ? T.mockNote : ""}</div>
       </div>
+      </DndContext>
 
       {/* add-day modal */}
       {addDayCtx && (
