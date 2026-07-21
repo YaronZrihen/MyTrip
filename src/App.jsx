@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "11.3.0";
+const APP_VERSION = "11.3.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -213,7 +213,7 @@ const T_DICT = {
     personalRating: "דירוג אישי לרשומה", uploadPhotos: "העלה תמונות",
     hotelInfoDemoNote: "כתובת ומפה — אמיתי (מהמיקום המאומת של הרשומה). תמונה ודירוג בפועל ידרשו חיבור ל-Google Places.",
     warnClosed: "סגור בשעה שנבחרה (לפי שעות פעילות OpenStreetMap)", warnFeeRequired: "דורש רכישת כרטיס כניסה (לפי OpenStreetMap)",
-    aiAssistant: "עוזר AI (הדגמה)", ok: "הבנתי",
+    aiAssistant: "עוזר AI (הדגמה)", ok: "הבנתי", close: "סגור",
     locHint: "טיפ: אם החיפוש לא מוצא תוצאה בעברית, נסה לחפש בשם המקומי/אנגלי (למשל \"Fiumicino Airport\" ולא \"פיומיצ׳ינו\").",
     tabSearch: "חיפוש טקסט", tabMap: "בחירה במפה", mapPickHint: "לחץ במקום הרצוי על המפה כדי לסמן אותו",
     mapResolving: "מזהה כתובת...", mapNoName: "לא נמצאה כתובת מדויקת לנקודה זו — ניתן עדיין לבחור לפי הקואורדינטות",
@@ -328,7 +328,7 @@ const T_DICT = {
     personalRating: "Personal rating for this record", uploadPhotos: "Upload photos",
     hotelInfoDemoNote: "Address and map link — real (from the record's verified location). An actual photo and rating would need a Google Places connection.",
     warnClosed: "Closed at the scheduled time (per OpenStreetMap opening hours)", warnFeeRequired: "Requires an entry ticket (per OpenStreetMap)",
-    aiAssistant: "AI Assistant (preview)", ok: "Got it",
+    aiAssistant: "AI Assistant (preview)", ok: "Got it", close: "Close",
     locHint: "Tip: if the search finds nothing in Hebrew, try the local/English name instead (e.g. \"Fiumicino Airport\").",
     tabSearch: "Text search", tabMap: "Pick on map", mapPickHint: "Click anywhere on the map to mark it",
     mapResolving: "Resolving address...", mapNoName: "No exact address found for this point — you can still pick it by coordinates",
@@ -1307,8 +1307,8 @@ function DateRangeField({ startDate, endDate, onChange, lang, T }) {
       </button>
       {open && (
         <>
-          <div className="mt-floating-backdrop" onClick={() => setOpen(false)} />
-          <div ref={refs.setFloating} style={floatingStyles} className="mt-floating-menu mt-daterange-cal" dir="ltr">
+          <div className="mt-floating-backdrop" style={{ zIndex: 190 }} onClick={() => setOpen(false)} />
+          <div ref={refs.setFloating} style={{ ...floatingStyles, zIndex: 200 }} className="mt-floating-menu mt-daterange-cal" dir="ltr">
             <div className="mt-cal-header">
               <button type="button" onClick={() => shiftMonth(-1)}><ChevronLeft size={16} /></button>
               <strong>{monthLabel}</strong>
@@ -1330,7 +1330,7 @@ function DateRangeField({ startDate, endDate, onChange, lang, T }) {
                 );
               })}
             </div>
-            <button type="button" className="mt-btn primary" style={{ width: "100%", marginTop: 8 }} onClick={() => setOpen(false)}>{T.ok}</button>
+            <button type="button" className="mt-btn primary" style={{ width: "100%", marginTop: 8 }} onClick={() => setOpen(false)}>{T.close}</button>
           </div>
         </>
       )}
