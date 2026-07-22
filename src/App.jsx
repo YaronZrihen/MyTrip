@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "11.22.0";
+const APP_VERSION = "12.0.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -180,6 +180,15 @@ const T_DICT = {
     newFrameWizard: "מסגרת חדשה עם שאלון",
     wizardTitle: "שאלון תכנון טיול", wizardStepOf: "שלב {n} מתוך {total}",
     wizardTripName: "שם הטיול", wizardTripNameHint: "לדוגמה: הטיול המשפחתי לאיטליה",
+    hotelName: "שם המלון", aliasLabel: "כינוי", date: "תאריך", checkIn: "צ'ק-אין", checkOut: "צ'ק-אאוט",
+    yes: "כן", no: "לא", skip: "דלג", wizardStartBtn: "התחל",
+    preWizardTitle: "ארגן את הטיול הבא", preWizardIntro: "כמה שאלות קצרות יעזרו לנו להקים עבורך את שלד הטיול. אפשר לדלג בכל שלב.",
+    preWizardQ1: "מהם יעדי הטיול?", preWizardQ2: "כמה טיסות בינלאומיות מתוכננות?",
+    preWizardQ4: "האם מתוכננות טיסות פנים?", preWizardQ5: "כמה טיסות פנים מתוכננות?", preWizardQ6: "בין כמה מקומות לינה תדלגו?",
+    preWizardFlightN: "טיסה {n}", preWizardHotelN: "מלון {n}",
+    preWizardSummary: "מוכן! בלחיצה על \"צור טיול\" ניצור עבורך מסגרת ראשית, מסגרת לטיסות הבינלאומיות, ומסגרת נפרדת לכל מלון — עם כל הרשומות ממוקמות לפי התאריכים שהזנת.",
+    intlFlightsFrameName: "טיסות בינלאומיות", hotelFrameNameFallback: "מלון",
+    newTripAction: "צור טיול חדש", editTripDetails: "ערוך פרטי טיול",
     wizardDestination: "יעד", wizardDestinationHint: "לדוגמה: רומא, איטליה",
     wizardOutboundHint: "פרטי הטיסות קובעים את תאריכי תחילת וסיום הטיול.",
     wizardOutboundShort: "הלוך", wizardReturnShort: "חזור",
@@ -297,6 +306,15 @@ const T_DICT = {
     newFrameWizard: "New frame via questionnaire",
     wizardTitle: "Trip planning questionnaire", wizardStepOf: "Step {n} of {total}",
     wizardTripName: "Trip name", wizardTripNameHint: "e.g. Our family trip to Italy",
+    hotelName: "Hotel name", aliasLabel: "Nickname", date: "Date", checkIn: "Check-in", checkOut: "Check-out",
+    yes: "Yes", no: "No", skip: "Skip", wizardStartBtn: "Start",
+    preWizardTitle: "Organize your next trip", preWizardIntro: "A few quick questions will help us set up the trip skeleton for you. You can skip at any step.",
+    preWizardQ1: "What are the trip's destinations?", preWizardQ2: "How many international flights are planned?",
+    preWizardQ4: "Are domestic flights planned?", preWizardQ5: "How many domestic flights are planned?", preWizardQ6: "How many lodging places will you hop between?",
+    preWizardFlightN: "Flight {n}", preWizardHotelN: "Hotel {n}",
+    preWizardSummary: "Ready! Clicking \"Create trip\" will create a main frame, a frame for international flights, and a separate frame for each hotel — with all records placed according to the dates you entered.",
+    intlFlightsFrameName: "International Flights", hotelFrameNameFallback: "Hotel",
+    newTripAction: "Create new trip", editTripDetails: "Edit trip details",
     wizardDestination: "Destination", wizardDestinationHint: "e.g. Rome, Italy",
     wizardOutboundHint: "Flight details set the trip's start and end dates.",
     wizardOutboundShort: "outbound", wizardReturnShort: "return",
@@ -1986,6 +2004,15 @@ export default function MyTripApp() {
   const [aiWizardStep, setAiWizardStep] = useState(0);
   const [aiWizardAnswers, setAiWizardAnswers] = useState(AI_WIZARD_DEFAULTS);
   const [aiWizardError, setAiWizardError] = useState(false);
+  const PRE_WIZARD_DEFAULTS = {
+    tripName: "", destinations: "",
+    intlFlightCount: 1, intlFlights: [{ from: "", fromAlias: "", to: "", toAlias: "", date: "" }],
+    hasDomestic: "", domesticFlightCount: 1, domesticFlights: [{ from: "", fromAlias: "", to: "", toAlias: "", date: "" }],
+    hotelCount: 1, hotels: [{ name: "", alias: "", checkIn: "", checkOut: "" }],
+  };
+  const [preWizardOpen, setPreWizardOpen] = useState(false);
+  const [preWizardStep, setPreWizardStep] = useState(0);
+  const [preWizardData, setPreWizardData] = useState(PRE_WIZARD_DEFAULTS);
   const [frameMenuOpenId, setFrameMenuOpenId] = useState(null);
   const [frameDraft, setFrameDraft] = useState(null);
   const [addDayCtx, setAddDayCtx] = useState(null); // { fid, date }
@@ -2189,6 +2216,96 @@ export default function MyTripApp() {
     setAiWizardOpen(false);
     setAiWizardStep(0);
     setAiWizardAnswers(AI_WIZARD_DEFAULTS);
+  }
+  function preWizardNext() {
+    setPreWizardStep((s) => {
+      if (s === 2) { setPreWizardArrayCount("intlFlights", "intlFlightCount", { from: "", fromAlias: "", to: "", toAlias: "", date: "" }); return 3; }
+      if (s === 4) return preWizardData.hasDomestic === "yes" ? 5 : 7;
+      if (s === 5) { setPreWizardArrayCount("domesticFlights", "domesticFlightCount", { from: "", fromAlias: "", to: "", toAlias: "", date: "" }); return 6; }
+      if (s === 7) { setPreWizardArrayCount("hotels", "hotelCount", { name: "", alias: "", checkIn: "", checkOut: "" }); return 8; }
+      return s + 1;
+    });
+  }
+  function preWizardBack() {
+    setPreWizardStep((s) => {
+      if (s === 7) return preWizardData.hasDomestic === "yes" ? 6 : 4;
+      return Math.max(0, s - 1);
+    });
+  }
+  function openPreWizard() {
+    setPreWizardData(PRE_WIZARD_DEFAULTS);
+    setPreWizardStep(0);
+    setPreWizardOpen(true);
+  }
+  function closePreWizard() {
+    setPreWizardOpen(false);
+    setPreWizardStep(0);
+  }
+  function setPreWizardArrayCount(field, countField, template) {
+    const n = Math.max(1, Math.min(20, Number(preWizardData[countField]) || 1));
+    setPreWizardData((d) => {
+      const arr = d[field].slice(0, n);
+      while (arr.length < n) arr.push({ ...template });
+      return { ...d, [field]: arr };
+    });
+  }
+  function updatePreWizardArrayItem(field, idx, patch) {
+    setPreWizardData((d) => {
+      const arr = d[field].slice();
+      arr[idx] = { ...arr[idx], ...patch };
+      return { ...d, [field]: arr };
+    });
+  }
+  function confirmPreWizard() {
+    const d = preWizardData;
+    const allDates = [
+      ...d.intlFlights.map((f) => f.date).filter(Boolean),
+      ...(d.hasDomestic === "yes" ? d.domesticFlights.map((f) => f.date).filter(Boolean) : []),
+      ...d.hotels.flatMap((h) => [h.checkIn, h.checkOut]).filter(Boolean),
+    ].sort();
+    const startDate = allDates[0] || toLocalISODate(new Date());
+    const endDate = allDates[allDates.length - 1] || startDate;
+    const mainFrame = { id: uid(), name: d.tripName || d.destinations || (lang === "he" ? "טיול חדש" : "New trip"), startDate, endDate, parentFrameId: null, collapsed: false };
+    const newFrames = [mainFrame];
+
+    let intlFrame = null;
+    const intlDates = d.intlFlights.map((f) => f.date).filter(Boolean).sort();
+    if (intlDates.length) {
+      intlFrame = { id: uid(), name: T.intlFlightsFrameName, startDate: intlDates[0], endDate: intlDates[intlDates.length - 1], parentFrameId: mainFrame.id, collapsed: false };
+      newFrames.push(intlFrame);
+    }
+
+    const hotelFrames = d.hotels.filter((h) => h.checkIn && h.checkOut).map((h) => ({
+      id: uid(), name: h.alias || h.name || T.hotelFrameNameFallback, startDate: h.checkIn, endDate: h.checkOut, parentFrameId: mainFrame.id, collapsed: false, hotelRef: h,
+    }));
+    newFrames.push(...hotelFrames);
+
+    setFrames((prev) => [...prev, ...newFrames]);
+
+    d.intlFlights.forEach((f) => {
+      if (!f.date) return;
+      const id = addRow(f.date, null, intlFrame ? intlFrame.id : mainFrame.id);
+      updateRow(id, { typeId: "flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias });
+    });
+
+    if (d.hasDomestic === "yes") {
+      d.domesticFlights.forEach((f) => {
+        if (!f.date) return;
+        const targetFrame = hotelFrames.find((hf) => f.date >= hf.startDate && f.date <= hf.endDate);
+        const id = addRow(f.date, null, targetFrame ? targetFrame.id : mainFrame.id);
+        updateRow(id, { typeId: "domestic-flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias });
+      });
+    }
+
+    hotelFrames.forEach((hf) => {
+      const h = hf.hotelRef;
+      const id1 = addRow(h.checkIn, null, hf.id);
+      updateRow(id1, { typeId: "hotel", startTime: "15:00", to: h.name, toAlias: h.alias });
+      const id2 = addRow(h.checkOut, null, hf.id);
+      updateRow(id2, { typeId: "hotel", endTime: "11:00", to: h.name, toAlias: h.alias });
+    });
+
+    closePreWizard();
   }
   function handleAiSuggest() { setAiMessages((p) => [...p, { role: "assistant", text: T.aiSuggestDemoText }]); }
   function handleAiSend() {
@@ -2942,7 +3059,7 @@ export default function MyTripApp() {
         .mt-group-today { border:2px solid var(--teal); border-radius:12px; padding:8px; background:var(--teal-tint); }
         .mt-group-header { display:flex; align-items:center; gap:7px; padding:6px 4px; cursor:pointer; user-select:none; flex-wrap:wrap; }
         .mt-day-badge { display:flex; flex-direction:column; align-items:center; border-radius:8px; overflow:hidden; flex-shrink:0; width:42px; margin-inline-start:auto; box-shadow:0 1px 3px rgba(0,0,0,.15); }
-        .mt-day-badge-top { background:var(--teal); width:100%; height:8px; flex-shrink:0; }
+        .mt-day-badge-top { background:var(--danger); width:100%; height:8px; flex-shrink:0; }
         .mt-day-badge-body { background:var(--surface); width:100%; display:flex; flex-direction:column; align-items:center; padding:3px 0; }
         .mt-day-badge-num { font-size:17px; font-weight:800; font-family:'Frank Ruhl Libre',serif; color:var(--ink); line-height:1; }
         .mt-day-badge-weekday { font-size:8px; font-weight:700; color:var(--muted); line-height:1.3; }
@@ -3071,6 +3188,7 @@ export default function MyTripApp() {
         .mt-wizard-progress { height:4px; background:var(--border); margin:0 18px; border-radius:2px; overflow:hidden; }
         .mt-wizard-progress-bar { height:100%; background:var(--teal); transition:width .25s ease; }
         .mt-wizard-choices { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
+        .mt-wizard-subgroup { border:1px solid var(--border); border-radius:10px; padding:10px; margin-bottom:10px; background:var(--bg); }
         .mt-wizard-choice { border:1.5px solid var(--border); background:var(--surface); color:var(--ink); border-radius:20px; padding:6px 14px; font-size:12.5px; font-weight:500; cursor:pointer; }
         .mt-wizard-choice.selected { background:var(--teal); border-color:var(--teal); color:#fff; }
         .mt-wizard-summary { margin-top:10px; padding:10px; background:var(--teal-tint); border-radius:8px; }
@@ -3274,6 +3392,12 @@ export default function MyTripApp() {
             <div className="mt-action-cat-label">{T.catNewFrame}</div>
             <button className="mt-share-opt" onClick={() => { openFrameModal(null, null); setActionsMenuOpen(false); }}><FolderPlus size={14} /> {T.newFrame}</button>
             <button className="mt-share-opt" onClick={openAiWizard}><Wand2 size={14} /> {T.newFrameWizard}</button>
+            <button className="mt-share-opt" onClick={() => { openPreWizard(); setActionsMenuOpen(false); }}><Sparkles size={14} /> {T.newTripAction}</button>
+            <button className="mt-share-opt" onClick={() => {
+              const topFrame = frames.find((f) => !f.parentFrameId);
+              setPreWizardData({ ...PRE_WIZARD_DEFAULTS, tripName: topFrame ? topFrame.name : "" });
+              setPreWizardStep(0); setPreWizardOpen(true); setActionsMenuOpen(false);
+            }}><Pencil size={14} /> {T.editTripDetails}</button>
             <div className="mt-action-cat-label">{T.catSaveExport}</div>
             <button className="mt-share-opt" onClick={openSaveTripModal}><Save size={14} /> {T.saveTripByName}</button>
             <button className="mt-share-opt" onClick={openLoadTripModal}><FolderOpen size={14} /> {T.loadSavedTrip}</button>
@@ -3496,6 +3620,99 @@ export default function MyTripApp() {
                 <button className="mt-btn primary" onClick={aiWizardNext}>{T.wizardNext}</button>
               ) : (
                 <button className="mt-btn primary" onClick={confirmAiWizard}><Wand2 size={13} /> {T.wizardCreate}</button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {preWizardOpen && (
+        <div className="mt-modal-backdrop" onClick={closePreWizard}>
+          <div className="mt-modal" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+            <div className="mt-modal-header"><span className="mt-modal-title">{T.preWizardTitle}</span><button className="mt-btn ghost" onClick={closePreWizard}><X size={16} /></button></div>
+            {preWizardStep > 0 && (
+              <div className="mt-wizard-progress"><div className="mt-wizard-progress-bar" style={{ width: `${(preWizardStep / 9) * 100}%` }} /></div>
+            )}
+            <div className="mt-modal-body">
+              {preWizardStep === 0 && (
+                <>
+                  <p className="mt-hint" style={{ margin: "0 0 10px" }}>{T.preWizardIntro}</p>
+                  <div className="mt-field"><label>{T.wizardTripName}</label><input value={preWizardData.tripName} onChange={(e) => setPreWizardData({ ...preWizardData, tripName: e.target.value })} placeholder={T.wizardTripNameHint} /></div>
+                </>
+              )}
+              {preWizardStep === 1 && (
+                <div className="mt-field"><label>{T.preWizardQ1}</label><input value={preWizardData.destinations} onChange={(e) => setPreWizardData({ ...preWizardData, destinations: e.target.value })} /></div>
+              )}
+              {preWizardStep === 2 && (
+                <div className="mt-field"><label>{T.preWizardQ2}</label><input type="number" min={1} max={20} value={preWizardData.intlFlightCount} onChange={(e) => setPreWizardData({ ...preWizardData, intlFlightCount: e.target.value })} /></div>
+              )}
+              {preWizardStep === 3 && (
+                <>
+                  {preWizardData.intlFlights.map((f, i) => (
+                    <div key={i} className="mt-wizard-subgroup">
+                      <div className="mt-section-label">{T.preWizardFlightN.replace("{n}", i + 1)}</div>
+                      <div className="mt-field"><label>{T.from}</label><input value={f.from} onChange={(e) => updatePreWizardArrayItem("intlFlights", i, { from: e.target.value })} /></div>
+                      <div className="mt-field"><label>{T.aliasLabel}</label><input value={f.fromAlias} onChange={(e) => updatePreWizardArrayItem("intlFlights", i, { fromAlias: e.target.value })} /></div>
+                      <div className="mt-field"><label>{T.to}</label><input value={f.to} onChange={(e) => updatePreWizardArrayItem("intlFlights", i, { to: e.target.value })} /></div>
+                      <div className="mt-field"><label>{T.aliasLabel}</label><input value={f.toAlias} onChange={(e) => updatePreWizardArrayItem("intlFlights", i, { toAlias: e.target.value })} /></div>
+                      <div className="mt-field"><label>{T.date}</label><DateField value={f.date} onChange={(e) => updatePreWizardArrayItem("intlFlights", i, { date: e.target.value })} /></div>
+                    </div>
+                  ))}
+                </>
+              )}
+              {preWizardStep === 4 && (
+                <div className="mt-field">
+                  <label>{T.preWizardQ4}</label>
+                  <div className="mt-wizard-choices">
+                    <button className={"mt-wizard-choice" + (preWizardData.hasDomestic === "yes" ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, hasDomestic: "yes" })}>{T.yes}</button>
+                    <button className={"mt-wizard-choice" + (preWizardData.hasDomestic === "no" ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, hasDomestic: "no" })}>{T.no}</button>
+                  </div>
+                </div>
+              )}
+              {preWizardStep === 5 && (
+                <div className="mt-field"><label>{T.preWizardQ5}</label><input type="number" min={1} max={20} value={preWizardData.domesticFlightCount} onChange={(e) => setPreWizardData({ ...preWizardData, domesticFlightCount: e.target.value })} /></div>
+              )}
+              {preWizardStep === 6 && (
+                <>
+                  {preWizardData.domesticFlights.map((f, i) => (
+                    <div key={i} className="mt-wizard-subgroup">
+                      <div className="mt-section-label">{T.preWizardFlightN.replace("{n}", i + 1)}</div>
+                      <div className="mt-field"><label>{T.from}</label><input value={f.from} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { from: e.target.value })} /></div>
+                      <div className="mt-field"><label>{T.aliasLabel}</label><input value={f.fromAlias} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { fromAlias: e.target.value })} /></div>
+                      <div className="mt-field"><label>{T.to}</label><input value={f.to} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { to: e.target.value })} /></div>
+                      <div className="mt-field"><label>{T.aliasLabel}</label><input value={f.toAlias} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { toAlias: e.target.value })} /></div>
+                      <div className="mt-field"><label>{T.date}</label><DateField value={f.date} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { date: e.target.value })} /></div>
+                    </div>
+                  ))}
+                </>
+              )}
+              {preWizardStep === 7 && (
+                <div className="mt-field"><label>{T.preWizardQ6}</label><input type="number" min={1} max={20} value={preWizardData.hotelCount} onChange={(e) => setPreWizardData({ ...preWizardData, hotelCount: e.target.value })} /></div>
+              )}
+              {preWizardStep === 8 && (
+                <>
+                  {preWizardData.hotels.map((h, i) => (
+                    <div key={i} className="mt-wizard-subgroup">
+                      <div className="mt-section-label">{T.preWizardHotelN.replace("{n}", i + 1)}</div>
+                      <div className="mt-field"><label>{T.hotelName}</label><input value={h.name} onChange={(e) => updatePreWizardArrayItem("hotels", i, { name: e.target.value })} /></div>
+                      <div className="mt-field"><label>{T.aliasLabel}</label><input value={h.alias} onChange={(e) => updatePreWizardArrayItem("hotels", i, { alias: e.target.value })} /></div>
+                      <div className="mt-field"><label>{T.checkIn}</label><DateField value={h.checkIn} onChange={(e) => updatePreWizardArrayItem("hotels", i, { checkIn: e.target.value })} /></div>
+                      <div className="mt-field"><label>{T.checkOut}</label><DateField value={h.checkOut} onChange={(e) => updatePreWizardArrayItem("hotels", i, { checkOut: e.target.value })} /></div>
+                    </div>
+                  ))}
+                </>
+              )}
+              {preWizardStep === 9 && (
+                <p className="mt-hint">{T.preWizardSummary}</p>
+              )}
+            </div>
+            <div className="mt-modal-footer">
+              {preWizardStep === 0 && <button className="mt-btn ghost" onClick={closePreWizard}>{T.skip}</button>}
+              {preWizardStep > 0 && <button className="mt-btn ghost" onClick={preWizardBack}>{T.wizardBack}</button>}
+              {preWizardStep < 9 ? (
+                <button className="mt-btn primary" onClick={preWizardNext}>{preWizardStep === 0 ? T.wizardStartBtn : T.wizardNext}</button>
+              ) : (
+                <button className="mt-btn primary" onClick={confirmPreWizard}><Check size={13} /> {T.wizardCreate}</button>
               )}
             </div>
           </div>
