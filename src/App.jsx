@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "12.0.0";
+const APP_VERSION = "12.1.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -185,7 +185,7 @@ const T_DICT = {
     preWizardTitle: "ארגן את הטיול הבא", preWizardIntro: "כמה שאלות קצרות יעזרו לנו להקים עבורך את שלד הטיול. אפשר לדלג בכל שלב.",
     preWizardQ1: "מהם יעדי הטיול?", preWizardQ2: "כמה טיסות בינלאומיות מתוכננות?",
     preWizardQ4: "האם מתוכננות טיסות פנים?", preWizardQ5: "כמה טיסות פנים מתוכננות?", preWizardQ6: "בין כמה מקומות לינה תדלגו?",
-    preWizardFlightN: "טיסה {n}", preWizardHotelN: "מלון {n}",
+    preWizardFlightN: "טיסה {n}", preWizardHotelN: "מלון {n}", preWizardFlightDates: "תאריכי טיסה (הלוך – חזור)",
     preWizardSummary: "מוכן! בלחיצה על \"צור טיול\" ניצור עבורך מסגרת ראשית, מסגרת לטיסות הבינלאומיות, ומסגרת נפרדת לכל מלון — עם כל הרשומות ממוקמות לפי התאריכים שהזנת.",
     intlFlightsFrameName: "טיסות בינלאומיות", hotelFrameNameFallback: "מלון",
     newTripAction: "צור טיול חדש", editTripDetails: "ערוך פרטי טיול",
@@ -311,7 +311,7 @@ const T_DICT = {
     preWizardTitle: "Organize your next trip", preWizardIntro: "A few quick questions will help us set up the trip skeleton for you. You can skip at any step.",
     preWizardQ1: "What are the trip's destinations?", preWizardQ2: "How many international flights are planned?",
     preWizardQ4: "Are domestic flights planned?", preWizardQ5: "How many domestic flights are planned?", preWizardQ6: "How many lodging places will you hop between?",
-    preWizardFlightN: "Flight {n}", preWizardHotelN: "Hotel {n}",
+    preWizardFlightN: "Flight {n}", preWizardHotelN: "Hotel {n}", preWizardFlightDates: "Flight dates (there – back)",
     preWizardSummary: "Ready! Clicking \"Create trip\" will create a main frame, a frame for international flights, and a separate frame for each hotel — with all records placed according to the dates you entered.",
     intlFlightsFrameName: "International Flights", hotelFrameNameFallback: "Hotel",
     newTripAction: "Create new trip", editTripDetails: "Edit trip details",
@@ -2005,14 +2005,15 @@ export default function MyTripApp() {
   const [aiWizardAnswers, setAiWizardAnswers] = useState(AI_WIZARD_DEFAULTS);
   const [aiWizardError, setAiWizardError] = useState(false);
   const PRE_WIZARD_DEFAULTS = {
-    tripName: "", destinations: "",
-    intlFlightCount: 1, intlFlights: [{ from: "", fromAlias: "", to: "", toAlias: "", date: "" }],
-    hasDomestic: "", domesticFlightCount: 1, domesticFlights: [{ from: "", fromAlias: "", to: "", toAlias: "", date: "" }],
+    tripName: "",
+    intlFlightCount: 1, intlFlights: [{ from: "", fromAlias: "", to: "", toAlias: "", depDate: "", retDate: "" }],
+    hasDomestic: "", domesticFlights: [{ from: "", fromAlias: "", to: "", toAlias: "", depDate: "", retDate: "" }],
     hotelCount: 1, hotels: [{ name: "", alias: "", checkIn: "", checkOut: "" }],
   };
   const [preWizardOpen, setPreWizardOpen] = useState(false);
-  const [preWizardStep, setPreWizardStep] = useState(0);
+  const [preWizardScreen, setPreWizardScreen] = useState(1);
   const [preWizardData, setPreWizardData] = useState(PRE_WIZARD_DEFAULTS);
+  const [preWizardLastSubmitted, setPreWizardLastSubmitted] = useState(null);
   const [frameMenuOpenId, setFrameMenuOpenId] = useState(null);
   const [frameDraft, setFrameDraft] = useState(null);
   const [addDayCtx, setAddDayCtx] = useState(null); // { fid, date }
@@ -2218,28 +2219,33 @@ export default function MyTripApp() {
     setAiWizardAnswers(AI_WIZARD_DEFAULTS);
   }
   function preWizardNext() {
-    setPreWizardStep((s) => {
-      if (s === 2) { setPreWizardArrayCount("intlFlights", "intlFlightCount", { from: "", fromAlias: "", to: "", toAlias: "", date: "" }); return 3; }
-      if (s === 4) return preWizardData.hasDomestic === "yes" ? 5 : 7;
-      if (s === 5) { setPreWizardArrayCount("domesticFlights", "domesticFlightCount", { from: "", fromAlias: "", to: "", toAlias: "", date: "" }); return 6; }
-      if (s === 7) { setPreWizardArrayCount("hotels", "hotelCount", { name: "", alias: "", checkIn: "", checkOut: "" }); return 8; }
-      return s + 1;
+    setPreWizardScreen((s) => {
+      if (s === 2) { setPreWizardArrayCount("intlFlights", "intlFlightCount", { from: "", fromAlias: "", to: "", toAlias: "", depDate: "", retDate: "" }); }
+      return Math.min(3, s + 1);
     });
   }
   function preWizardBack() {
-    setPreWizardStep((s) => {
-      if (s === 7) return preWizardData.hasDomestic === "yes" ? 6 : 4;
-      return Math.max(0, s - 1);
-    });
+    setPreWizardScreen((s) => Math.max(1, s - 1));
+  }
+  function addPreWizardDomesticFlight() {
+    setPreWizardData((d) => ({ ...d, domesticFlights: [...d.domesticFlights, { from: "", fromAlias: "", to: "", toAlias: "", depDate: "", retDate: "" }] }));
+  }
+  function removePreWizardDomesticFlight(idx) {
+    setPreWizardData((d) => ({ ...d, domesticFlights: d.domesticFlights.length > 1 ? d.domesticFlights.filter((_, i) => i !== idx) : d.domesticFlights }));
   }
   function openPreWizard() {
     setPreWizardData(PRE_WIZARD_DEFAULTS);
-    setPreWizardStep(0);
+    setPreWizardScreen(1);
+    setPreWizardOpen(true);
+  }
+  function openEditTripDetails() {
+    setPreWizardData(preWizardLastSubmitted ? { ...PRE_WIZARD_DEFAULTS, ...preWizardLastSubmitted } : PRE_WIZARD_DEFAULTS);
+    setPreWizardScreen(1);
     setPreWizardOpen(true);
   }
   function closePreWizard() {
     setPreWizardOpen(false);
-    setPreWizardStep(0);
+    setPreWizardScreen(1);
   }
   function setPreWizardArrayCount(field, countField, template) {
     const n = Math.max(1, Math.min(20, Number(preWizardData[countField]) || 1));
@@ -2258,22 +2264,16 @@ export default function MyTripApp() {
   }
   function confirmPreWizard() {
     const d = preWizardData;
+    const domesticFlights = d.hasDomestic === "yes" ? d.domesticFlights.filter((f) => f.depDate) : [];
     const allDates = [
-      ...d.intlFlights.map((f) => f.date).filter(Boolean),
-      ...(d.hasDomestic === "yes" ? d.domesticFlights.map((f) => f.date).filter(Boolean) : []),
+      ...d.intlFlights.flatMap((f) => [f.depDate, f.retDate]).filter(Boolean),
+      ...domesticFlights.flatMap((f) => [f.depDate, f.retDate]).filter(Boolean),
       ...d.hotels.flatMap((h) => [h.checkIn, h.checkOut]).filter(Boolean),
     ].sort();
     const startDate = allDates[0] || toLocalISODate(new Date());
     const endDate = allDates[allDates.length - 1] || startDate;
-    const mainFrame = { id: uid(), name: d.tripName || d.destinations || (lang === "he" ? "טיול חדש" : "New trip"), startDate, endDate, parentFrameId: null, collapsed: false };
+    const mainFrame = { id: uid(), name: d.tripName || (lang === "he" ? "טיול חדש" : "New trip"), startDate, endDate, parentFrameId: null, collapsed: false };
     const newFrames = [mainFrame];
-
-    let intlFrame = null;
-    const intlDates = d.intlFlights.map((f) => f.date).filter(Boolean).sort();
-    if (intlDates.length) {
-      intlFrame = { id: uid(), name: T.intlFlightsFrameName, startDate: intlDates[0], endDate: intlDates[intlDates.length - 1], parentFrameId: mainFrame.id, collapsed: false };
-      newFrames.push(intlFrame);
-    }
 
     const hotelFrames = d.hotels.filter((h) => h.checkIn && h.checkOut).map((h) => ({
       id: uid(), name: h.alias || h.name || T.hotelFrameNameFallback, startDate: h.checkIn, endDate: h.checkOut, parentFrameId: mainFrame.id, collapsed: false, hotelRef: h,
@@ -2282,20 +2282,18 @@ export default function MyTripApp() {
 
     setFrames((prev) => [...prev, ...newFrames]);
 
-    d.intlFlights.forEach((f) => {
-      if (!f.date) return;
-      const id = addRow(f.date, null, intlFrame ? intlFrame.id : mainFrame.id);
-      updateRow(id, { typeId: "flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias });
-    });
-
-    if (d.hasDomestic === "yes") {
-      d.domesticFlights.forEach((f) => {
-        if (!f.date) return;
-        const targetFrame = hotelFrames.find((hf) => f.date >= hf.startDate && f.date <= hf.endDate);
-        const id = addRow(f.date, null, targetFrame ? targetFrame.id : mainFrame.id);
-        updateRow(id, { typeId: "domestic-flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias });
-      });
+    function addFlightPair(f, typeId) {
+      if (f.depDate) {
+        const id = addRow(f.depDate, null, mainFrame.id);
+        updateRow(id, { typeId, from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias });
+      }
+      if (f.retDate) {
+        const id = addRow(f.retDate, null, mainFrame.id);
+        updateRow(id, { typeId, from: f.to, fromAlias: f.toAlias, to: f.from, toAlias: f.fromAlias });
+      }
     }
+    d.intlFlights.forEach((f) => addFlightPair(f, "flight"));
+    domesticFlights.forEach((f) => addFlightPair(f, "domestic-flight"));
 
     hotelFrames.forEach((hf) => {
       const h = hf.hotelRef;
@@ -2305,6 +2303,7 @@ export default function MyTripApp() {
       updateRow(id2, { typeId: "hotel", endTime: "11:00", to: h.name, toAlias: h.alias });
     });
 
+    setPreWizardLastSubmitted(d);
     closePreWizard();
   }
   function handleAiSuggest() { setAiMessages((p) => [...p, { role: "assistant", text: T.aiSuggestDemoText }]); }
@@ -3189,6 +3188,11 @@ export default function MyTripApp() {
         .mt-wizard-progress-bar { height:100%; background:var(--teal); transition:width .25s ease; }
         .mt-wizard-choices { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
         .mt-wizard-subgroup { border:1px solid var(--border); border-radius:10px; padding:10px; margin-bottom:10px; background:var(--bg); }
+        .mt-wizard-qa { margin-bottom:12px; }
+        .mt-wizard-qa label { display:block; font-weight:700; font-size:13px; color:var(--ink); text-align:right; margin-bottom:5px; }
+        .mt-wizard-qa input, .mt-wizard-qa .mt-daterange-btn, .mt-wizard-qa .mt-datefield { width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:13.5px; font-family:inherit; box-sizing:border-box; text-align:right; color:var(--ink); }
+        .mt-wizard-qa input:focus { outline:none; border-color:var(--teal); }
+        .mt-wizard-qa input[type="number"] { text-align:center; }
         .mt-wizard-choice { border:1.5px solid var(--border); background:var(--surface); color:var(--ink); border-radius:20px; padding:6px 14px; font-size:12.5px; font-weight:500; cursor:pointer; }
         .mt-wizard-choice.selected { background:var(--teal); border-color:var(--teal); color:#fff; }
         .mt-wizard-summary { margin-top:10px; padding:10px; background:var(--teal-tint); border-radius:8px; }
@@ -3628,89 +3632,103 @@ export default function MyTripApp() {
 
       {preWizardOpen && (
         <div className="mt-modal-backdrop" onClick={closePreWizard}>
-          <div className="mt-modal" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+          <div className="mt-modal" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
             <div className="mt-modal-header"><span className="mt-modal-title">{T.preWizardTitle}</span><button className="mt-btn ghost" onClick={closePreWizard}><X size={16} /></button></div>
-            {preWizardStep > 0 && (
-              <div className="mt-wizard-progress"><div className="mt-wizard-progress-bar" style={{ width: `${(preWizardStep / 9) * 100}%` }} /></div>
-            )}
+            <div className="mt-wizard-progress"><div className="mt-wizard-progress-bar" style={{ width: `${(preWizardScreen / 3) * 100}%` }} /></div>
+            <div className="mt-hint" style={{ padding: "6px 18px 0" }}>{T.wizardStepOf.replace("{n}", preWizardScreen).replace("{total}", 3)}</div>
             <div className="mt-modal-body">
-              {preWizardStep === 0 && (
+              {preWizardScreen === 1 && (
                 <>
-                  <p className="mt-hint" style={{ margin: "0 0 10px" }}>{T.preWizardIntro}</p>
-                  <div className="mt-field"><label>{T.wizardTripName}</label><input value={preWizardData.tripName} onChange={(e) => setPreWizardData({ ...preWizardData, tripName: e.target.value })} placeholder={T.wizardTripNameHint} /></div>
+                  <div className="mt-section-label">{T.preWizardScreen1}</div>
+                  <div className="mt-wizard-qa">
+                    <label>{T.preWizardQName}</label>
+                    <input value={preWizardData.tripName} onChange={(e) => setPreWizardData({ ...preWizardData, tripName: e.target.value })} placeholder={T.wizardTripNameHint} />
+                  </div>
                 </>
               )}
-              {preWizardStep === 1 && (
-                <div className="mt-field"><label>{T.preWizardQ1}</label><input value={preWizardData.destinations} onChange={(e) => setPreWizardData({ ...preWizardData, destinations: e.target.value })} /></div>
-              )}
-              {preWizardStep === 2 && (
-                <div className="mt-field"><label>{T.preWizardQ2}</label><input type="number" min={1} max={20} value={preWizardData.intlFlightCount} onChange={(e) => setPreWizardData({ ...preWizardData, intlFlightCount: e.target.value })} /></div>
-              )}
-              {preWizardStep === 3 && (
+              {preWizardScreen === 2 && (
                 <>
+                  <div className="mt-section-label">{T.preWizardScreen2}</div>
+                  <div className="mt-wizard-qa">
+                    <label>{T.preWizardQ2}</label>
+                    <input type="number" min={1} max={20} value={preWizardData.intlFlightCount} onChange={(e) => setPreWizardData({ ...preWizardData, intlFlightCount: e.target.value })}
+                      onBlur={() => setPreWizardArrayCount("intlFlights", "intlFlightCount", { from: "", fromAlias: "", to: "", toAlias: "", depDate: "", retDate: "" })} />
+                  </div>
                   {preWizardData.intlFlights.map((f, i) => (
                     <div key={i} className="mt-wizard-subgroup">
                       <div className="mt-section-label">{T.preWizardFlightN.replace("{n}", i + 1)}</div>
-                      <div className="mt-field"><label>{T.from}</label><input value={f.from} onChange={(e) => updatePreWizardArrayItem("intlFlights", i, { from: e.target.value })} /></div>
-                      <div className="mt-field"><label>{T.aliasLabel}</label><input value={f.fromAlias} onChange={(e) => updatePreWizardArrayItem("intlFlights", i, { fromAlias: e.target.value })} /></div>
-                      <div className="mt-field"><label>{T.to}</label><input value={f.to} onChange={(e) => updatePreWizardArrayItem("intlFlights", i, { to: e.target.value })} /></div>
-                      <div className="mt-field"><label>{T.aliasLabel}</label><input value={f.toAlias} onChange={(e) => updatePreWizardArrayItem("intlFlights", i, { toAlias: e.target.value })} /></div>
-                      <div className="mt-field"><label>{T.date}</label><DateField value={f.date} onChange={(e) => updatePreWizardArrayItem("intlFlights", i, { date: e.target.value })} /></div>
+                      <div className="mt-wizard-qa"><label>{T.from}</label><input value={f.from} onChange={(e) => updatePreWizardArrayItem("intlFlights", i, { from: e.target.value })} /></div>
+                      <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={f.fromAlias} onChange={(e) => updatePreWizardArrayItem("intlFlights", i, { fromAlias: e.target.value })} /></div>
+                      <div className="mt-wizard-qa"><label>{T.to}</label><input value={f.to} onChange={(e) => updatePreWizardArrayItem("intlFlights", i, { to: e.target.value })} /></div>
+                      <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={f.toAlias} onChange={(e) => updatePreWizardArrayItem("intlFlights", i, { toAlias: e.target.value })} /></div>
+                      <div className="mt-wizard-qa">
+                        <label>{T.preWizardFlightDates}</label>
+                        <DateRangeField startDate={f.depDate} endDate={f.retDate} lang={lang} T={T}
+                          onChange={(s, e) => updatePreWizardArrayItem("intlFlights", i, { depDate: s, retDate: e })} />
+                      </div>
                     </div>
                   ))}
-                </>
-              )}
-              {preWizardStep === 4 && (
-                <div className="mt-field">
-                  <label>{T.preWizardQ4}</label>
-                  <div className="mt-wizard-choices">
-                    <button className={"mt-wizard-choice" + (preWizardData.hasDomestic === "yes" ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, hasDomestic: "yes" })}>{T.yes}</button>
-                    <button className={"mt-wizard-choice" + (preWizardData.hasDomestic === "no" ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, hasDomestic: "no" })}>{T.no}</button>
+                  <div className="divider" />
+                  <div className="mt-wizard-qa">
+                    <label>{T.preWizardQ4}</label>
+                    <div className="mt-wizard-choices">
+                      <button className={"mt-wizard-choice" + (preWizardData.hasDomestic === "yes" ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, hasDomestic: "yes" })}>{T.yes}</button>
+                      <button className={"mt-wizard-choice" + (preWizardData.hasDomestic === "no" ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, hasDomestic: "no" })}>{T.no}</button>
+                    </div>
                   </div>
-                </div>
-              )}
-              {preWizardStep === 5 && (
-                <div className="mt-field"><label>{T.preWizardQ5}</label><input type="number" min={1} max={20} value={preWizardData.domesticFlightCount} onChange={(e) => setPreWizardData({ ...preWizardData, domesticFlightCount: e.target.value })} /></div>
-              )}
-              {preWizardStep === 6 && (
-                <>
-                  {preWizardData.domesticFlights.map((f, i) => (
-                    <div key={i} className="mt-wizard-subgroup">
-                      <div className="mt-section-label">{T.preWizardFlightN.replace("{n}", i + 1)}</div>
-                      <div className="mt-field"><label>{T.from}</label><input value={f.from} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { from: e.target.value })} /></div>
-                      <div className="mt-field"><label>{T.aliasLabel}</label><input value={f.fromAlias} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { fromAlias: e.target.value })} /></div>
-                      <div className="mt-field"><label>{T.to}</label><input value={f.to} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { to: e.target.value })} /></div>
-                      <div className="mt-field"><label>{T.aliasLabel}</label><input value={f.toAlias} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { toAlias: e.target.value })} /></div>
-                      <div className="mt-field"><label>{T.date}</label><DateField value={f.date} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { date: e.target.value })} /></div>
-                    </div>
-                  ))}
+                  {preWizardData.hasDomestic === "yes" && (
+                    <>
+                      {preWizardData.domesticFlights.map((f, i) => (
+                        <div key={i} className="mt-wizard-subgroup">
+                          <div className="mt-section-label" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span>{T.preWizardFlightN.replace("{n}", i + 1)}</span>
+                            {preWizardData.domesticFlights.length > 1 && <button className="mt-btn ghost" style={{ padding: "2px 6px" }} onClick={() => removePreWizardDomesticFlight(i)}><X size={12} /></button>}
+                          </div>
+                          <div className="mt-wizard-qa"><label>{T.from}</label><input value={f.from} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { from: e.target.value })} /></div>
+                          <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={f.fromAlias} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { fromAlias: e.target.value })} /></div>
+                          <div className="mt-wizard-qa"><label>{T.to}</label><input value={f.to} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { to: e.target.value })} /></div>
+                          <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={f.toAlias} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { toAlias: e.target.value })} /></div>
+                          <div className="mt-wizard-qa">
+                            <label>{T.preWizardFlightDates}</label>
+                            <DateRangeField startDate={f.depDate} endDate={f.retDate} lang={lang} T={T}
+                              onChange={(s, e) => updatePreWizardArrayItem("domesticFlights", i, { depDate: s, retDate: e })} />
+                          </div>
+                        </div>
+                      ))}
+                      <button className="mt-btn ghost" style={{ width: "100%" }} onClick={addPreWizardDomesticFlight}><Plus size={13} /> {T.preWizardAddFlight}</button>
+                    </>
+                  )}
                 </>
               )}
-              {preWizardStep === 7 && (
-                <div className="mt-field"><label>{T.preWizardQ6}</label><input type="number" min={1} max={20} value={preWizardData.hotelCount} onChange={(e) => setPreWizardData({ ...preWizardData, hotelCount: e.target.value })} /></div>
-              )}
-              {preWizardStep === 8 && (
+              {preWizardScreen === 3 && (
                 <>
+                  <div className="mt-section-label">{T.preWizardScreen3}</div>
+                  <div className="mt-wizard-qa">
+                    <label>{T.preWizardQ6}</label>
+                    <input type="number" min={1} max={20} value={preWizardData.hotelCount} onChange={(e) => { setPreWizardData({ ...preWizardData, hotelCount: e.target.value }); }} onBlur={() => setPreWizardArrayCount("hotels", "hotelCount", { name: "", alias: "", checkIn: "", checkOut: "" })} />
+                  </div>
                   {preWizardData.hotels.map((h, i) => (
                     <div key={i} className="mt-wizard-subgroup">
                       <div className="mt-section-label">{T.preWizardHotelN.replace("{n}", i + 1)}</div>
-                      <div className="mt-field"><label>{T.hotelName}</label><input value={h.name} onChange={(e) => updatePreWizardArrayItem("hotels", i, { name: e.target.value })} /></div>
-                      <div className="mt-field"><label>{T.aliasLabel}</label><input value={h.alias} onChange={(e) => updatePreWizardArrayItem("hotels", i, { alias: e.target.value })} /></div>
-                      <div className="mt-field"><label>{T.checkIn}</label><DateField value={h.checkIn} onChange={(e) => updatePreWizardArrayItem("hotels", i, { checkIn: e.target.value })} /></div>
-                      <div className="mt-field"><label>{T.checkOut}</label><DateField value={h.checkOut} onChange={(e) => updatePreWizardArrayItem("hotels", i, { checkOut: e.target.value })} /></div>
+                      <div className="mt-wizard-qa"><label>{T.hotelName}</label><input value={h.name} onChange={(e) => updatePreWizardArrayItem("hotels", i, { name: e.target.value })} /></div>
+                      <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={h.alias} onChange={(e) => updatePreWizardArrayItem("hotels", i, { alias: e.target.value })} /></div>
+                      <div className="mt-wizard-qa">
+                        <label>{T.checkInOut}</label>
+                        <DateRangeField startDate={h.checkIn} endDate={h.checkOut} lang={lang} T={T}
+                          onChange={(s, e) => updatePreWizardArrayItem("hotels", i, { checkIn: s, checkOut: e })} />
+                      </div>
                     </div>
                   ))}
+                  <div className="divider" />
+                  <p className="mt-hint">{T.preWizardSummary}</p>
                 </>
-              )}
-              {preWizardStep === 9 && (
-                <p className="mt-hint">{T.preWizardSummary}</p>
               )}
             </div>
             <div className="mt-modal-footer">
-              {preWizardStep === 0 && <button className="mt-btn ghost" onClick={closePreWizard}>{T.skip}</button>}
-              {preWizardStep > 0 && <button className="mt-btn ghost" onClick={preWizardBack}>{T.wizardBack}</button>}
-              {preWizardStep < 9 ? (
-                <button className="mt-btn primary" onClick={preWizardNext}>{preWizardStep === 0 ? T.wizardStartBtn : T.wizardNext}</button>
+              {preWizardScreen === 1 && <button className="mt-btn ghost" onClick={closePreWizard}>{T.skip}</button>}
+              {preWizardScreen > 1 && <button className="mt-btn ghost" onClick={preWizardBack}>{T.wizardBack}</button>}
+              {preWizardScreen < 3 ? (
+                <button className="mt-btn primary" onClick={preWizardNext}>{T.wizardNext}</button>
               ) : (
                 <button className="mt-btn primary" onClick={confirmPreWizard}><Check size={13} /> {T.wizardCreate}</button>
               )}
