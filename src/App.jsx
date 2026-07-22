@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "11.20.0";
+const APP_VERSION = "11.21.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1918,7 +1918,17 @@ export default function MyTripApp() {
   const [headerCollapsed, setHeaderCollapsed] = useState(false);
   const [narrowScreen, setNarrowScreen] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
-  const [collapsedGroups, setCollapsedGroups] = useState({});
+  const [collapsedGroups, setCollapsedGroups] = useState(() => {
+    const todayStr = toLocalISODate(new Date());
+    const initial = {};
+    rows.forEach((r) => {
+      if (r.date && r.date < todayStr) {
+        const gk = (r.frameId || "root") + "__" + r.date;
+        initial[gk] = true;
+      }
+    });
+    return initial;
+  });
   const [collapsedParents, setCollapsedParents] = useState({});
   const [colMenuOpen, setColMenuOpen] = useState(false);
   const colMenu = useFloatingMenu(colMenuOpen, setColMenuOpen);
@@ -2804,9 +2814,6 @@ export default function MyTripApp() {
       if (a.type !== b.type) return a.type === "day" ? -1 : 1; // same date: existing day records render before a same-dated frame
       return 0;
     });
-    const todayStr = toLocalISODate(new Date());
-    const todayIdx = nodes.findIndex((n) => n.type === "day" && n.group.date === todayStr);
-    if (todayIdx > 0) { const [todayNode] = nodes.splice(todayIdx, 1); nodes.unshift(todayNode); }
 
     if (nodes.length === 0) {
       return (
