@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "12.1.1";
+const APP_VERSION = "12.2.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -186,6 +186,7 @@ const T_DICT = {
     preWizardQ1: "מהם יעדי הטיול?", preWizardQ2: "כמה טיסות בינלאומיות מתוכננות?",
     preWizardQ4: "האם מתוכננות טיסות פנים?", preWizardQ5: "כמה טיסות פנים מתוכננות?", preWizardQ6: "בין כמה מקומות לינה תדלגו?",
     preWizardFlightN: "טיסה {n}", preWizardHotelN: "מלון {n}", preWizardFlightDates: "תאריכי טיסה (הלוך – חזור)",
+    preWizardDefineIntlFlights: "הגדר טיסות בינלאומיות", preWizardRoundTrip: "טיסת הלוך וחזור",
     preWizardSummary: "מוכן! בלחיצה על \"צור טיול\" ניצור עבורך מסגרת ראשית, מסגרת לטיסות הבינלאומיות, ומסגרת נפרדת לכל מלון — עם כל הרשומות ממוקמות לפי התאריכים שהזנת.",
     intlFlightsFrameName: "טיסות בינלאומיות", hotelFrameNameFallback: "מלון",
     newTripAction: "צור טיול חדש", editTripDetails: "ערוך פרטי טיול",
@@ -312,6 +313,7 @@ const T_DICT = {
     preWizardQ1: "What are the trip's destinations?", preWizardQ2: "How many international flights are planned?",
     preWizardQ4: "Are domestic flights planned?", preWizardQ5: "How many domestic flights are planned?", preWizardQ6: "How many lodging places will you hop between?",
     preWizardFlightN: "Flight {n}", preWizardHotelN: "Hotel {n}", preWizardFlightDates: "Flight dates (there – back)",
+    preWizardDefineIntlFlights: "Define international flights", preWizardRoundTrip: "Round-trip flight",
     preWizardSummary: "Ready! Clicking \"Create trip\" will create a main frame, a frame for international flights, and a separate frame for each hotel — with all records placed according to the dates you entered.",
     intlFlightsFrameName: "International Flights", hotelFrameNameFallback: "Hotel",
     newTripAction: "Create new trip", editTripDetails: "Edit trip details",
@@ -1298,9 +1300,9 @@ function DateField({ value, onChange }) {
   );
 }
 
-function DateRangeField({ startDate, endDate, onChange, lang, T }) {
+function DateRangeField({ startDate, endDate, onChange, lang, T, initialViewMonth }) {
   const [open, setOpen] = useState(false);
-  const [viewMonth, setViewMonth] = useState(() => { const d = startDate ? new Date(startDate + "T00:00:00") : new Date(); d.setDate(1); return d; });
+  const [viewMonth, setViewMonth] = useState(() => { const d = startDate ? new Date(startDate + "T00:00:00") : initialViewMonth ? new Date(initialViewMonth + "T00:00:00") : new Date(); d.setDate(1); return d; });
   const [tempStart, setTempStart] = useState(startDate || "");
   const [tempEnd, setTempEnd] = useState(endDate || "");
   const { refs, floatingStyles } = useFloating({
@@ -1311,7 +1313,7 @@ function DateRangeField({ startDate, endDate, onChange, lang, T }) {
     whileElementsMounted: autoUpdate,
   });
   function toggleOpen() {
-    if (!open) { const d = tempStart ? new Date(tempStart + "T00:00:00") : new Date(); d.setDate(1); setViewMonth(d); }
+    if (!open) { const d = tempStart ? new Date(tempStart + "T00:00:00") : initialViewMonth ? new Date(initialViewMonth + "T00:00:00") : new Date(); d.setDate(1); setViewMonth(d); }
     setOpen((v) => !v);
   }
   function pad(n) { return String(n).padStart(2, "0"); }
@@ -2006,14 +2008,15 @@ export default function MyTripApp() {
   const [aiWizardError, setAiWizardError] = useState(false);
   const PRE_WIZARD_DEFAULTS = {
     tripName: "",
-    intlFlightCount: 1, intlFlights: [{ from: "", fromAlias: "", to: "", toAlias: "", depDate: "", retDate: "" }],
-    hasDomestic: "", domesticFlights: [{ from: "", fromAlias: "", to: "", toAlias: "", depDate: "", retDate: "" }],
+    intlFlights: [{ from: "", fromAlias: "", to: "", toAlias: "", depDate: "", retDate: "" }],
+    hasDomestic: "", domesticFlights: [{ from: "", fromAlias: "", to: "", toAlias: "", depDate: "", retDate: "", isRoundTrip: false }],
     hotelCount: 1, hotels: [{ name: "", alias: "", checkIn: "", checkOut: "" }],
   };
   const [preWizardOpen, setPreWizardOpen] = useState(false);
   const [preWizardScreen, setPreWizardScreen] = useState(1);
   const [preWizardData, setPreWizardData] = useState(PRE_WIZARD_DEFAULTS);
   const [preWizardLastSubmitted, setPreWizardLastSubmitted] = useState(null);
+  const [preWizardRefDate, setPreWizardRefDate] = useState("");
   const [frameMenuOpenId, setFrameMenuOpenId] = useState(null);
   const [frameDraft, setFrameDraft] = useState(null);
   const [addDayCtx, setAddDayCtx] = useState(null); // { fid, date }
@@ -2219,16 +2222,19 @@ export default function MyTripApp() {
     setAiWizardAnswers(AI_WIZARD_DEFAULTS);
   }
   function preWizardNext() {
-    setPreWizardScreen((s) => {
-      if (s === 2) { setPreWizardArrayCount("intlFlights", "intlFlightCount", { from: "", fromAlias: "", to: "", toAlias: "", depDate: "", retDate: "" }); }
-      return Math.min(3, s + 1);
-    });
+    setPreWizardScreen((s) => Math.min(3, s + 1));
   }
   function preWizardBack() {
     setPreWizardScreen((s) => Math.max(1, s - 1));
   }
+  function addPreWizardIntlFlight() {
+    setPreWizardData((d) => ({ ...d, intlFlights: [...d.intlFlights, { from: "", fromAlias: "", to: "", toAlias: "", depDate: "", retDate: "" }] }));
+  }
+  function removePreWizardIntlFlight(idx) {
+    setPreWizardData((d) => ({ ...d, intlFlights: d.intlFlights.length > 1 ? d.intlFlights.filter((_, i) => i !== idx) : d.intlFlights }));
+  }
   function addPreWizardDomesticFlight() {
-    setPreWizardData((d) => ({ ...d, domesticFlights: [...d.domesticFlights, { from: "", fromAlias: "", to: "", toAlias: "", depDate: "", retDate: "" }] }));
+    setPreWizardData((d) => ({ ...d, domesticFlights: [...d.domesticFlights, { from: "", fromAlias: "", to: "", toAlias: "", depDate: "", retDate: "", isRoundTrip: false }] }));
   }
   function removePreWizardDomesticFlight(idx) {
     setPreWizardData((d) => ({ ...d, domesticFlights: d.domesticFlights.length > 1 ? d.domesticFlights.filter((_, i) => i !== idx) : d.domesticFlights }));
@@ -2236,16 +2242,20 @@ export default function MyTripApp() {
   function openPreWizard() {
     setPreWizardData(PRE_WIZARD_DEFAULTS);
     setPreWizardScreen(1);
+    setPreWizardRefDate("");
     setPreWizardOpen(true);
   }
   function openEditTripDetails() {
-    setPreWizardData(preWizardLastSubmitted ? { ...PRE_WIZARD_DEFAULTS, ...preWizardLastSubmitted } : PRE_WIZARD_DEFAULTS);
+    const restored = preWizardLastSubmitted ? { ...PRE_WIZARD_DEFAULTS, ...preWizardLastSubmitted } : PRE_WIZARD_DEFAULTS;
+    setPreWizardData(restored);
     setPreWizardScreen(1);
+    setPreWizardRefDate(restored.intlFlights[0] && restored.intlFlights[0].depDate || "");
     setPreWizardOpen(true);
   }
   function closePreWizard() {
     setPreWizardOpen(false);
     setPreWizardScreen(1);
+    setPreWizardRefDate("");
   }
   function setPreWizardArrayCount(field, countField, template) {
     const n = Math.max(1, Math.min(20, Number(preWizardData[countField]) || 1));
@@ -3644,26 +3654,25 @@ export default function MyTripApp() {
               )}
               {preWizardScreen === 2 && (
                 <>
-                  <div className="mt-section-label">{T.preWizardScreen2}</div>
-                  <div className="mt-wizard-qa">
-                    <label>{T.preWizardQ2}</label>
-                    <input type="number" min={1} max={20} value={preWizardData.intlFlightCount} onChange={(e) => setPreWizardData({ ...preWizardData, intlFlightCount: e.target.value })}
-                      onBlur={() => setPreWizardArrayCount("intlFlights", "intlFlightCount", { from: "", fromAlias: "", to: "", toAlias: "", depDate: "", retDate: "" })} />
-                  </div>
+                  <div className="mt-section-label">{T.preWizardDefineIntlFlights}</div>
                   {preWizardData.intlFlights.map((f, i) => (
                     <div key={i} className="mt-wizard-subgroup">
-                      <div className="mt-section-label">{T.preWizardFlightN.replace("{n}", i + 1)}</div>
+                      <div className="mt-section-label" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span>{T.preWizardFlightN.replace("{n}", i + 1)}</span>
+                        {preWizardData.intlFlights.length > 1 && <button className="mt-btn ghost" style={{ padding: "2px 6px" }} onClick={() => removePreWizardIntlFlight(i)}><X size={12} /></button>}
+                      </div>
                       <div className="mt-wizard-qa"><label>{T.from}</label><input value={f.from} onChange={(e) => updatePreWizardArrayItem("intlFlights", i, { from: e.target.value })} /></div>
                       <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={f.fromAlias} onChange={(e) => updatePreWizardArrayItem("intlFlights", i, { fromAlias: e.target.value })} /></div>
                       <div className="mt-wizard-qa"><label>{T.to}</label><input value={f.to} onChange={(e) => updatePreWizardArrayItem("intlFlights", i, { to: e.target.value })} /></div>
                       <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={f.toAlias} onChange={(e) => updatePreWizardArrayItem("intlFlights", i, { toAlias: e.target.value })} /></div>
                       <div className="mt-wizard-qa">
                         <label>{T.preWizardFlightDates}</label>
-                        <DateRangeField startDate={f.depDate} endDate={f.retDate} lang={lang} T={T}
-                          onChange={(s, e) => updatePreWizardArrayItem("intlFlights", i, { depDate: s, retDate: e })} />
+                        <DateRangeField startDate={f.depDate} endDate={f.retDate} lang={lang} T={T} initialViewMonth={preWizardRefDate}
+                          onChange={(s, e) => { updatePreWizardArrayItem("intlFlights", i, { depDate: s, retDate: e }); if (s) setPreWizardRefDate(s); }} />
                       </div>
                     </div>
                   ))}
+                  <button className="mt-btn ghost" style={{ width: "100%" }} onClick={addPreWizardIntlFlight}><Plus size={13} /> {T.preWizardAddFlight}</button>
                   <div className="divider" />
                   <div className="mt-wizard-qa">
                     <label>{T.preWizardQ4}</label>
@@ -3684,11 +3693,19 @@ export default function MyTripApp() {
                           <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={f.fromAlias} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { fromAlias: e.target.value })} /></div>
                           <div className="mt-wizard-qa"><label>{T.to}</label><input value={f.to} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { to: e.target.value })} /></div>
                           <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={f.toAlias} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { toAlias: e.target.value })} /></div>
-                          <div className="mt-wizard-qa">
-                            <label>{T.preWizardFlightDates}</label>
-                            <DateRangeField startDate={f.depDate} endDate={f.retDate} lang={lang} T={T}
-                              onChange={(s, e) => updatePreWizardArrayItem("domesticFlights", i, { depDate: s, retDate: e })} />
-                          </div>
+                          <label className="mt-checkbox-row"><input type="checkbox" checked={!!f.isRoundTrip} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { isRoundTrip: e.target.checked })} />{T.preWizardRoundTrip}</label>
+                          {f.isRoundTrip ? (
+                            <div className="mt-wizard-qa">
+                              <label>{T.preWizardFlightDates}</label>
+                              <DateRangeField startDate={f.depDate} endDate={f.retDate} lang={lang} T={T} initialViewMonth={preWizardRefDate}
+                                onChange={(s, e) => { updatePreWizardArrayItem("domesticFlights", i, { depDate: s, retDate: e }); if (s) setPreWizardRefDate(s); }} />
+                            </div>
+                          ) : (
+                            <div className="mt-wizard-qa">
+                              <label>{T.date}</label>
+                              <DateField value={f.depDate} onChange={(e) => { updatePreWizardArrayItem("domesticFlights", i, { depDate: e.target.value, retDate: "" }); if (e.target.value) setPreWizardRefDate(e.target.value); }} />
+                            </div>
+                          )}
                         </div>
                       ))}
                       <button className="mt-btn ghost" style={{ width: "100%" }} onClick={addPreWizardDomesticFlight}><Plus size={13} /> {T.preWizardAddFlight}</button>
@@ -3710,8 +3727,8 @@ export default function MyTripApp() {
                       <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={h.alias} onChange={(e) => updatePreWizardArrayItem("hotels", i, { alias: e.target.value })} /></div>
                       <div className="mt-wizard-qa">
                         <label>{T.checkInOut}</label>
-                        <DateRangeField startDate={h.checkIn} endDate={h.checkOut} lang={lang} T={T}
-                          onChange={(s, e) => updatePreWizardArrayItem("hotels", i, { checkIn: s, checkOut: e })} />
+                        <DateRangeField startDate={h.checkIn} endDate={h.checkOut} lang={lang} T={T} initialViewMonth={preWizardRefDate}
+                          onChange={(s, e) => { updatePreWizardArrayItem("hotels", i, { checkIn: s, checkOut: e }); if (s) setPreWizardRefDate(s); }} />
                       </div>
                     </div>
                   ))}
