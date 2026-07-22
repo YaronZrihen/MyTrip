@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "12.1.0";
+const APP_VERSION = "12.1.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -3397,11 +3397,7 @@ export default function MyTripApp() {
             <button className="mt-share-opt" onClick={() => { openFrameModal(null, null); setActionsMenuOpen(false); }}><FolderPlus size={14} /> {T.newFrame}</button>
             <button className="mt-share-opt" onClick={openAiWizard}><Wand2 size={14} /> {T.newFrameWizard}</button>
             <button className="mt-share-opt" onClick={() => { openPreWizard(); setActionsMenuOpen(false); }}><Sparkles size={14} /> {T.newTripAction}</button>
-            <button className="mt-share-opt" onClick={() => {
-              const topFrame = frames.find((f) => !f.parentFrameId);
-              setPreWizardData({ ...PRE_WIZARD_DEFAULTS, tripName: topFrame ? topFrame.name : "" });
-              setPreWizardStep(0); setPreWizardOpen(true); setActionsMenuOpen(false);
-            }}><Pencil size={14} /> {T.editTripDetails}</button>
+            <button className="mt-share-opt" onClick={() => { openEditTripDetails(); setActionsMenuOpen(false); }}><Pencil size={14} /> {T.editTripDetails}</button>
             <div className="mt-action-cat-label">{T.catSaveExport}</div>
             <button className="mt-share-opt" onClick={openSaveTripModal}><Save size={14} /> {T.saveTripByName}</button>
             <button className="mt-share-opt" onClick={openLoadTripModal}><FolderOpen size={14} /> {T.loadSavedTrip}</button>
