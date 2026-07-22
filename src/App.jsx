@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "12.4.0";
+const APP_VERSION = "13.0.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -395,6 +395,11 @@ function formatDayCount(n, lang) {
   return n === 1 ? "1 day" : `${n} days`;
 }
 function dayOfMonth(dateStr) { const d = new Date(dateStr + "T00:00:00"); return isNaN(d) ? "—" : d.getDate(); }
+function monthAbbrev(dateStr, lang) {
+  const d = new Date(dateStr + "T00:00:00");
+  if (isNaN(d)) return "";
+  return d.toLocaleDateString(lang === "he" ? "he-IL" : "en-US", { month: "short" }).replace(".", "");
+}
 function computeDuration(start, end, overnight) {
   if (!start || !end) return "—";
   const [sh, sm] = start.split(":").map(Number); const [eh, em] = end.split(":").map(Number);
@@ -1852,32 +1857,74 @@ function FrameSummaryRow({ frame, ctx }) {
   );
 }
 
+function FrameDateBadge({ date, lang }) {
+  return (
+    <span className="mt-frame-date-badge">
+      <span className="mt-day-badge-top" />
+      <span className="mt-day-badge-body">
+        <span className="mt-day-badge-num">{dayOfMonth(date)}</span>
+        <span className="mt-day-badge-mon">{monthAbbrev(date, lang)}</span>
+      </span>
+    </span>
+  );
+}
+
 function FrameBlock({ frame, depth, ctx, renderContext }) {
-  const { T, lang, toggleFrameCollapse, openFrameModal, deleteFrame, openAddDayModal, addRow, lastDateInContext, frameTotals, displayCurrency, convertAmount, frameMenuOpenId, setFrameMenuOpenId, onDropDay, dragDayKey, rows, frames } = ctx;
+  const { T, lang, toggleFrameCollapse, openFrameModal, deleteFrame, openAddDayModal, addRow, lastDateInContext, frameTotals, displayCurrency, convertAmount, frameMenuOpenId, setFrameMenuOpenId, onDropDay, dragDayKey, rows, frames, openHotelInfo } = ctx;
   const totals = frameTotals(frame.id);
   const convertedTotal = Object.entries(totals).reduce((sum, [cur, amt]) => sum + convertAmount(amt, cur, displayCurrency), 0);
   const color = FRAME_COLORS[depth % FRAME_COLORS.length];
   const isMenuOpen = frameMenuOpenId === frame.id;
   const menuFloating = useFloatingMenu(isMenuOpen, (open) => setFrameMenuOpenId(open ? frame.id : null));
   const { setNodeRef: setFrameDropRef, isOver: isFrameOver } = useDroppable({ id: "frame:" + frame.id, data: { type: "frame", fid: frame.id } });
+  const dayCount = frame.startDate && frame.endDate ? Math.round((new Date(frame.endDate + "T00:00:00") - new Date(frame.startDate + "T00:00:00")) / 86400000) + 1 : 0;
+  const hotelRowWithPlace = frame.frameType === "hotel" ? rows.find((r) => r.frameId === frame.id && r.typeId === "hotel" && (r.fromPlaceId || r.toPlaceId)) : null;
   return (
     <div className="mt-frame-block" style={{ "--frame-color": color }}>
-      <div ref={setFrameDropRef} className={"mt-frame-header" + (dragDayKey ? " droppable" : "") + (isFrameOver ? " mt-drop-hover" : "")} onClick={() => toggleFrameCollapse(frame.id)}>
-        <div className="mt-frame-header-top">
-          <span className="chev">{frame.collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}</span>
-          <span className="mt-frame-name">{frame.name}</span>
-          <span className="mt-frame-end-group">
-            {convertedTotal > 0 && (
-              <span className="mt-frame-cost-inline">{displayCurrency} {convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+      <div ref={setFrameDropRef} className={"mt-frame-header" + (dragDayKey ? " droppable" : "") + (isFrameOver ? " mt-drop-hover" : "") + (frame.frameType ? " mt-frame-header-special" : "")} onClick={() => toggleFrameCollapse(frame.id)}>
+        {frame.frameType ? (
+          <div className="mt-frame-header-top">
+            <span className="chev">{frame.collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}</span>
+            {frame.frameType === "trip" ? (
+              <span className="mt-frame-type-icon"><Plane size={15} /></span>
+            ) : (
+              <button className="mt-frame-type-icon mt-frame-type-icon-btn" onClick={(e) => { e.stopPropagation(); if (hotelRowWithPlace) openHotelInfo(hotelRowWithPlace); }} title={hotelRowWithPlace ? T.placeInfo : undefined}><BedDouble size={15} /></button>
             )}
-            <span className="mt-frame-actions" onClick={(e) => e.stopPropagation()}>
-              <button ref={menuFloating.refs.setReference} {...menuFloating.getReferenceProps()} title={T.moreOptions}><MoreVertical size={16} /></button>
+            <span className="mt-frame-name">{frame.name}</span>
+            <span className="mt-frame-end-group">
+              {convertedTotal > 0 && (
+                <span className="mt-frame-cost-inline">{displayCurrency} {convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+              )}
+              <span className="mt-frame-actions" onClick={(e) => e.stopPropagation()}>
+                <button ref={menuFloating.refs.setReference} {...menuFloating.getReferenceProps()} title={T.moreOptions}><MoreVertical size={16} /></button>
+              </span>
             </span>
-          </span>
-        </div>
-        <div className="mt-frame-header-dates">
-          <FrameInlineDatePicker frame={frame} ctx={ctx} />
-        </div>
+            <span className="mt-frame-date-cluster">
+              {dayCount > 0 && <span className="mt-frame-daycount">{formatDayCount(dayCount, lang)}</span>}
+              <FrameDateBadge date={frame.startDate} lang={lang} />
+              <ArrowLeft size={14} className="mt-frame-date-arrow" />
+              <FrameDateBadge date={frame.endDate} lang={lang} />
+            </span>
+          </div>
+        ) : (
+          <>
+            <div className="mt-frame-header-top">
+              <span className="chev">{frame.collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}</span>
+              <span className="mt-frame-name">{frame.name}</span>
+              <span className="mt-frame-end-group">
+                {convertedTotal > 0 && (
+                  <span className="mt-frame-cost-inline">{displayCurrency} {convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                )}
+                <span className="mt-frame-actions" onClick={(e) => e.stopPropagation()}>
+                  <button ref={menuFloating.refs.setReference} {...menuFloating.getReferenceProps()} title={T.moreOptions}><MoreVertical size={16} /></button>
+                </span>
+              </span>
+            </div>
+            <div className="mt-frame-header-dates">
+              <FrameInlineDatePicker frame={frame} ctx={ctx} />
+            </div>
+          </>
+        )}
       </div>
       {isMenuOpen && (
         <div ref={menuFloating.refs.setFloating} style={menuFloating.floatingStyles} {...menuFloating.getFloatingProps()} className="mt-floating-menu mt-kebab-menu">
@@ -2070,6 +2117,7 @@ export default function MyTripApp() {
   const [preWizardData, setPreWizardData] = useState(PRE_WIZARD_DEFAULTS);
   const [preWizardLastSubmitted, setPreWizardLastSubmitted] = useState(null);
   const [preWizardRefDate, setPreWizardRefDate] = useState("");
+  const [preWizardCreatedIds, setPreWizardCreatedIds] = useState(null);
   const [frameMenuOpenId, setFrameMenuOpenId] = useState(null);
   const [frameDraft, setFrameDraft] = useState(null);
   const [addDayCtx, setAddDayCtx] = useState(null); // { fid, date }
@@ -2325,6 +2373,12 @@ export default function MyTripApp() {
   }
   function confirmPreWizard() {
     const d = preWizardData;
+    if (preWizardCreatedIds) {
+      const frameIdSet = new Set(preWizardCreatedIds.frameIds);
+      const rowIdSet = new Set(preWizardCreatedIds.rowIds);
+      setFrames((prev) => prev.filter((f) => !frameIdSet.has(f.id)));
+      setRows((prev) => prev.filter((r) => !rowIdSet.has(r.id)));
+    }
     const domesticFlights = d.hasDomestic === "yes" ? d.domesticFlights.filter((f) => f.depDate) : [];
     const allDates = [
       ...d.intlFlights.flatMap((f) => [f.depDate, f.retDate]).filter(Boolean),
@@ -2333,24 +2387,27 @@ export default function MyTripApp() {
     ].sort();
     const startDate = allDates[0] || toLocalISODate(new Date());
     const endDate = allDates[allDates.length - 1] || startDate;
-    const mainFrame = { id: uid(), name: d.tripName || (lang === "he" ? "טיול חדש" : "New trip"), startDate, endDate, parentFrameId: null, collapsed: false };
+    const mainFrame = { id: uid(), name: d.tripName || (lang === "he" ? "טיול חדש" : "New trip"), startDate, endDate, parentFrameId: null, collapsed: false, frameType: "trip" };
     const newFrames = [mainFrame];
 
     const hotelFrames = d.hotels.filter((h) => h.checkIn && h.checkOut).map((h) => ({
-      id: uid(), name: h.alias || h.name || T.hotelFrameNameFallback, startDate: h.checkIn, endDate: h.checkOut, parentFrameId: mainFrame.id, collapsed: false, hotelRef: h,
+      id: uid(), name: h.alias || h.name || T.hotelFrameNameFallback, startDate: h.checkIn, endDate: h.checkOut, parentFrameId: mainFrame.id, collapsed: false, frameType: "hotel", hotelRef: h,
     }));
     newFrames.push(...hotelFrames);
 
     setFrames((prev) => [...prev, ...newFrames]);
 
+    const createdRowIds = [];
     function addFlightPair(f, typeId) {
       if (f.depDate) {
         const id = addRow(f.depDate, null, mainFrame.id);
         updateRow(id, { typeId, from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias });
+        createdRowIds.push(id);
       }
       if (f.retDate) {
         const id = addRow(f.retDate, null, mainFrame.id);
         updateRow(id, { typeId, from: f.to, fromAlias: f.toAlias, to: f.from, toAlias: f.fromAlias });
+        createdRowIds.push(id);
       }
     }
     d.intlFlights.forEach((f) => addFlightPair(f, "flight"));
@@ -2362,8 +2419,10 @@ export default function MyTripApp() {
       updateRow(id1, { typeId: "hotel", startTime: "15:00", to: h.name, toAlias: h.alias });
       const id2 = addRow(h.checkOut, null, hf.id);
       updateRow(id2, { typeId: "hotel", endTime: "11:00", to: h.name, toAlias: h.alias });
+      createdRowIds.push(id1, id2);
     });
 
+    setPreWizardCreatedIds({ frameIds: newFrames.map((f) => f.id), rowIds: createdRowIds });
     setPreWizardLastSubmitted(d);
     closePreWizard();
   }
@@ -3085,6 +3144,13 @@ export default function MyTripApp() {
         .mt-frame-header { display:flex; flex-direction:column; padding:10px 12px; cursor:pointer; user-select:none; background:#FBFDFC; border-radius:11px 11px 0 0; }
         .mt-frame-header-top { display:flex; align-items:center; gap:9px; }
         .mt-frame-header-dates { margin-top:5px; padding-inline-start:24px; }
+        .mt-frame-header-special { background:color-mix(in srgb, var(--frame-color) 14%, white); border-radius:10px; padding:8px 10px; }
+        .mt-frame-type-icon { width:28px; height:28px; border-radius:8px; background:var(--frame-color); color:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .mt-frame-type-icon-btn { border:none; cursor:pointer; }
+        .mt-frame-date-cluster { display:flex; align-items:center; gap:6px; margin-inline-start:auto; flex-shrink:0; }
+        .mt-frame-daycount { font-size:11px; font-weight:700; color:var(--muted); white-space:nowrap; }
+        .mt-frame-date-arrow { color:var(--muted); flex-shrink:0; }
+        .mt-frame-date-badge { display:flex; flex-direction:column; align-items:center; border-radius:8px; overflow:hidden; flex-shrink:0; width:36px; box-shadow:0 1px 3px rgba(0,0,0,.15); }
         .mt-frame-name { font-weight:700; font-size:15px; font-family:'Frank Ruhl Libre',serif; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:24px; flex-shrink:1; }
         .mt-frame-date-inline { font-size:12.5px; font-weight:600; color:var(--muted); font-family:'Heebo',sans-serif; white-space:nowrap; flex-shrink:0; font-variant-numeric:tabular-nums; display:flex; align-items:center; gap:5px; }
         .mt-frame-date-btn { border:none; background:none; padding:0; cursor:pointer; display:flex; align-items:center; gap:5px; color:inherit; }
@@ -3249,9 +3315,9 @@ export default function MyTripApp() {
         .mt-wizard-progress-bar { height:100%; background:var(--teal); transition:width .25s ease; }
         .mt-wizard-choices { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
         .mt-wizard-subgroup { border:1px solid var(--border); border-radius:10px; padding:10px; margin-bottom:10px; background:var(--bg); }
-        .mt-wizard-qa { margin-bottom:12px; }
-        .mt-wizard-qa label { display:block; font-weight:700; font-size:13px; color:var(--ink); text-align:right; margin-bottom:5px; }
-        .mt-wizard-qa input, .mt-wizard-qa .mt-daterange-btn, .mt-wizard-qa .mt-datefield { width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:13.5px; font-family:inherit; box-sizing:border-box; text-align:right; color:var(--ink); }
+        .mt-wizard-qa { margin-bottom:8px; display:flex; align-items:center; gap:8px; }
+        .mt-wizard-qa label { flex:0 0 auto; width:108px; font-weight:700; font-size:12.5px; color:var(--ink); text-align:right; line-height:1.3; }
+        .mt-wizard-qa input, .mt-wizard-qa .mt-daterange-btn, .mt-wizard-qa .mt-datefield { flex:1; min-width:0; border:1px solid var(--border); border-radius:8px; padding:7px 9px; font-size:13px; font-family:inherit; box-sizing:border-box; text-align:right; color:var(--ink); }
         .mt-wizard-qa input:focus { outline:none; border-color:var(--teal); }
         .mt-wizard-qa input[type="number"] { text-align:center; }
         .mt-wizard-choice { border:1.5px solid var(--border); background:var(--surface); color:var(--ink); border-radius:20px; padding:6px 14px; font-size:12.5px; font-weight:500; cursor:pointer; }
