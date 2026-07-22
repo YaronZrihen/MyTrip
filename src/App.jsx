@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "13.0.0";
+const APP_VERSION = "13.1.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1890,20 +1890,20 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
             ) : (
               <button className="mt-frame-type-icon mt-frame-type-icon-btn" onClick={(e) => { e.stopPropagation(); if (hotelRowWithPlace) openHotelInfo(hotelRowWithPlace); }} title={hotelRowWithPlace ? T.placeInfo : undefined}><BedDouble size={15} /></button>
             )}
-            <span className="mt-frame-name">{frame.name}</span>
-            <span className="mt-frame-end-group">
-              {convertedTotal > 0 && (
-                <span className="mt-frame-cost-inline">{displayCurrency} {convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-              )}
-              <span className="mt-frame-actions" onClick={(e) => e.stopPropagation()}>
-                <button ref={menuFloating.refs.setReference} {...menuFloating.getReferenceProps()} title={T.moreOptions}><MoreVertical size={16} /></button>
-              </span>
-            </span>
-            <span className="mt-frame-date-cluster">
+            <span className="mt-frame-name-col">
+              <span className="mt-frame-name">{frame.name}</span>
               {dayCount > 0 && <span className="mt-frame-daycount">{formatDayCount(dayCount, lang)}</span>}
+            </span>
+            {convertedTotal > 0 && (
+              <span className="mt-frame-cost-inline">{displayCurrency} {convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+            )}
+            <span className="mt-frame-date-cluster">
               <FrameDateBadge date={frame.startDate} lang={lang} />
               <ArrowLeft size={14} className="mt-frame-date-arrow" />
               <FrameDateBadge date={frame.endDate} lang={lang} />
+            </span>
+            <span className="mt-frame-actions mt-frame-actions-pinned" onClick={(e) => e.stopPropagation()}>
+              <button ref={menuFloating.refs.setReference} {...menuFloating.getReferenceProps()} title={T.moreOptions}><MoreVertical size={16} /></button>
             </span>
           </div>
         ) : (
@@ -3147,10 +3147,13 @@ export default function MyTripApp() {
         .mt-frame-header-special { background:color-mix(in srgb, var(--frame-color) 14%, white); border-radius:10px; padding:8px 10px; }
         .mt-frame-type-icon { width:28px; height:28px; border-radius:8px; background:var(--frame-color); color:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
         .mt-frame-type-icon-btn { border:none; cursor:pointer; }
-        .mt-frame-date-cluster { display:flex; align-items:center; gap:6px; margin-inline-start:auto; flex-shrink:0; }
-        .mt-frame-daycount { font-size:11px; font-weight:700; color:var(--muted); white-space:nowrap; }
+        .mt-frame-date-cluster { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+        .mt-frame-name-col { display:flex; flex-direction:column; gap:1px; min-width:24px; overflow:hidden; }
+        .mt-frame-daycount { font-size:11px; font-weight:700; font-family:'Frank Ruhl Libre',serif; color:var(--muted); white-space:nowrap; }
         .mt-frame-date-arrow { color:var(--muted); flex-shrink:0; }
         .mt-frame-date-badge { display:flex; flex-direction:column; align-items:center; border-radius:8px; overflow:hidden; flex-shrink:0; width:36px; box-shadow:0 1px 3px rgba(0,0,0,.15); }
+        .mt-frame-date-badge .mt-day-badge-top { height:6px; }
+        .mt-frame-date-badge .mt-day-badge-body { padding:2px 0; }
         .mt-frame-name { font-weight:700; font-size:15px; font-family:'Frank Ruhl Libre',serif; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:24px; flex-shrink:1; }
         .mt-frame-date-inline { font-size:12.5px; font-weight:600; color:var(--muted); font-family:'Heebo',sans-serif; white-space:nowrap; flex-shrink:0; font-variant-numeric:tabular-nums; display:flex; align-items:center; gap:5px; }
         .mt-frame-date-btn { border:none; background:none; padding:0; cursor:pointer; display:flex; align-items:center; gap:5px; color:inherit; }
@@ -3158,6 +3161,7 @@ export default function MyTripApp() {
         .mt-frame-cost-inline { font-size:12.5px; font-weight:700; color:var(--amber); white-space:nowrap; flex-shrink:0; }
         .mt-frame-end-group { display:flex; align-items:center; gap:8px; margin-inline-start:auto; flex-shrink:0; }
         .mt-frame-actions { display:flex; gap:2px; flex-shrink:0; }
+        .mt-frame-actions-pinned { margin-inline-start:auto; }
         .mt-kebab-menu { min-width:180px; }
         .mt-daterange-btn { display:flex; align-items:center; gap:7px; width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:13px; background:#fff; color:var(--ink); }
         .mt-datefield { display:flex; align-items:center; gap:7px; width:100%; border:1px solid var(--border); border-radius:8px; padding:6px 10px; background:#fff; color:var(--teal-dark); }
@@ -3188,6 +3192,7 @@ export default function MyTripApp() {
         .mt-day-badge-top { background:var(--danger); width:100%; height:8px; flex-shrink:0; }
         .mt-day-badge-body { background:var(--surface); width:100%; display:flex; flex-direction:column; align-items:center; padding:3px 0; }
         .mt-day-badge-num { font-size:17px; font-weight:800; font-family:'Frank Ruhl Libre',serif; color:var(--ink); line-height:1; }
+        .mt-day-badge-mon { font-size:8px; font-weight:700; color:var(--muted); text-transform:uppercase; line-height:1.3; }
         .mt-day-badge-weekday { font-size:8px; font-weight:700; color:var(--muted); line-height:1.3; }
         .mt-group-actions { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
         .mt-group-add { font-size:12px; color:var(--teal); display:flex; align-items:center; gap:3px; background:none; border:none; font-weight:600; text-decoration:none; }
