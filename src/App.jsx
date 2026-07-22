@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "12.2.0";
+const APP_VERSION = "12.4.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -187,6 +187,7 @@ const T_DICT = {
     preWizardQ4: "האם מתוכננות טיסות פנים?", preWizardQ5: "כמה טיסות פנים מתוכננות?", preWizardQ6: "בין כמה מקומות לינה תדלגו?",
     preWizardFlightN: "טיסה {n}", preWizardHotelN: "מלון {n}", preWizardFlightDates: "תאריכי טיסה (הלוך – חזור)",
     preWizardDefineIntlFlights: "הגדר טיסות בינלאומיות", preWizardRoundTrip: "טיסת הלוך וחזור",
+    preWizardAddFlight: "הוסף טיסה", preWizardAddHotel: "הוסף מלון",
     preWizardSummary: "מוכן! בלחיצה על \"צור טיול\" ניצור עבורך מסגרת ראשית, מסגרת לטיסות הבינלאומיות, ומסגרת נפרדת לכל מלון — עם כל הרשומות ממוקמות לפי התאריכים שהזנת.",
     intlFlightsFrameName: "טיסות בינלאומיות", hotelFrameNameFallback: "מלון",
     newTripAction: "צור טיול חדש", editTripDetails: "ערוך פרטי טיול",
@@ -314,6 +315,7 @@ const T_DICT = {
     preWizardQ4: "Are domestic flights planned?", preWizardQ5: "How many domestic flights are planned?", preWizardQ6: "How many lodging places will you hop between?",
     preWizardFlightN: "Flight {n}", preWizardHotelN: "Hotel {n}", preWizardFlightDates: "Flight dates (there – back)",
     preWizardDefineIntlFlights: "Define international flights", preWizardRoundTrip: "Round-trip flight",
+    preWizardAddFlight: "Add flight", preWizardAddHotel: "Add hotel",
     preWizardSummary: "Ready! Clicking \"Create trip\" will create a main frame, a frame for international flights, and a separate frame for each hotel — with all records placed according to the dates you entered.",
     intlFlightsFrameName: "International Flights", hotelFrameNameFallback: "Hotel",
     newTripAction: "Create new trip", editTripDetails: "Edit trip details",
@@ -1290,12 +1292,63 @@ function FrameInlineDatePicker({ frame, ctx }) {
   );
 }
 
-function DateField({ value, onChange }) {
+function DateField({ value, onChange, lang, T, initialViewMonth }) {
+  const [open, setOpen] = useState(false);
+  const [viewMonth, setViewMonth] = useState(() => { const d = value ? new Date(value + "T00:00:00") : initialViewMonth ? new Date(initialViewMonth + "T00:00:00") : new Date(); d.setDate(1); return d; });
+  const { refs, floatingStyles } = useFloating({
+    open, onOpenChange: setOpen,
+    placement: "bottom-start",
+    strategy: "fixed",
+    middleware: [offset(6), flip(), shift({ padding: 8 })],
+    whileElementsMounted: autoUpdate,
+  });
+  function toggleOpen() {
+    if (!open) { const d = value ? new Date(value + "T00:00:00") : initialViewMonth ? new Date(initialViewMonth + "T00:00:00") : new Date(); d.setDate(1); setViewMonth(d); }
+    setOpen((v) => !v);
+  }
+  function pad(n) { return String(n).padStart(2, "0"); }
+  function toISO(y, m, day) { return `${y}-${pad(m + 1)}-${pad(day)}`; }
+  function clickDay(iso) { onChange({ target: { value: iso } }); setOpen(false); }
+  function shiftMonth(delta) { setViewMonth((prev) => { const d = new Date(prev); d.setMonth(d.getMonth() + delta); return d; }); }
+  const y = viewMonth.getFullYear(), m = viewMonth.getMonth();
+  const firstDow = new Date(y, m, 1).getDay();
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < firstDow; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  const monthLabel = viewMonth.toLocaleDateString(lang === "he" ? "he-IL" : "en-US", { month: "long", year: "numeric" });
   return (
-    <div className="mt-datefield">
-      <CalendarIcon size={14} />
-      <input type="date" value={value} onChange={onChange}
-        onClick={(e) => { if (e.target.showPicker) { try { e.target.showPicker(); } catch (err) {} } }} />
+    <div style={{ position: "relative" }}>
+      <button ref={refs.setReference} type="button" className="mt-daterange-btn" onClick={toggleOpen}>
+        <CalendarIcon size={14} />
+        <span>{value ? fmtDate(value, lang) : "—"}</span>
+      </button>
+      {open && (
+        <>
+          <div className="mt-floating-backdrop" style={{ zIndex: 190 }} onClick={() => setOpen(false)} />
+          <div ref={refs.setFloating} style={{ ...floatingStyles, zIndex: 200 }} className="mt-floating-menu mt-daterange-cal" dir="ltr">
+            <div className="mt-cal-header">
+              <button type="button" onClick={() => shiftMonth(-1)}><ChevronLeft size={16} /></button>
+              <strong>{monthLabel}</strong>
+              <button type="button" onClick={() => shiftMonth(1)}><ChevronRight size={16} /></button>
+            </div>
+            <div className="mt-cal-grid mt-cal-weekdays">
+              {(lang === "he" ? ["א", "ב", "ג", "ד", "ה", "ו", "ש"] : ["S", "M", "T", "W", "T", "F", "S"]).map((d, i) => <span key={i}>{d}</span>)}
+            </div>
+            <div className="mt-cal-grid">
+              {cells.map((d, i) => {
+                if (!d) return <span key={i} />;
+                const iso = toISO(y, m, d);
+                return (
+                  <button type="button" key={i}
+                    className={"mt-cal-day" + (iso === value ? " edge" : "")}
+                    onClick={() => clickDay(iso)}>{d}</button>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -2010,7 +2063,7 @@ export default function MyTripApp() {
     tripName: "",
     intlFlights: [{ from: "", fromAlias: "", to: "", toAlias: "", depDate: "", retDate: "" }],
     hasDomestic: "", domesticFlights: [{ from: "", fromAlias: "", to: "", toAlias: "", depDate: "", retDate: "", isRoundTrip: false }],
-    hotelCount: 1, hotels: [{ name: "", alias: "", checkIn: "", checkOut: "" }],
+    hotels: [{ name: "", alias: "", checkIn: "", checkOut: "" }],
   };
   const [preWizardOpen, setPreWizardOpen] = useState(false);
   const [preWizardScreen, setPreWizardScreen] = useState(1);
@@ -2236,6 +2289,12 @@ export default function MyTripApp() {
   function addPreWizardDomesticFlight() {
     setPreWizardData((d) => ({ ...d, domesticFlights: [...d.domesticFlights, { from: "", fromAlias: "", to: "", toAlias: "", depDate: "", retDate: "", isRoundTrip: false }] }));
   }
+  function addPreWizardHotel() {
+    setPreWizardData((d) => ({ ...d, hotels: [...d.hotels, { name: "", alias: "", checkIn: "", checkOut: "" }] }));
+  }
+  function removePreWizardHotel(idx) {
+    setPreWizardData((d) => ({ ...d, hotels: d.hotels.length > 1 ? d.hotels.filter((_, i) => i !== idx) : d.hotels }));
+  }
   function removePreWizardDomesticFlight(idx) {
     setPreWizardData((d) => ({ ...d, domesticFlights: d.domesticFlights.length > 1 ? d.domesticFlights.filter((_, i) => i !== idx) : d.domesticFlights }));
   }
@@ -2256,14 +2315,6 @@ export default function MyTripApp() {
     setPreWizardOpen(false);
     setPreWizardScreen(1);
     setPreWizardRefDate("");
-  }
-  function setPreWizardArrayCount(field, countField, template) {
-    const n = Math.max(1, Math.min(20, Number(preWizardData[countField]) || 1));
-    setPreWizardData((d) => {
-      const arr = d[field].slice(0, n);
-      while (arr.length < n) arr.push({ ...template });
-      return { ...d, [field]: arr };
-    });
   }
   function updatePreWizardArrayItem(field, idx, patch) {
     setPreWizardData((d) => {
@@ -3514,11 +3565,11 @@ export default function MyTripApp() {
                 <>
                   <div className="mt-hint">{T.wizardOutboundHint}</div>
                   <div className="mt-field-row">
-                    <div className="mt-field"><label>{T.wizardFlightDate} ({T.wizardOutboundShort})</label><DateField value={aiWizardAnswers.outboundDate} onChange={(e) => setAiWizardAnswers({ ...aiWizardAnswers, outboundDate: e.target.value })} /></div>
+                    <div className="mt-field"><label>{T.wizardFlightDate} ({T.wizardOutboundShort})</label><DateField value={aiWizardAnswers.outboundDate} lang={lang} T={T} onChange={(e) => setAiWizardAnswers({ ...aiWizardAnswers, outboundDate: e.target.value })} /></div>
                     <div className="mt-field"><label>{T.wizardFlightTime}</label><input type="time" value={aiWizardAnswers.outboundTime} onChange={(e) => setAiWizardAnswers({ ...aiWizardAnswers, outboundTime: e.target.value })} /></div>
                   </div>
                   <div className="mt-field-row">
-                    <div className="mt-field"><label>{T.wizardFlightDate} ({T.wizardReturnShort})</label><DateField value={aiWizardAnswers.returnDate} onChange={(e) => setAiWizardAnswers({ ...aiWizardAnswers, returnDate: e.target.value })} /></div>
+                    <div className="mt-field"><label>{T.wizardFlightDate} ({T.wizardReturnShort})</label><DateField value={aiWizardAnswers.returnDate} lang={lang} T={T} onChange={(e) => setAiWizardAnswers({ ...aiWizardAnswers, returnDate: e.target.value })} /></div>
                     <div className="mt-field"><label>{T.wizardFlightTime}</label><input type="time" value={aiWizardAnswers.returnTime} onChange={(e) => setAiWizardAnswers({ ...aiWizardAnswers, returnTime: e.target.value })} /></div>
                   </div>
                   {aiWizardError && <div className="mt-error"><AlertTriangle size={13} /> {T.wizardDateRequired}</div>}
@@ -3703,7 +3754,7 @@ export default function MyTripApp() {
                           ) : (
                             <div className="mt-wizard-qa">
                               <label>{T.date}</label>
-                              <DateField value={f.depDate} onChange={(e) => { updatePreWizardArrayItem("domesticFlights", i, { depDate: e.target.value, retDate: "" }); if (e.target.value) setPreWizardRefDate(e.target.value); }} />
+                              <DateField value={f.depDate} lang={lang} T={T} initialViewMonth={preWizardRefDate} onChange={(e) => { updatePreWizardArrayItem("domesticFlights", i, { depDate: e.target.value, retDate: "" }); if (e.target.value) setPreWizardRefDate(e.target.value); }} />
                             </div>
                           )}
                         </div>
@@ -3716,13 +3767,12 @@ export default function MyTripApp() {
               {preWizardScreen === 3 && (
                 <>
                   <div className="mt-section-label">{T.preWizardScreen3}</div>
-                  <div className="mt-wizard-qa">
-                    <label>{T.preWizardQ6}</label>
-                    <input type="number" min={1} max={20} value={preWizardData.hotelCount} onChange={(e) => { setPreWizardData({ ...preWizardData, hotelCount: e.target.value }); }} onBlur={() => setPreWizardArrayCount("hotels", "hotelCount", { name: "", alias: "", checkIn: "", checkOut: "" })} />
-                  </div>
                   {preWizardData.hotels.map((h, i) => (
                     <div key={i} className="mt-wizard-subgroup">
-                      <div className="mt-section-label">{T.preWizardHotelN.replace("{n}", i + 1)}</div>
+                      <div className="mt-section-label" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span>{T.preWizardHotelN.replace("{n}", i + 1)}</span>
+                        {preWizardData.hotels.length > 1 && <button className="mt-btn ghost" style={{ padding: "2px 6px" }} onClick={() => removePreWizardHotel(i)}><X size={12} /></button>}
+                      </div>
                       <div className="mt-wizard-qa"><label>{T.hotelName}</label><input value={h.name} onChange={(e) => updatePreWizardArrayItem("hotels", i, { name: e.target.value })} /></div>
                       <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={h.alias} onChange={(e) => updatePreWizardArrayItem("hotels", i, { alias: e.target.value })} /></div>
                       <div className="mt-wizard-qa">
@@ -3732,6 +3782,7 @@ export default function MyTripApp() {
                       </div>
                     </div>
                   ))}
+                  <button className="mt-btn ghost" style={{ width: "100%" }} onClick={addPreWizardHotel}><Plus size={13} /> {T.preWizardAddHotel}</button>
                   <div className="divider" />
                   <p className="mt-hint">{T.preWizardSummary}</p>
                 </>
@@ -3781,7 +3832,7 @@ export default function MyTripApp() {
                     </select>
                   </div>
                   <div className="mt-field-row">
-                    <div className="mt-field"><label>{T.addDayDate}</label><DateField value={routeImportDate} onChange={(e) => setRouteImportDate(e.target.value)} /></div>
+                    <div className="mt-field"><label>{T.addDayDate}</label><DateField value={routeImportDate} lang={lang} T={T} onChange={(e) => setRouteImportDate(e.target.value)} /></div>
                     <div className="mt-field"><label>{T.start}</label><input type="time" value={routeImportStartTime} onChange={(e) => setRouteImportStartTime(e.target.value)} /></div>
                   </div>
                 </>
@@ -3853,7 +3904,7 @@ export default function MyTripApp() {
           <div className="mt-modal narrow" onClick={(e) => e.stopPropagation()}>
             <div className="mt-modal-header"><span className="mt-modal-title">{T.addDayModalTitle}</span><button className="mt-btn ghost" onClick={closeAddDayModal}><X size={16} /></button></div>
             <div className="mt-modal-body">
-              <div className="mt-field"><label>{T.addDayDate}</label><DateField value={addDayCtx.date} onChange={(e) => setAddDayCtx({ ...addDayCtx, date: e.target.value })} /></div>
+              <div className="mt-field"><label>{T.addDayDate}</label><DateField value={addDayCtx.date} lang={lang} T={T} onChange={(e) => setAddDayCtx({ ...addDayCtx, date: e.target.value })} /></div>
               {addDayIssue && <div className="mt-error"><AlertTriangle /> {addDayIssue}</div>}
               <div className="mt-field">
                 <label>{T.addDayAutoRecords}</label>
@@ -3973,7 +4024,7 @@ export default function MyTripApp() {
                     ))}
                   </select>
                 </div>
-                <div className="mt-field"><label>תאריך</label><DateField value={cardDraft.date} onChange={(e) => setCardDraft({ ...cardDraft, date: e.target.value })} /></div>
+                <div className="mt-field"><label>תאריך</label><DateField value={cardDraft.date} lang={lang} T={T} onChange={(e) => setCardDraft({ ...cardDraft, date: e.target.value })} /></div>
               </div>
 
               <div className="mt-field-row">
