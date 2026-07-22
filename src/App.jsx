@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "11.18.0";
+const APP_VERSION = "11.20.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1239,7 +1239,7 @@ function FrameInlineDatePicker({ frame, ctx }) {
     <span style={{ position: "relative" }}>
       <button ref={refs.setReference} type="button" className="mt-frame-date-inline mt-frame-date-btn" onClick={openPicker}>
         <CalendarIcon size={13} />
-        <span>{dayCount > 0 ? `${formatDayCount(dayCount, lang)} · ` : ""}{fmtDate(frame.startDate, lang)} – {fmtDate(frame.endDate, lang)}</span>
+        <span>{dayCount > 0 ? `${formatDayCount(dayCount, lang)} · ` : ""}<span dir="ltr">{fmtDate(frame.startDate, lang)} – {fmtDate(frame.endDate, lang)}</span></span>
       </button>
       {open && (
         <>
@@ -1640,6 +1640,7 @@ function DayGroup({ g, fid, depth, ctx }) {
   const { T, lang, effectiveMobile, viewMode, collapsedGroups, setCollapsedGroups, collapsedParents, setCollapsedParents,
     addRow, openCard, types, visibleColumns, openAddDayModal, rows, sortDayByTime, getColWidth, startResize, dragDayKey, setDragDayKey, dragId, openHotelInfo } = ctx;
   const gk = (fid || "root") + "__" + g.date;
+  const isToday = g.date === toLocalISODate(new Date());
   const { attributes: dayDragAttrs, listeners: dayDragListeners, setNodeRef: setDayDragNodeRef } = useDraggable({ id: "day:" + gk, data: { type: "day", gk } });
   const collapsed = !!collapsedGroups[gk];
   const childrenOf = (pid) => childrenOfPure(rows, pid);
@@ -1648,7 +1649,7 @@ function DayGroup({ g, fid, depth, ctx }) {
   const chronoOk = isChronological(g.rows);
 
   return (
-    <div className="mt-group">
+    <div className={"mt-group" + (isToday ? " mt-group-today" : "")}>
       <div className={"mt-group-header" + (dragDayKey === gk ? " dragging" : "")} onClick={() => setCollapsedGroups((p) => ({ ...p, [gk]: !p[gk] }))}>
         <span className="mt-day-drag-handle" title={T.dragDayHint} ref={setDayDragNodeRef} onClick={(e) => e.stopPropagation()}
           {...dayDragListeners} {...dayDragAttrs}><GripVertical size={13} /></span>
@@ -2803,6 +2804,9 @@ export default function MyTripApp() {
       if (a.type !== b.type) return a.type === "day" ? -1 : 1; // same date: existing day records render before a same-dated frame
       return 0;
     });
+    const todayStr = toLocalISODate(new Date());
+    const todayIdx = nodes.findIndex((n) => n.type === "day" && n.group.date === todayStr);
+    if (todayIdx > 0) { const [todayNode] = nodes.splice(todayIdx, 1); nodes.unshift(todayNode); }
 
     if (nodes.length === 0) {
       return (
@@ -2920,6 +2924,7 @@ export default function MyTripApp() {
         .mt-frame-body { padding:2px 8px 12px 8px; }
         .mt-frame-add-row { margin-top:10px; padding:6px 4px; }
         .mt-group { margin-top:14px; }
+        .mt-group-today { border:2px solid var(--teal); border-radius:12px; padding:8px; background:var(--teal-tint); }
         .mt-group-header { display:flex; align-items:center; gap:7px; padding:6px 4px; cursor:pointer; user-select:none; flex-wrap:wrap; }
         .mt-day-badge { display:flex; flex-direction:column; align-items:center; border-radius:8px; overflow:hidden; flex-shrink:0; width:42px; margin-inline-start:auto; box-shadow:0 1px 3px rgba(0,0,0,.15); }
         .mt-day-badge-top { background:var(--teal); width:100%; height:8px; flex-shrink:0; }
