@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "13.7.0";
+const APP_VERSION = "13.8.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -132,6 +132,7 @@ const T_DICT = {
     totalPerCurrency: "סה״כ טיול", timeError: "שעת סיום לפני שעת ההתחלה — סמן \"חוצה חצות\" אם מדובר בלילה",
     noRows: "אין עדיין רשומות כאן", dragHint: "גרירה לשינוי סדר", mockNote: "*הדמיית התחברות בלבד בפרוטוטייפ",
     frameModalNew: "מסגרת טיול חדשה", frameModalEdit: "עריכת מסגרת", frameName: "שם המסגרת",
+    frameTypeLabel: "סוג מסגרת", frameTypeBasic: "בסיסית", frameTypeTrip: "טיול", frameTypeFlight: "טיסה", frameTypeHotel: "מלון",
     frameStart: "תאריך התחלה", frameEnd: "תאריך סיום", frameDateRange: "טווח תאריכים", parentFrame: "שייכת למסגרת",
     addSubFrame: "הוסף מסגרת-משנה", suggestPrefix: "זוהו", suggestMid: "טיסות ללא מסגרת:", moreOptions: "עוד אפשרויות", editFrame: "ערוך מסגרת",
     fillDatesAbove: "הוסף מסגרת מעל התאריך הקיים", fillDatesBelow: "הוסף מסגרת מתחת לתאריך הקיים",
@@ -188,7 +189,7 @@ const T_DICT = {
     preWizardQ1: "מהם יעדי הטיול?", preWizardQ2: "כמה טיסות בינלאומיות מתוכננות?",
     preWizardQ4: "האם מתוכננות טיסות פנים?", preWizardQ5: "כמה טיסות פנים מתוכננות?", preWizardQ6: "בין כמה מקומות לינה תדלגו?",
     preWizardFlightN: "טיסה {n}", preWizardHotelN: "מלון {n}", preWizardFlightDates: "תאריכי טיסה (הלוך – חזור)",
-    preWizardDefineIntlFlights: "הגדר טיסות בינלאומיות", preWizardRoundTrip: "טיסת הלוך וחזור",
+    preWizardDefineIntlFlights: "הגדר טיסות בינלאומיות", preWizardDefineDomesticFlights: "הגדר טיסות פנים", preWizardRoundTrip: "טיסת הלוך וחזור",
     preWizardAddFlight: "הוסף טיסה", preWizardAddHotel: "הוסף מלון",
     preWizardSummary: "מוכן! בלחיצה על \"צור טיול\" ניצור עבורך מסגרת ראשית, מסגרת לטיסות הבינלאומיות, ומסגרת נפרדת לכל מלון — עם כל הרשומות ממוקמות לפי התאריכים שהזנת.",
     intlFlightsFrameName: "טיסות בינלאומיות", hotelFrameNameFallback: "מלון",
@@ -262,6 +263,7 @@ const T_DICT = {
     totalPerCurrency: "Trip total", timeError: "End time is before start time — check \"crosses midnight\" for overnight legs",
     noRows: "No records here yet", dragHint: "Drag to reorder", mockNote: "*Sign-in is a prototype mock only",
     frameModalNew: "New trip frame", frameModalEdit: "Edit frame", frameName: "Frame name",
+    frameTypeLabel: "Frame type", frameTypeBasic: "Basic", frameTypeTrip: "Trip", frameTypeFlight: "Flight", frameTypeHotel: "Hotel",
     frameStart: "Start date", frameEnd: "End date", frameDateRange: "Date range", parentFrame: "Belongs to frame",
     addSubFrame: "Add sub-frame", suggestPrefix: "Found", suggestMid: "flights without a frame:", moreOptions: "More options", editFrame: "Edit frame",
     fillDatesAbove: "Add frame above the existing date", fillDatesBelow: "Add frame below the existing date",
@@ -318,7 +320,7 @@ const T_DICT = {
     preWizardQ1: "What are the trip's destinations?", preWizardQ2: "How many international flights are planned?",
     preWizardQ4: "Are domestic flights planned?", preWizardQ5: "How many domestic flights are planned?", preWizardQ6: "How many lodging places will you hop between?",
     preWizardFlightN: "Flight {n}", preWizardHotelN: "Hotel {n}", preWizardFlightDates: "Flight dates (there – back)",
-    preWizardDefineIntlFlights: "Define international flights", preWizardRoundTrip: "Round-trip flight",
+    preWizardDefineIntlFlights: "Define international flights", preWizardDefineDomesticFlights: "Define domestic flights", preWizardRoundTrip: "Round-trip flight",
     preWizardAddFlight: "Add flight", preWizardAddHotel: "Add hotel",
     preWizardSummary: "Ready! Clicking \"Create trip\" will create a main frame, a frame for international flights, and a separate frame for each hotel — with all records placed according to the dates you entered.",
     intlFlightsFrameName: "International Flights", hotelFrameNameFallback: "Hotel",
@@ -1882,7 +1884,7 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
   const menuFloating = useFloatingMenu(isMenuOpen, (open) => setFrameMenuOpenId(open ? frame.id : null));
   const { setNodeRef: setFrameDropRef, isOver: isFrameOver } = useDroppable({ id: "frame:" + frame.id, data: { type: "frame", fid: frame.id } });
   const dayCount = frame.startDate && frame.endDate ? Math.round((new Date(frame.endDate + "T00:00:00") - new Date(frame.startDate + "T00:00:00")) / 86400000) + 1 : 0;
-  const effectiveFrameType = frame.frameType || (!frame.parentFrameId ? "trip" : (rows.some((r) => r.frameId === frame.id && r.typeId === "hotel") ? "hotel" : null));
+  const effectiveFrameType = frame.frameType === "basic" ? null : (frame.frameType || (!frame.parentFrameId ? "trip" : (rows.some((r) => r.frameId === frame.id && r.typeId === "hotel") ? "hotel" : null)));
   const hotelRowWithPlace = effectiveFrameType === "hotel" ? rows.find((r) => r.frameId === frame.id && r.typeId === "hotel" && (r.fromPlaceId || r.toPlaceId)) : null;
   return (
     <div className="mt-frame-block" style={{ "--frame-color": color }}>
@@ -1893,6 +1895,8 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
               <span className="chev">{frame.collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}</span>
               {effectiveFrameType === "trip" ? (
                 <span className="mt-frame-type-icon"><Plane size={15} /></span>
+              ) : effectiveFrameType === "flight" ? (
+                <span className="mt-frame-type-icon"><PlaneTakeoff size={15} /></span>
               ) : (
                 <button className="mt-frame-type-icon mt-frame-type-icon-btn" onClick={(e) => { e.stopPropagation(); if (hotelRowWithPlace) openHotelInfo(hotelRowWithPlace); }} title={hotelRowWithPlace ? T.placeInfo : undefined}><BedDouble size={15} /></button>
               )}
@@ -2346,7 +2350,7 @@ export default function MyTripApp() {
     setAiWizardAnswers(AI_WIZARD_DEFAULTS);
   }
   function preWizardNext() {
-    setPreWizardScreen((s) => Math.min(3, s + 1));
+    setPreWizardScreen((s) => Math.min(4, s + 1));
   }
   function preWizardBack() {
     setPreWizardScreen((s) => Math.max(1, s - 1));
@@ -3032,7 +3036,7 @@ export default function MyTripApp() {
 
   /* ---------- frame modal ---------- */
   function openFrameModal(frame, presetParentId) {
-    setFrameDraft(frame ? { ...frame } : { id: null, name: "", startDate: "", endDate: "", parentFrameId: presetParentId || null, collapsed: false });
+    setFrameDraft(frame ? { ...frame } : { id: null, name: "", startDate: "", endDate: "", parentFrameId: presetParentId || null, collapsed: false, frameType: "basic" });
   }
   function closeFrameModal() { setFrameDraft(null); }
   function fillFrameDatesBelow() {
@@ -3798,7 +3802,7 @@ export default function MyTripApp() {
         <div className="mt-modal-backdrop" onClick={closePreWizard}>
           <div className="mt-modal" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
             <div className="mt-modal-header"><span className="mt-modal-title">{T.preWizardTitle}</span><button className="mt-btn ghost" onClick={closePreWizard}><X size={16} /></button></div>
-            <div className="mt-wizard-progress"><div className="mt-wizard-progress-bar" style={{ width: `${(preWizardScreen / 3) * 100}%` }} /></div>
+            <div className="mt-wizard-progress"><div className="mt-wizard-progress-bar" style={{ width: `${(preWizardScreen / 4) * 100}%` }} /></div>
             <div className="mt-hint" style={{ padding: "6px 18px 0" }}>{T.wizardStepOf.replace("{n}", preWizardScreen).replace("{total}", 3)}</div>
             <div className="mt-modal-body">
               {preWizardScreen === 1 && (
@@ -3831,7 +3835,11 @@ export default function MyTripApp() {
                     </div>
                   ))}
                   <button className="mt-btn ghost" style={{ width: "100%" }} onClick={addPreWizardIntlFlight}><Plus size={13} /> {T.preWizardAddFlight}</button>
-                  <div className="divider" />
+                </>
+              )}
+              {preWizardScreen === 3 && (
+                <>
+                  <div className="mt-section-label">{T.preWizardDefineDomesticFlights}</div>
                   <div className="mt-wizard-qa">
                     <label>{T.preWizardQ4}</label>
                     <div className="mt-wizard-choices">
@@ -3871,7 +3879,7 @@ export default function MyTripApp() {
                   )}
                 </>
               )}
-              {preWizardScreen === 3 && (
+              {preWizardScreen === 4 && (
                 <>
                   <div className="mt-section-label">{T.preWizardScreen3}</div>
                   {preWizardData.hotels.map((h, i) => (
@@ -3898,7 +3906,7 @@ export default function MyTripApp() {
             <div className="mt-modal-footer">
               {preWizardScreen === 1 && <button className="mt-btn ghost" onClick={closePreWizard}>{T.skip}</button>}
               {preWizardScreen > 1 && <button className="mt-btn ghost" onClick={preWizardBack}>{T.wizardBack}</button>}
-              {preWizardScreen < 3 ? (
+              {preWizardScreen < 4 ? (
                 <button className="mt-btn primary" onClick={preWizardNext}>{T.wizardNext}</button>
               ) : (
                 <button className="mt-btn primary" onClick={confirmPreWizard}><Check size={13} /> {T.wizardCreate}</button>
@@ -4358,6 +4366,15 @@ export default function MyTripApp() {
               <button className="mt-btn ghost" onClick={closeFrameModal}><X size={16} /></button>
             </div>
             <div className="mt-modal-body">
+              <div className="mt-field">
+                <label>{T.frameTypeLabel}</label>
+                <div className="mt-wizard-choices">
+                  <button className={"mt-wizard-choice" + (frameDraft.frameType === "basic" || !frameDraft.frameType ? " selected" : "")} onClick={() => setFrameDraft({ ...frameDraft, frameType: "basic" })}>{T.frameTypeBasic}</button>
+                  <button className={"mt-wizard-choice" + (frameDraft.frameType === "trip" ? " selected" : "")} onClick={() => setFrameDraft({ ...frameDraft, frameType: "trip" })}>{T.frameTypeTrip}</button>
+                  <button className={"mt-wizard-choice" + (frameDraft.frameType === "flight" ? " selected" : "")} onClick={() => setFrameDraft({ ...frameDraft, frameType: "flight" })}>{T.frameTypeFlight}</button>
+                  <button className={"mt-wizard-choice" + (frameDraft.frameType === "hotel" ? " selected" : "")} onClick={() => setFrameDraft({ ...frameDraft, frameType: "hotel" })}>{T.frameTypeHotel}</button>
+                </div>
+              </div>
               <div className="mt-field">
                 <label>{T.parentFrame}</label>
                 <select value={frameDraft.parentFrameId || ""} onChange={(e) => setFrameDraft({ ...frameDraft, parentFrameId: e.target.value || null })}>
