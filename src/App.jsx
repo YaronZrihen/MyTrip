@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "13.1.0";
+const APP_VERSION = "13.3.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -139,7 +139,7 @@ const T_DICT = {
     frameRangeContent: "טווח התאריכים חייב לכלול את כל הרשומות/תת-המסגרות שכבר קיימות במסגרת זו",
     frameRangeParent: "טווח התאריכים חייב להיות בתוך טווח המסגרת המכילה",
     rowOutOfFrame: "התאריך חייב להיות בתוך טווח המסגרת שאליה הרשומה משויכת",
-    routeTooltip: "פתח מסלול בגוגל מפות", dayRoute: "מסלול", addDayShort: "+ יום", noRoute: "אין מספיק נתוני מיקום",
+    routeTooltip: "פתח מסלול בגוגל מפות", dayRoute: "מסלול", addDayShort: "יום", addRowShort: "רשומה", noRoute: "אין מספיק נתוני מיקום",
     fetchFlightData: "משוך נתונים לפי מספר טיסה", flightApiMissing: "לצורך משיכה אוטומטית יש לחבר ספק נתוני טיסות (כגון AeroDataBox) עם מפתח API ופרוקסי בצד השרת. שדה זה מוכן לחיבור עתידי.",
     flightNoNumber: "יש להזין מספר טיסה קודם.", flightLookupLoading: "מחפש נתוני טיסה...", flightLookupError: "לא נמצאו נתונים לטיסה זו, או שהחיבור לשרת נכשל.", flightLookupSuccess: "נתוני הטיסה עודכנו.",
     flightAlreadyLookedUp: "כבר נמשכו נתונים לטיסה זו. שנה את מספר הטיסה כדי לבצע בדיקה חדשה.",
@@ -267,7 +267,7 @@ const T_DICT = {
     frameRangeContent: "The date range must cover all records/sub-frames already inside this frame",
     frameRangeParent: "The date range must fit inside the containing frame's range",
     rowOutOfFrame: "The date must fall inside the frame this record belongs to",
-    routeTooltip: "Open route in Google Maps", dayRoute: "Route", addDayShort: "+ Day", noRoute: "Not enough location data",
+    routeTooltip: "Open route in Google Maps", dayRoute: "Route", addDayShort: "Day", addRowShort: "Record", noRoute: "Not enough location data",
     fetchFlightData: "Fetch data by flight number", flightApiMissing: "Live lookup needs a flight-data provider (e.g. AeroDataBox) with an API key and a server-side proxy. This field is ready to be wired up later.",
     flightNoNumber: "Enter a flight number first.", flightLookupLoading: "Looking up flight data...", flightLookupError: "No data found for this flight, or the server connection failed.", flightLookupSuccess: "Flight data updated.",
     flightAlreadyLookedUp: "Data was already fetched for this flight. Change the flight number to look up again.",
@@ -1754,13 +1754,13 @@ function DayGroup({ g, fid, depth, ctx }) {
             <MobileRowCard key={r.id} r={r} prevRow={ri > 0 ? allRowsHere[ri - 1] : null} types={types} lang={lang} T={T} ctx={ctx} />
           ))}
           <div className="mt-group-footer-actions">
+            <button className="mt-group-add" onClick={() => addRow(g.date, null, fid)}><Plus size={13} /> {T.addRowShort}</button>
+            <button className="mt-group-add" onClick={() => openAddDayModal(fid, g.date)}><Plus size={13} /> {T.addDayShort}</button>
             {dayRoute ? (
               <a className="mt-group-add" href={dayRoute} target="_blank" rel="noreferrer"><Waypoints size={13} /> {T.dayRoute}</a>
             ) : (
               <span className="mt-group-add disabled" title={T.noRoute}><Waypoints size={13} /> {T.dayRoute}</span>
             )}
-            <button className="mt-group-add" onClick={() => openAddDayModal(fid, g.date)}>{T.addDayShort}</button>
-            <button className="mt-group-add" onClick={() => addRow(g.date, null, fid)}><Plus size={13} /> {T.addRow}</button>
           </div>
         </div>
       ) : (
@@ -1801,13 +1801,13 @@ function DayGroup({ g, fid, depth, ctx }) {
             </tbody>
           </table>
           <div className="mt-group-footer-actions">
+            <button className="mt-group-add" onClick={() => addRow(g.date, null, fid)}><Plus size={13} /> {T.addRowShort}</button>
+            <button className="mt-group-add" onClick={() => openAddDayModal(fid, g.date)}><Plus size={13} /> {T.addDayShort}</button>
             {dayRoute ? (
               <a className="mt-group-add" href={dayRoute} target="_blank" rel="noreferrer"><Waypoints size={13} /> {T.dayRoute}</a>
             ) : (
               <span className="mt-group-add disabled" title={T.noRoute}><Waypoints size={13} /> {T.dayRoute}</span>
             )}
-            <button className="mt-group-add" onClick={() => openAddDayModal(fid, g.date)}>{T.addDayShort}</button>
-            <button className="mt-group-add" onClick={() => addRow(g.date, null, fid)}><Plus size={13} /> {T.addRow}</button>
           </div>
         </div>
       ))}
@@ -1878,14 +1878,15 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
   const menuFloating = useFloatingMenu(isMenuOpen, (open) => setFrameMenuOpenId(open ? frame.id : null));
   const { setNodeRef: setFrameDropRef, isOver: isFrameOver } = useDroppable({ id: "frame:" + frame.id, data: { type: "frame", fid: frame.id } });
   const dayCount = frame.startDate && frame.endDate ? Math.round((new Date(frame.endDate + "T00:00:00") - new Date(frame.startDate + "T00:00:00")) / 86400000) + 1 : 0;
-  const hotelRowWithPlace = frame.frameType === "hotel" ? rows.find((r) => r.frameId === frame.id && r.typeId === "hotel" && (r.fromPlaceId || r.toPlaceId)) : null;
+  const effectiveFrameType = frame.frameType || (!frame.parentFrameId ? "trip" : (rows.some((r) => r.frameId === frame.id && r.typeId === "hotel") ? "hotel" : null));
+  const hotelRowWithPlace = effectiveFrameType === "hotel" ? rows.find((r) => r.frameId === frame.id && r.typeId === "hotel" && (r.fromPlaceId || r.toPlaceId)) : null;
   return (
     <div className="mt-frame-block" style={{ "--frame-color": color }}>
-      <div ref={setFrameDropRef} className={"mt-frame-header" + (dragDayKey ? " droppable" : "") + (isFrameOver ? " mt-drop-hover" : "") + (frame.frameType ? " mt-frame-header-special" : "")} onClick={() => toggleFrameCollapse(frame.id)}>
-        {frame.frameType ? (
+      <div ref={setFrameDropRef} className={"mt-frame-header" + (dragDayKey ? " droppable" : "") + (isFrameOver ? " mt-drop-hover" : "") + (effectiveFrameType ? " mt-frame-header-special" : "")} onClick={() => toggleFrameCollapse(frame.id)}>
+        {effectiveFrameType ? (
           <div className="mt-frame-header-top">
             <span className="chev">{frame.collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}</span>
-            {frame.frameType === "trip" ? (
+            {effectiveFrameType === "trip" ? (
               <span className="mt-frame-type-icon"><Plane size={15} /></span>
             ) : (
               <button className="mt-frame-type-icon mt-frame-type-icon-btn" onClick={(e) => { e.stopPropagation(); if (hotelRowWithPlace) openHotelInfo(hotelRowWithPlace); }} title={hotelRowWithPlace ? T.placeInfo : undefined}><BedDouble size={15} /></button>
@@ -2107,10 +2108,22 @@ export default function MyTripApp() {
   const [aiWizardAnswers, setAiWizardAnswers] = useState(AI_WIZARD_DEFAULTS);
   const [aiWizardError, setAiWizardError] = useState(false);
   const PRE_WIZARD_DEFAULTS = {
-    tripName: "",
-    intlFlights: [{ from: "", fromAlias: "", to: "", toAlias: "", depDate: "", retDate: "" }],
-    hasDomestic: "", domesticFlights: [{ from: "", fromAlias: "", to: "", toAlias: "", depDate: "", retDate: "", isRoundTrip: false }],
-    hotels: [{ name: "", alias: "", checkIn: "", checkOut: "" }],
+    tripName: "טיול מקיף תאילנד",
+    intlFlights: [{ from: "תל אביב", fromAlias: "", to: "בנגקוק", toAlias: "", depDate: "2026-08-01", retDate: "2026-08-31" }],
+    hasDomestic: "yes",
+    domesticFlights: [
+      { from: "בנגקוק", fromAlias: "", to: "קוסמוי", toAlias: "", depDate: "2026-08-09", retDate: "", isRoundTrip: false },
+      { from: "קוסמוי", fromAlias: "", to: "פוקט", toAlias: "", depDate: "2026-08-16", retDate: "", isRoundTrip: false },
+      { from: "פוקט", fromAlias: "", to: "בנגקוק", toAlias: "", depDate: "2026-08-23", retDate: "", isRoundTrip: false },
+    ],
+    hotels: [
+      { name: "מלון בצ'אנג מאי", alias: "", checkIn: "2026-08-01", checkOut: "2026-08-09" },
+      { name: "מלון בקוסמוי", alias: "", checkIn: "2026-08-09", checkOut: "2026-08-14" },
+      { name: "מלון בקופנגאן", alias: "", checkIn: "2026-08-14", checkOut: "2026-08-16" },
+      { name: "מלון בפוקט", alias: "", checkIn: "2026-08-16", checkOut: "2026-08-23" },
+      { name: "מלון בקנצ'נבורי", alias: "", checkIn: "2026-08-23", checkOut: "2026-08-27" },
+      { name: "מלון בבנגקוק", alias: "", checkIn: "2026-08-27", checkOut: "2026-08-31" },
+    ],
   };
   const [preWizardOpen, setPreWizardOpen] = useState(false);
   const [preWizardScreen, setPreWizardScreen] = useState(1);
@@ -2349,7 +2362,7 @@ export default function MyTripApp() {
   function openPreWizard() {
     setPreWizardData(PRE_WIZARD_DEFAULTS);
     setPreWizardScreen(1);
-    setPreWizardRefDate("");
+    setPreWizardRefDate(PRE_WIZARD_DEFAULTS.intlFlights[0].depDate || "");
     setPreWizardOpen(true);
   }
   function openEditTripDetails() {
@@ -3155,7 +3168,7 @@ export default function MyTripApp() {
         .mt-frame-date-badge .mt-day-badge-top { height:6px; }
         .mt-frame-date-badge .mt-day-badge-body { padding:2px 0; }
         .mt-frame-name { font-weight:700; font-size:15px; font-family:'Frank Ruhl Libre',serif; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:24px; flex-shrink:1; }
-        .mt-frame-date-inline { font-size:12.5px; font-weight:600; color:var(--muted); font-family:'Heebo',sans-serif; white-space:nowrap; flex-shrink:0; font-variant-numeric:tabular-nums; display:flex; align-items:center; gap:5px; }
+        .mt-frame-date-inline { font-size:12.5px; font-weight:600; color:var(--muted); font-family:'Frank Ruhl Libre',serif; white-space:nowrap; flex-shrink:0; font-variant-numeric:tabular-nums; display:flex; align-items:center; gap:5px; }
         .mt-frame-date-btn { border:none; background:none; padding:0; cursor:pointer; display:flex; align-items:center; gap:5px; color:inherit; }
         .mt-frame-date-btn:hover { color:var(--teal-dark); text-decoration:underline; }
         .mt-frame-cost-inline { font-size:12.5px; font-weight:700; color:var(--amber); white-space:nowrap; flex-shrink:0; }
