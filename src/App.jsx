@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "13.5.0";
+const APP_VERSION = "13.7.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -118,6 +118,8 @@ const T_DICT = {
     login: "התחברות עם Google", logout: "יציאה",
     desktop: "מחשב", mobile: "סלולר", flowView: "תצוגת זרימה", lang: "English", editRecord: "כרטיס רשומה",
     save: "שמירה", cancel: "ביטול", delete: "מחיקה", addSub: "הוסף תת-רשומה",
+    deleteFrameTitle: "מחיקת מסגרת", deleteFrameHint: "איך למחוק את המסגרת?",
+    deleteFrameOnly: "מחק מסגרת בלבד (התוכן יעבור למסגרת האם)", deleteFrameWithContent: "מחק מסגרת ואת כל התוכן שבתוכה",
     type: "סוג", from: "מוצא", to: "יעד", start: "בשעה", end: "עד שעה", overnight: "חוצה חצות",
     requiresTicket: "דורש רכישת כרטיס כניסה", calcRoute: "חשב מסלול",
     routeErrNoOrigin: "אין מוצא זמין לחישוב (גם לא ברשומה הקודמת)", routeErrNoDest: "אין יעד ברשומה זו",
@@ -177,7 +179,7 @@ const T_DICT = {
     placeOpenNow: "פתוח", placeClosedNow: "סגור", placeWebsite: "אתר", placeCall: "התקשר",
     googleUiKitError: "טעינת מידע Google נכשלה. ודא ש-Maps JavaScript API מופעל ומורשה במפתח.", notLinkedToGoogle: "הרשומה עדיין לא מאומתת מול Google — לחץ על סמל האימות בשדה המיקום.",
     tripScheduleCheck: "בדיקת התאמה למועד הטיול",
-    newFrameWizard: "מסגרת חדשה עם שאלון",
+    newFrameWizard: "מסגרת חדשה עם שאלון", tripWizard: "אשף הטיול", tripWizardActivateAi: "האם להפעיל עוזר AI לתכנון הטיול?",
     wizardTitle: "שאלון תכנון טיול", wizardStepOf: "שלב {n} מתוך {total}",
     wizardTripName: "שם הטיול", wizardTripNameHint: "לדוגמה: הטיול המשפחתי לאיטליה",
     hotelName: "שם המלון", aliasLabel: "כינוי", date: "תאריך", checkIn: "צ'ק-אין", checkOut: "צ'ק-אאוט",
@@ -246,6 +248,8 @@ const T_DICT = {
     login: "Sign in with Google", logout: "Sign out",
     desktop: "Desktop", mobile: "Mobile", flowView: "Flow view", lang: "עברית", editRecord: "Record card",
     save: "Save", cancel: "Cancel", delete: "Delete", addSub: "Add sub-record",
+    deleteFrameTitle: "Delete Frame", deleteFrameHint: "How would you like to delete this frame?",
+    deleteFrameOnly: "Delete frame only (content moves to parent)", deleteFrameWithContent: "Delete frame and all its content",
     type: "Type", from: "Origin", to: "Destination", start: "At", end: "Until", overnight: "Crosses midnight",
     requiresTicket: "Requires entrance ticket", calcRoute: "Calculate route",
     routeErrNoOrigin: "No origin available for calculation (not even from the previous record)", routeErrNoDest: "This record has no destination",
@@ -305,7 +309,7 @@ const T_DICT = {
     placeOpenNow: "Open", placeClosedNow: "Closed", placeWebsite: "Website", placeCall: "Call",
     googleUiKitError: "Failed to load Google info. Make sure the Maps JavaScript API is enabled and allowed on your key.", notLinkedToGoogle: "This record isn't verified against Google yet — click the verify icon on the location field.",
     tripScheduleCheck: "Trip-schedule check",
-    newFrameWizard: "New frame via questionnaire",
+    newFrameWizard: "New frame via questionnaire", tripWizard: "Trip Wizard", tripWizardActivateAi: "Activate the AI assistant for trip planning?",
     wizardTitle: "Trip planning questionnaire", wizardStepOf: "Step {n} of {total}",
     wizardTripName: "Trip name", wizardTripNameHint: "e.g. Our family trip to Italy",
     hotelName: "Hotel name", aliasLabel: "Nickname", date: "Date", checkIn: "Check-in", checkOut: "Check-out",
@@ -1870,7 +1874,7 @@ function FrameDateBadge({ date, lang }) {
 }
 
 function FrameBlock({ frame, depth, ctx, renderContext }) {
-  const { T, lang, toggleFrameCollapse, openFrameModal, deleteFrame, openAddDayModal, addRow, lastDateInContext, frameTotals, displayCurrency, convertAmount, frameMenuOpenId, setFrameMenuOpenId, onDropDay, dragDayKey, rows, frames, openHotelInfo } = ctx;
+  const { T, lang, toggleFrameCollapse, openFrameModal, setDeleteFrameConfirmId, openAddDayModal, addRow, lastDateInContext, frameTotals, displayCurrency, convertAmount, frameMenuOpenId, setFrameMenuOpenId, onDropDay, dragDayKey, rows, frames, openHotelInfo } = ctx;
   const totals = frameTotals(frame.id);
   const convertedTotal = Object.entries(totals).reduce((sum, [cur, amt]) => sum + convertAmount(amt, cur, displayCurrency), 0);
   const color = FRAME_COLORS[depth % FRAME_COLORS.length];
@@ -1884,28 +1888,32 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
     <div className="mt-frame-block" style={{ "--frame-color": color }}>
       <div ref={setFrameDropRef} className={"mt-frame-header" + (dragDayKey ? " droppable" : "") + (isFrameOver ? " mt-drop-hover" : "") + (effectiveFrameType ? " mt-frame-header-special" : "")} onClick={() => toggleFrameCollapse(frame.id)}>
         {effectiveFrameType ? (
-          <div className="mt-frame-header-top">
-            <span className="chev">{frame.collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}</span>
-            {effectiveFrameType === "trip" ? (
-              <span className="mt-frame-type-icon"><Plane size={15} /></span>
-            ) : (
-              <button className="mt-frame-type-icon mt-frame-type-icon-btn" onClick={(e) => { e.stopPropagation(); if (hotelRowWithPlace) openHotelInfo(hotelRowWithPlace); }} title={hotelRowWithPlace ? T.placeInfo : undefined}><BedDouble size={15} /></button>
-            )}
-            <span className="mt-frame-name-col">
-              <span className="mt-frame-name">{frame.name}</span>
-              {dayCount > 0 && <span className="mt-frame-daycount">{formatDayCount(dayCount, lang)}</span>}
-            </span>
-            {convertedTotal > 0 && (
-              <span className="mt-frame-cost-inline">{displayCurrency} {convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-            )}
-            <span className="mt-frame-date-cluster" dir="ltr">
-              <FrameDateBadge date={frame.startDate} lang={lang} />
-              <ArrowRight size={14} className="mt-frame-date-arrow" />
-              <FrameDateBadge date={frame.endDate} lang={lang} />
-            </span>
-            <span className="mt-frame-actions mt-frame-actions-pinned" onClick={(e) => e.stopPropagation()}>
-              <button ref={menuFloating.refs.setReference} {...menuFloating.getReferenceProps()} title={T.moreOptions}><MoreVertical size={16} /></button>
-            </span>
+          <div className="mt-frame-header-top mt-frame-header-top-grouped">
+            <div className="mt-frame-header-start">
+              <span className="chev">{frame.collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}</span>
+              {effectiveFrameType === "trip" ? (
+                <span className="mt-frame-type-icon"><Plane size={15} /></span>
+              ) : (
+                <button className="mt-frame-type-icon mt-frame-type-icon-btn" onClick={(e) => { e.stopPropagation(); if (hotelRowWithPlace) openHotelInfo(hotelRowWithPlace); }} title={hotelRowWithPlace ? T.placeInfo : undefined}><BedDouble size={15} /></button>
+              )}
+              <span className="mt-frame-name-col">
+                <span className="mt-frame-name">{frame.name}</span>
+                {dayCount > 0 && <span className="mt-frame-daycount">{formatDayCount(dayCount, lang)}</span>}
+              </span>
+              {convertedTotal > 0 && (
+                <span className="mt-frame-cost-inline">{displayCurrency} {convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+              )}
+            </div>
+            <div className="mt-frame-header-end">
+              <span className="mt-frame-date-cluster" dir="ltr">
+                <FrameDateBadge date={frame.startDate} lang={lang} />
+                <ArrowRight size={14} className="mt-frame-date-arrow" />
+                <FrameDateBadge date={frame.endDate} lang={lang} />
+              </span>
+              <span className="mt-frame-actions" onClick={(e) => e.stopPropagation()}>
+                <button ref={menuFloating.refs.setReference} {...menuFloating.getReferenceProps()} title={T.moreOptions}><MoreVertical size={16} /></button>
+              </span>
+            </div>
           </div>
         ) : (
           <>
@@ -1940,7 +1948,7 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
               ) : <span className="mt-share-opt disabled"><Waypoints size={14} /> {T.showOverallRoute}</span>;
             })()}
             <div className="divider" />
-            <button className="mt-share-opt" style={{ color: "var(--danger)" }} onClick={() => { deleteFrame(frame.id); setFrameMenuOpenId(null); }}><Trash2 size={14} /> {T.delete}</button>
+            <button className="mt-share-opt" style={{ color: "var(--danger)" }} onClick={() => { setDeleteFrameConfirmId(frame.id); setFrameMenuOpenId(null); }}><Trash2 size={14} /> {T.delete}</button>
         </div>
       )}
       {!frame.collapsed && (
@@ -2133,6 +2141,8 @@ export default function MyTripApp() {
   const [preWizardCreatedIds, setPreWizardCreatedIds] = useState(null);
   const [frameMenuOpenId, setFrameMenuOpenId] = useState(null);
   const [frameDraft, setFrameDraft] = useState(null);
+  const [deleteFrameConfirmId, setDeleteFrameConfirmId] = useState(null);
+  const [tripWizardChoiceOpen, setTripWizardChoiceOpen] = useState(false);
   const [addDayCtx, setAddDayCtx] = useState(null); // { fid, date }
   const [locPicker, setLocPicker] = useState(null); // { field, query, results, loading }
   const [dragId, setDragId] = useState(null);
@@ -3042,10 +3052,22 @@ export default function MyTripApp() {
     else setFrames((prev) => [...prev, { ...frameDraft, id: uid() }]);
     closeFrameModal();
   }
-  function deleteFrame(id) {
+  function deleteFrameOnly(id) {
     const f = frames.find((x) => x.id === id);
     setFrames((prev) => prev.filter((x) => x.id !== id).map((x) => (x.parentFrameId === id ? { ...x, parentFrameId: f.parentFrameId } : x)));
     setRows((prev) => prev.map((r) => (r.frameId === id ? { ...r, frameId: f.parentFrameId } : r)));
+  }
+  function deleteFrameWithContent(id) {
+    const idsToDelete = new Set([id]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      frames.forEach((f) => {
+        if (f.parentFrameId && idsToDelete.has(f.parentFrameId) && !idsToDelete.has(f.id)) { idsToDelete.add(f.id); changed = true; }
+      });
+    }
+    setFrames((prev) => prev.filter((x) => !idsToDelete.has(x.id)));
+    setRows((prev) => prev.filter((r) => !(r.frameId && idsToDelete.has(r.frameId))));
   }
   function toggleFrameCollapse(id) { setFrames((prev) => prev.map((f) => (f.id === id ? { ...f, collapsed: !f.collapsed } : f))); }
   function updateFrameDates(frameId, start, end) { setFrames((prev) => prev.map((f) => (f.id === frameId ? { ...f, startDate: start, endDate: end } : f))); }
@@ -3056,7 +3078,7 @@ export default function MyTripApp() {
     updateRow, deleteRow, openCard, addRow, dragId, setDragId, onDropRow, dragDayKey, setDragDayKey, onDropDay,
     typeMenuOpen, setTypeMenuOpen, newTypeDraft, setNewTypeDraft, addCustomType,
     collapsedParents, setCollapsedParents, collapsedGroups, setCollapsedGroups,
-    toggleFrameCollapse, openFrameModal, deleteFrame, updateFrameDates, nextDateInContext, lastDateInContext, frameTotals,
+    toggleFrameCollapse, openFrameModal, setDeleteFrameConfirmId, updateFrameDates, nextDateInContext, lastDateInContext, frameTotals,
     openAddDayModal, sortDayByTime, getColWidth, startResize, displayCurrency, convertAmount, openHotelInfo,
     frameMenuOpenId, setFrameMenuOpenId, generateTravelJournal,
   };
@@ -3156,11 +3178,14 @@ export default function MyTripApp() {
         .mt-frame-block { border:1px solid var(--border); border-inline-start:4px solid var(--frame-color,var(--teal)); border-radius:12px; margin-top:16px; background:var(--surface); }
         .mt-frame-header { display:flex; flex-direction:column; padding:10px 12px; cursor:pointer; user-select:none; background:#FBFDFC; border-radius:11px 11px 0 0; }
         .mt-frame-header-top { display:flex; align-items:center; gap:9px; }
+        .mt-frame-header-top-grouped { justify-content:space-between; }
+        .mt-frame-header-start { display:flex; align-items:center; gap:9px; min-width:0; overflow:hidden; }
+        .mt-frame-header-end { display:flex; align-items:center; gap:9px; flex-shrink:0; }
         .mt-frame-header-dates { margin-top:5px; padding-inline-start:24px; }
         .mt-frame-header-special { background:color-mix(in srgb, var(--frame-color) 14%, white); border-radius:10px; padding:8px 10px; }
         .mt-frame-type-icon { width:28px; height:28px; border-radius:8px; background:var(--frame-color); color:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
         .mt-frame-type-icon-btn { border:none; cursor:pointer; }
-        .mt-frame-date-cluster { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+        .mt-frame-date-cluster { display:flex; align-items:center; gap:6px; flex-shrink:0; margin-inline-start:auto; }
         .mt-frame-name-col { display:flex; flex-direction:column; gap:1px; min-width:24px; overflow:hidden; }
         .mt-frame-daycount { font-size:11px; font-weight:700; font-family:'Frank Ruhl Libre',serif; color:var(--muted); white-space:nowrap; }
         .mt-frame-date-arrow { color:var(--muted); flex-shrink:0; }
@@ -3174,7 +3199,6 @@ export default function MyTripApp() {
         .mt-frame-cost-inline { font-size:12.5px; font-weight:700; color:var(--amber); white-space:nowrap; flex-shrink:0; }
         .mt-frame-end-group { display:flex; align-items:center; gap:8px; margin-inline-start:auto; flex-shrink:0; }
         .mt-frame-actions { display:flex; gap:2px; flex-shrink:0; }
-        .mt-frame-actions-pinned { margin-inline-start:auto; }
         .mt-kebab-menu { min-width:180px; }
         .mt-daterange-btn { display:flex; align-items:center; gap:7px; width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:13px; background:#fff; color:var(--ink); }
         .mt-datefield { display:flex; align-items:center; gap:7px; width:100%; border:1px solid var(--border); border-radius:8px; padding:6px 10px; background:#fff; color:var(--teal-dark); }
@@ -3540,8 +3564,7 @@ export default function MyTripApp() {
         <div ref={actionsMenu.refs.setFloating} style={{ ...actionsMenu.floatingStyles, maxWidth: "min(240px, 92vw)" }} {...actionsMenu.getFloatingProps()} className="mt-floating-menu mt-kebab-menu">
             <div className="mt-action-cat-label">{T.catNewFrame}</div>
             <button className="mt-share-opt" onClick={() => { openFrameModal(null, null); setActionsMenuOpen(false); }}><FolderPlus size={14} /> {T.newFrame}</button>
-            <button className="mt-share-opt" onClick={openAiWizard}><Wand2 size={14} /> {T.newFrameWizard}</button>
-            <button className="mt-share-opt" onClick={() => { openPreWizard(); setActionsMenuOpen(false); }}><Sparkles size={14} /> {T.newTripAction}</button>
+            <button className="mt-share-opt" onClick={() => { setTripWizardChoiceOpen(true); setActionsMenuOpen(false); }}><Wand2 size={14} /> {T.tripWizard}</button>
             <button className="mt-share-opt" onClick={() => { openEditTripDetails(); setActionsMenuOpen(false); }}><Pencil size={14} /> {T.editTripDetails}</button>
             <div className="mt-action-cat-label">{T.catSaveExport}</div>
             <button className="mt-share-opt" onClick={openSaveTripModal}><Save size={14} /> {T.saveTripByName}</button>
@@ -4301,6 +4324,32 @@ export default function MyTripApp() {
       )}
 
       {/* frame modal */}
+      {tripWizardChoiceOpen && (
+        <div className="mt-modal-backdrop" onClick={() => setTripWizardChoiceOpen(false)}>
+          <div className="mt-modal" style={{ maxWidth: 380 }} onClick={(e) => e.stopPropagation()}>
+            <div className="mt-modal-header"><span className="mt-modal-title">{T.tripWizard}</span><button className="mt-btn ghost" onClick={() => setTripWizardChoiceOpen(false)}><X size={16} /></button></div>
+            <div className="mt-modal-body">
+              <p className="mt-hint" style={{ margin: "0 0 12px" }}>{T.tripWizardActivateAi}</p>
+              <button className="mt-btn primary" style={{ width: "100%", marginBottom: 8 }} onClick={() => { setTripWizardChoiceOpen(false); openAiWizard(); }}><Wand2 size={13} /> {T.yes}</button>
+              <button className="mt-btn ghost" style={{ width: "100%" }} onClick={() => { setTripWizardChoiceOpen(false); openPreWizard(); }}>{T.no}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteFrameConfirmId && (
+        <div className="mt-modal-backdrop" onClick={() => setDeleteFrameConfirmId(null)}>
+          <div className="mt-modal" style={{ maxWidth: 380 }} onClick={(e) => e.stopPropagation()}>
+            <div className="mt-modal-header"><span className="mt-modal-title">{T.deleteFrameTitle}</span><button className="mt-btn ghost" onClick={() => setDeleteFrameConfirmId(null)}><X size={16} /></button></div>
+            <div className="mt-modal-body">
+              <p className="mt-hint" style={{ margin: "0 0 12px" }}>{T.deleteFrameHint}</p>
+              <button className="mt-btn ghost" style={{ width: "100%", marginBottom: 8 }} onClick={() => { deleteFrameOnly(deleteFrameConfirmId); setDeleteFrameConfirmId(null); }}>{T.deleteFrameOnly}</button>
+              <button className="mt-btn" style={{ width: "100%", background: "var(--danger)", color: "#fff", border: "none" }} onClick={() => { deleteFrameWithContent(deleteFrameConfirmId); setDeleteFrameConfirmId(null); }}><Trash2 size={13} /> {T.deleteFrameWithContent}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {frameDraft && (
         <div className="mt-modal-backdrop" onClick={closeFrameModal}>
           <div className="mt-modal" onClick={(e) => e.stopPropagation()}>
