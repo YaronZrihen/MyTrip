@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "13.9.0";
+const APP_VERSION = "14.0.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1890,8 +1890,8 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
     <div className="mt-frame-block" style={{ "--frame-color": color }}>
       <div ref={setFrameDropRef} className={"mt-frame-header" + (dragDayKey ? " droppable" : "") + (isFrameOver ? " mt-drop-hover" : "") + (effectiveFrameType ? " mt-frame-header-special" : "")} onClick={() => toggleFrameCollapse(frame.id)}>
         {effectiveFrameType ? (
-          <div className="mt-frame-header-top mt-frame-header-top-grouped">
-            <div className="mt-frame-header-start">
+          <div className="mt-frame-header-special-wrap">
+            <div className="mt-frame-header-row1">
               <span className="chev">{frame.collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}</span>
               {effectiveFrameType === "trip" ? (
                 <span className="mt-frame-type-icon"><Plane size={15} /></span>
@@ -1900,23 +1900,25 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
               ) : (
                 <button className="mt-frame-type-icon mt-frame-type-icon-btn" onClick={(e) => { e.stopPropagation(); if (hotelRowWithPlace) openHotelInfo(hotelRowWithPlace); }} title={hotelRowWithPlace ? T.placeInfo : undefined}><BedDouble size={15} /></button>
               )}
-              <span className="mt-frame-name-col">
-                <span className="mt-frame-name">{frame.name}</span>
-                {dayCount > 0 && <span className="mt-frame-daycount">{formatDayCount(dayCount, lang)}</span>}
-              </span>
-              {convertedTotal > 0 && (
-                <span className="mt-frame-cost-inline">{displayCurrency} {convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-              )}
+              <span className="mt-frame-name-full">{frame.name}</span>
             </div>
-            <div className="mt-frame-header-end">
-              <span className="mt-frame-date-cluster" dir="ltr">
-                <FrameDateBadge date={frame.startDate} lang={lang} />
-                <ArrowRight size={14} className="mt-frame-date-arrow" />
-                <FrameDateBadge date={frame.endDate} lang={lang} />
-              </span>
-              <span className="mt-frame-actions" onClick={(e) => e.stopPropagation()}>
-                <button ref={menuFloating.refs.setReference} {...menuFloating.getReferenceProps()} title={T.moreOptions}><MoreVertical size={16} /></button>
-              </span>
+            <div className="mt-frame-header-row2">
+              <div className="mt-frame-header-row2-start">
+                {dayCount > 0 && <span className="mt-frame-daycount">{formatDayCount(dayCount, lang)}</span>}
+                {convertedTotal > 0 && (
+                  <span className="mt-frame-cost-inline">{displayCurrency} {convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                )}
+              </div>
+              <div className="mt-frame-header-row2-end">
+                <span className="mt-frame-date-cluster" dir="ltr">
+                  <FrameDateBadge date={frame.startDate} lang={lang} />
+                  <ArrowRight size={14} className="mt-frame-date-arrow" />
+                  <FrameDateBadge date={frame.endDate} lang={lang} />
+                </span>
+                <span className="mt-frame-actions" onClick={(e) => e.stopPropagation()}>
+                  <button ref={menuFloating.refs.setReference} {...menuFloating.getReferenceProps()} title={T.moreOptions}><MoreVertical size={16} /></button>
+                </span>
+              </div>
             </div>
           </div>
         ) : (
@@ -3182,15 +3184,17 @@ export default function MyTripApp() {
         .mt-frame-block { border:1px solid var(--border); border-inline-start:4px solid var(--frame-color,var(--teal)); border-radius:12px; margin-top:16px; background:var(--surface); }
         .mt-frame-header { display:flex; flex-direction:column; padding:10px 12px; cursor:pointer; user-select:none; background:#FBFDFC; border-radius:11px 11px 0 0; }
         .mt-frame-header-top { display:flex; align-items:center; gap:9px; }
-        .mt-frame-header-top-grouped { justify-content:space-between; }
-        .mt-frame-header-start { display:flex; align-items:center; gap:9px; min-width:0; overflow:hidden; }
-        .mt-frame-header-end { display:flex; align-items:center; gap:9px; flex-shrink:0; }
+        .mt-frame-header-special-wrap { display:flex; flex-direction:column; gap:6px; width:100%; }
+        .mt-frame-header-row1 { display:flex; align-items:center; gap:9px; }
+        .mt-frame-name-full { font-weight:700; font-size:15px; overflow-wrap:break-word; min-width:24px; }
+        .mt-frame-header-row2 { display:flex; align-items:center; justify-content:space-between; gap:9px; padding-inline-start:24px; }
+        .mt-frame-header-row2-start { display:flex; align-items:center; gap:10px; min-width:0; }
+        .mt-frame-header-row2-end { display:flex; align-items:center; gap:9px; flex-shrink:0; }
         .mt-frame-header-dates { margin-top:5px; padding-inline-start:24px; }
         .mt-frame-header-special { background:color-mix(in srgb, var(--frame-color) 14%, white); border-radius:10px; padding:8px 10px; }
         .mt-frame-type-icon { width:28px; height:28px; border-radius:8px; background:var(--frame-color); color:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
         .mt-frame-type-icon-btn { border:none; cursor:pointer; }
         .mt-frame-date-cluster { display:flex; align-items:center; gap:6px; flex-shrink:0; margin-inline-start:auto; }
-        .mt-frame-name-col { display:flex; flex-direction:column; gap:1px; min-width:24px; overflow:hidden; }
         .mt-frame-daycount { font-size:11px; font-weight:700; color:var(--muted); white-space:nowrap; }
         .mt-frame-date-arrow { color:var(--muted); flex-shrink:0; }
         .mt-frame-date-badge { display:flex; flex-direction:column; align-items:center; border-radius:8px; overflow:hidden; flex-shrink:0; width:36px; box-shadow:0 1px 3px rgba(0,0,0,.15); }
