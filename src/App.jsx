@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "13.8.0";
+const APP_VERSION = "13.9.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -3125,7 +3125,7 @@ export default function MyTripApp() {
       {showIntro && <SplashIntro onFinish={() => setShowIntro(false)} lang={lang} />}
       <div className="mytrip-app" dir={dir}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700&family=Frank+Ruhl+Libre:wght@500;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&display=swap');
         .mytrip-app { --bg:#F5F8F6; --surface:#FFFFFF; --ink:#1E2A28; --muted:#6B7C76; --border:#DEE7E2; --teal:#256D64; --teal-dark:#174C45; --teal-tint:#E6F0EE; --amber:#D98E3F; --amber-tint:#FBEEDD; --danger:#C1443A;
           font-family:'Heebo',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-variant-numeric:tabular-nums; color-scheme:light; }
         .mytrip-app * { box-sizing:border-box; }
@@ -3144,7 +3144,7 @@ export default function MyTripApp() {
         .mt-brand-mark { width:30px; height:30px; border-radius:8px; background:var(--teal); display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; }
         .mt-brand-mark::after { content:''; position:absolute; width:44px; height:44px; border:2px solid rgba(255,255,255,.35); border-radius:50%; top:-14px; inset-inline-start:-8px; }
         .mt-brand-mark svg { color:#fff; width:16px; height:16px; z-index:1; }
-        .mt-brand-name { font-family:'Frank Ruhl Libre',serif; font-size:18px; font-weight:700; line-height:1; }
+        .mt-brand-name { font-size:18px; font-weight:700; line-height:1; }
         .mt-brand-version { font-size:9.5px; color:var(--muted); font-weight:600; letter-spacing:.02em; }
         .mt-header-actions { display:flex; align-items:center; justify-content:space-between; gap:5px; flex-wrap:wrap; padding:5px 14px; }
         .mt-header-actions-group { display:flex; align-items:center; gap:5px; flex-wrap:nowrap; flex-shrink:0; }
@@ -3160,7 +3160,7 @@ export default function MyTripApp() {
         .mt-floating-menu { background:var(--surface); color:var(--ink); border:1px solid var(--border); border-radius:10px; box-shadow:0 12px 32px rgba(20,40,35,.18); padding:10px; z-index:200; max-width:92vw; max-height:70vh; overflow-y:auto; }
         .mt-floating-backdrop { position:fixed; inset:0; z-index:190; background:transparent; }
         .mt-menu-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:7px; }
-        .mt-menu-head strong { font-size:12.5px; font-family:'Frank Ruhl Libre',serif; }
+        .mt-menu-head strong { font-size:12.5px; }
         .mt-share-opt { width:100%; display:flex; align-items:center; gap:8px; padding:8px; border-radius:7px; background:none; border:none; font-size:12.5px; text-align:start; color:var(--ink); }
         .mt-share-opt:hover { background:var(--bg); }
         .mt-share-opt.disabled { color:var(--muted); }
@@ -3191,13 +3191,13 @@ export default function MyTripApp() {
         .mt-frame-type-icon-btn { border:none; cursor:pointer; }
         .mt-frame-date-cluster { display:flex; align-items:center; gap:6px; flex-shrink:0; margin-inline-start:auto; }
         .mt-frame-name-col { display:flex; flex-direction:column; gap:1px; min-width:24px; overflow:hidden; }
-        .mt-frame-daycount { font-size:11px; font-weight:700; font-family:'Frank Ruhl Libre',serif; color:var(--muted); white-space:nowrap; }
+        .mt-frame-daycount { font-size:11px; font-weight:700; color:var(--muted); white-space:nowrap; }
         .mt-frame-date-arrow { color:var(--muted); flex-shrink:0; }
         .mt-frame-date-badge { display:flex; flex-direction:column; align-items:center; border-radius:8px; overflow:hidden; flex-shrink:0; width:36px; box-shadow:0 1px 3px rgba(0,0,0,.15); }
         .mt-frame-date-badge .mt-day-badge-top { height:6px; }
         .mt-frame-date-badge .mt-day-badge-body { padding:2px 0; }
-        .mt-frame-name { font-weight:700; font-size:15px; font-family:'Frank Ruhl Libre',serif; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:24px; flex-shrink:1; }
-        .mt-frame-date-inline { font-size:12.5px; font-weight:600; color:var(--muted); font-family:'Frank Ruhl Libre',serif; white-space:nowrap; flex-shrink:0; font-variant-numeric:tabular-nums; display:flex; align-items:center; gap:5px; }
+        .mt-frame-name { font-weight:700; font-size:15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:24px; flex-shrink:1; }
+        .mt-frame-date-inline { font-size:12.5px; font-weight:600; color:var(--muted); white-space:nowrap; flex-shrink:0; font-variant-numeric:tabular-nums; display:flex; align-items:center; gap:5px; }
         .mt-frame-date-btn { border:none; background:none; padding:0; cursor:pointer; display:flex; align-items:center; gap:5px; color:inherit; }
         .mt-frame-date-btn:hover { color:var(--teal-dark); text-decoration:underline; }
         .mt-frame-cost-inline { font-size:12.5px; font-weight:700; color:var(--amber); white-space:nowrap; flex-shrink:0; }
@@ -3232,7 +3232,7 @@ export default function MyTripApp() {
         .mt-day-badge { display:flex; flex-direction:column; align-items:center; border-radius:8px; overflow:hidden; flex-shrink:0; width:42px; margin-inline-start:auto; box-shadow:0 1px 3px rgba(0,0,0,.15); }
         .mt-day-badge-top { background:var(--danger); width:100%; height:8px; flex-shrink:0; }
         .mt-day-badge-body { background:var(--surface); width:100%; display:flex; flex-direction:column; align-items:center; padding:3px 0; }
-        .mt-day-badge-num { font-size:17px; font-weight:800; font-family:'Frank Ruhl Libre',serif; color:var(--ink); line-height:1; }
+        .mt-day-badge-num { font-size:17px; font-weight:800; color:var(--ink); line-height:1; }
         .mt-day-badge-mon { font-size:8px; font-weight:700; color:var(--muted); text-transform:uppercase; line-height:1.3; }
         .mt-day-badge-weekday { font-size:8px; font-weight:700; color:var(--muted); line-height:1.3; }
         .mt-group-actions { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
@@ -3349,7 +3349,7 @@ export default function MyTripApp() {
         .mt-modal { background:var(--surface); border-radius:16px; width:100%; max-width:440px; max-height:86vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,.25); }
         .mt-modal.narrow { max-width:360px; }
         .mt-modal-header { display:flex; align-items:center; justify-content:space-between; padding:15px 18px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--surface); }
-        .mt-modal-title { font-family:'Frank Ruhl Libre',serif; font-size:17px; font-weight:700; }
+        .mt-modal-title { font-size:17px; font-weight:700; }
         .mt-modal-body { padding:14px 18px; display:flex; flex-direction:column; gap:9px; }
         .mt-field label { display:block; font-size:11.5px; font-weight:600; color:var(--muted); margin-bottom:4px; }
         .mt-field input, .mt-field select, .mt-field textarea { width:100%; border:1px solid var(--border); border-radius:8px; padding:7px 9px; font-size:13px; font-family:inherit; background:#fff; color:var(--ink); }
@@ -3481,7 +3481,7 @@ export default function MyTripApp() {
         .mt-intro-pin text { fill:#C1443A; font-size:7.5px; font-weight:700; font-family:Heebo,sans-serif; }
         @keyframes mt-pin-drop { 0% { opacity:0; transform:translateY(-110px); } 65% { opacity:1; } 100% { opacity:1; transform:translateY(0); } }
         .mt-intro-brand { display:flex; flex-direction:column; align-items:center; gap:4px; opacity:0; animation:mt-intro-fadein .8s ease forwards; animation-delay:.35s; }
-        .mt-intro-logo { font-family:'Frank Ruhl Libre',serif; font-size:24px; font-weight:700; color:#174C45; letter-spacing:.02em; }
+        .mt-intro-logo { font-size:24px; font-weight:700; color:#174C45; letter-spacing:.02em; }
         .mt-intro-version { font-size:10.5px; color:#9AAAA5; font-variant-numeric:tabular-nums; }
         .mt-intro-tag { font-size:12.5px; color:#6B7C76; margin-top:2px; }
 
