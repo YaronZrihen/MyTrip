@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "13.3.0";
+const APP_VERSION = "13.5.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1898,9 +1898,9 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
             {convertedTotal > 0 && (
               <span className="mt-frame-cost-inline">{displayCurrency} {convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
             )}
-            <span className="mt-frame-date-cluster">
+            <span className="mt-frame-date-cluster" dir="ltr">
               <FrameDateBadge date={frame.startDate} lang={lang} />
-              <ArrowLeft size={14} className="mt-frame-date-arrow" />
+              <ArrowRight size={14} className="mt-frame-date-arrow" />
               <FrameDateBadge date={frame.endDate} lang={lang} />
             </span>
             <span className="mt-frame-actions mt-frame-actions-pinned" onClick={(e) => e.stopPropagation()}>
@@ -2118,8 +2118,8 @@ export default function MyTripApp() {
     ],
     hotels: [
       { name: "מלון בצ'אנג מאי", alias: "", checkIn: "2026-08-01", checkOut: "2026-08-09" },
-      { name: "מלון בקוסמוי", alias: "", checkIn: "2026-08-09", checkOut: "2026-08-14" },
-      { name: "מלון בקופנגאן", alias: "", checkIn: "2026-08-14", checkOut: "2026-08-16" },
+      { name: "מלון בקוסמוי", alias: "", checkIn: "2026-08-09", checkOut: "2026-08-12" },
+      { name: "מלון בקופנגאן", alias: "", checkIn: "2026-08-12", checkOut: "2026-08-16" },
       { name: "מלון בפוקט", alias: "", checkIn: "2026-08-16", checkOut: "2026-08-23" },
       { name: "מלון בקנצ'נבורי", alias: "", checkIn: "2026-08-23", checkOut: "2026-08-27" },
       { name: "מלון בבנגקוק", alias: "", checkIn: "2026-08-27", checkOut: "2026-08-31" },
@@ -3099,7 +3099,7 @@ export default function MyTripApp() {
       {showIntro && <SplashIntro onFinish={() => setShowIntro(false)} lang={lang} />}
       <div className="mytrip-app" dir={dir}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700&family=Frank+Ruhl+Libre:wght@500;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700&family=Frank+Ruhl+Libre:wght@500;700;800&display=swap');
         .mytrip-app { --bg:#F5F8F6; --surface:#FFFFFF; --ink:#1E2A28; --muted:#6B7C76; --border:#DEE7E2; --teal:#256D64; --teal-dark:#174C45; --teal-tint:#E6F0EE; --amber:#D98E3F; --amber-tint:#FBEEDD; --danger:#C1443A;
           font-family:'Heebo',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-variant-numeric:tabular-nums; color-scheme:light; }
         .mytrip-app * { box-sizing:border-box; }
@@ -3134,7 +3134,7 @@ export default function MyTripApp() {
         .mt-floating-menu { background:var(--surface); color:var(--ink); border:1px solid var(--border); border-radius:10px; box-shadow:0 12px 32px rgba(20,40,35,.18); padding:10px; z-index:200; max-width:92vw; max-height:70vh; overflow-y:auto; }
         .mt-floating-backdrop { position:fixed; inset:0; z-index:190; background:transparent; }
         .mt-menu-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:7px; }
-        .mt-menu-head strong { font-size:12.5px; }
+        .mt-menu-head strong { font-size:12.5px; font-family:'Frank Ruhl Libre',serif; }
         .mt-share-opt { width:100%; display:flex; align-items:center; gap:8px; padding:8px; border-radius:7px; background:none; border:none; font-size:12.5px; text-align:start; color:var(--ink); }
         .mt-share-opt:hover { background:var(--bg); }
         .mt-share-opt.disabled { color:var(--muted); }
