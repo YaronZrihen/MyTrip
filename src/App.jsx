@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "15.2.0";
+const APP_VERSION = "15.2.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -3670,61 +3670,83 @@ export default function MyTripApp() {
             <div className="mt-modal-body">
               {preWizardScreen === 0 && (
                 <>
-                  <div className="mt-wizard-qa"><label>{T.preWizardQName}</label><input value={preWizardData.tripName} onChange={(e) => setPreWizardData({ ...preWizardData, tripName: e.target.value })} placeholder={T.wizardTripNameHint} /></div>
-                  <div className="mt-field">
-                    <label>{T.preWizardTravelerCount}</label>
-                    <div className="mt-wizard-choices">
-                      {["solo", "couple", "family", "group"].map((k) => (
-                        <button key={k} className={"mt-wizard-choice" + (preWizardData.travelerCount === k ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, travelerCount: k })}>{T["wizardTravelers_" + k]}</button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="mt-wizard-qa"><label>{T.preWizardDestination}</label><input value={preWizardData.destination} onChange={(e) => setPreWizardData({ ...preWizardData, destination: e.target.value })} /></div>
                   <div className="mt-wizard-qa">
-                    <label>{T.preWizardTripDates}</label>
-                    <DateRangeField startDate={preWizardData.planStartDate} endDate={preWizardData.planEndDate} lang={lang} T={T} initialViewMonth={preWizardRefDate}
-                      onChange={(s, e) => { setPreWizardData({ ...preWizardData, planStartDate: s, planEndDate: e }); if (s) setPreWizardRefDate(s); }} />
-                  </div>
-                  <div className="divider" style={{ margin: "14px 0" }} />
-                  <div className="mt-section-label">{T.preWizardAiSectionLabel}</div>
-                  <div className="mt-wizard-qa"><label>{T.preWizardPreferredDest}</label><input value={preWizardData.preferredDestinations} onChange={(e) => setPreWizardData({ ...preWizardData, preferredDestinations: e.target.value })} /></div>
-                  <div className="mt-field">
-                    <label>{T.wizardBudget}</label>
+                    <label>{T.preWizardHasPlan}</label>
                     <div className="mt-wizard-choices">
-                      {["low", "mid", "high"].map((k) => (
-                        <button key={k} className={"mt-wizard-choice" + (preWizardData.budgetLevel === k ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, budgetLevel: k })}>{T["wizardBudget_" + k]}</button>
-                      ))}
+                      <button className={"mt-wizard-choice" + (preWizardData.hasTripPlan === "yes" ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, hasTripPlan: "yes" })}>{T.yes}</button>
+                      <button className={"mt-wizard-choice" + (preWizardData.hasTripPlan === "no" ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, hasTripPlan: "no" })}>{T.no}</button>
                     </div>
                   </div>
-                  <div className="mt-field">
-                    <label>{T.wizardInterests}</label>
-                    <div className="mt-wizard-choices">
-                      {["history", "food", "nature", "nightlife", "shopping", "art", "adventure"].map((k) => (
-                        <button key={k} className={"mt-wizard-choice" + (preWizardData.interests.includes(k) ? " selected" : "")} onClick={() => togglePreWizardInterest(k)}>{T["wizardInterest_" + k]}</button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="mt-field">
-                    <label>{T.wizardAccommodation}</label>
-                    <div className="mt-wizard-choices">
-                      {["hotel", "apartment", "hostel", "flexible"].map((k) => (
-                        <button key={k} className={"mt-wizard-choice" + (preWizardData.accommodationPrefs === k ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, accommodationPrefs: k })}>{T["wizardAccommodation_" + k]}</button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="mt-field">
-                    <label>{T.wizardPace}</label>
-                    <div className="mt-wizard-choices">
-                      {["relaxed", "balanced", "packed"].map((k) => (
-                        <button key={k} className={"mt-wizard-choice" + (preWizardData.pace === k ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, pace: k })}>{T["wizardPace_" + k]}</button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="mt-field"><label>{T.preWizardNotes}</label><textarea rows={5} value={preWizardData.planNotes} onChange={(e) => setPreWizardData({ ...preWizardData, planNotes: e.target.value })} /></div>
-                  <div className="mt-ai-suggest-box">
-                    <p className="mt-hint" style={{ margin: "0 0 8px" }}>{T.preWizardAiPitch}</p>
-                    <button className="mt-btn primary" style={{ width: "100%" }} onClick={activatePreWizardAiAgent}><Wand2 size={13} /> {T.preWizardActivateAi}</button>
-                  </div>
+                  {preWizardData.hasTripPlan === "yes" && (
+                    <>
+                      <div className="mt-wizard-qa"><label>{T.preWizardQName}</label><input value={preWizardData.tripName} onChange={(e) => setPreWizardData({ ...preWizardData, tripName: e.target.value })} placeholder={T.wizardTripNameHint} /></div>
+                      <div className="mt-field">
+                        <label>{T.preWizardTravelerCount}</label>
+                        <div className="mt-wizard-choices">
+                          {["solo", "couple", "family", "group"].map((k) => (
+                            <button key={k} className={"mt-wizard-choice" + (preWizardData.travelerCount === k ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, travelerCount: k })}>{T["wizardTravelers_" + k]}</button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="mt-wizard-qa"><label>{T.preWizardDestination}</label><input value={preWizardData.destination} onChange={(e) => setPreWizardData({ ...preWizardData, destination: e.target.value })} /></div>
+                      <div className="mt-wizard-qa">
+                        <label>{T.preWizardTripDates}</label>
+                        <DateRangeField startDate={preWizardData.planStartDate} endDate={preWizardData.planEndDate} lang={lang} T={T} initialViewMonth={preWizardRefDate}
+                          onChange={(s, e) => { setPreWizardData({ ...preWizardData, planStartDate: s, planEndDate: e }); if (s) setPreWizardRefDate(s); }} />
+                      </div>
+                    </>
+                  )}
+                  {preWizardData.hasTripPlan === "no" && (
+                    <>
+                      <div className="mt-section-label">{T.preWizardAiSectionLabel}</div>
+                      <div className="mt-field">
+                        <label>{T.preWizardTravelerCount}</label>
+                        <div className="mt-wizard-choices">
+                          {["solo", "couple", "family", "group"].map((k) => (
+                            <button key={k} className={"mt-wizard-choice" + (preWizardData.travelerCount === k ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, travelerCount: k })}>{T["wizardTravelers_" + k]}</button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="mt-wizard-qa"><label>{T.preWizardPreferredDest}</label><input value={preWizardData.preferredDestinations} onChange={(e) => setPreWizardData({ ...preWizardData, preferredDestinations: e.target.value })} /></div>
+                      <div className="mt-field">
+                        <label>{T.wizardBudget}</label>
+                        <div className="mt-wizard-choices">
+                          {["low", "mid", "high"].map((k) => (
+                            <button key={k} className={"mt-wizard-choice" + (preWizardData.budgetLevel === k ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, budgetLevel: k })}>{T["wizardBudget_" + k]}</button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="mt-field">
+                        <label>{T.wizardInterests}</label>
+                        <div className="mt-wizard-choices">
+                          {["history", "food", "nature", "nightlife", "shopping", "art", "adventure"].map((k) => (
+                            <button key={k} className={"mt-wizard-choice" + (preWizardData.interests.includes(k) ? " selected" : "")} onClick={() => togglePreWizardInterest(k)}>{T["wizardInterest_" + k]}</button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="mt-field">
+                        <label>{T.wizardAccommodation}</label>
+                        <div className="mt-wizard-choices">
+                          {["hotel", "apartment", "hostel", "flexible"].map((k) => (
+                            <button key={k} className={"mt-wizard-choice" + (preWizardData.accommodationPrefs === k ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, accommodationPrefs: k })}>{T["wizardAccommodation_" + k]}</button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="mt-field">
+                        <label>{T.wizardPace}</label>
+                        <div className="mt-wizard-choices">
+                          {["relaxed", "balanced", "packed"].map((k) => (
+                            <button key={k} className={"mt-wizard-choice" + (preWizardData.pace === k ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, pace: k })}>{T["wizardPace_" + k]}</button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="mt-field"><label>{T.preWizardNotes}</label><textarea rows={5} value={preWizardData.planNotes} onChange={(e) => setPreWizardData({ ...preWizardData, planNotes: e.target.value })} /></div>
+                      <div className="mt-ai-suggest-box">
+                        <p className="mt-hint" style={{ margin: "0 0 8px" }}>{T.preWizardAiPitch}</p>
+                        <button className="mt-btn primary" style={{ width: "100%" }} onClick={activatePreWizardAiAgent}><Wand2 size={13} /> {T.preWizardActivateAi}</button>
+                      </div>
+                    </>
+                  )}
                 </>
               )}
               {preWizardScreen === 1 && (
