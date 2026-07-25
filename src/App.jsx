@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "15.1.0";
+const APP_VERSION = "15.2.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -193,7 +193,8 @@ const T_DICT = {
     preWizardHasPlan: "האם יש לך תוכנית טיול?", preWizardQName: "שם הטיול", preWizardTravelerCount: "מספר מטיילים", preWizardDestination: "יעד",
     preWizardPreferredDest: "יעדים מועדפים", preWizardAccommodationPrefs: "העדפות לינה", preWizardNotes: "הערות, מגבלות ודרישות לתוכנית הטיול",
     preWizardAiPitch: "יש לי יכולות AI לתכנן לך מסלול טיול על פי הפרמטרים שהזנת. שם הטיול ייקבע לאחר תוצאות ה-AI.", preWizardActivateAi: "הפעל סוכן AI",
-    preWizardHasFlights: "האם יש לך כרטיסי טיסה?", preWizardHasHotels: "האם יש לך מלונות?", checkInOut: "צ'ק-אין / צ'ק-אאוט", preWizardTripDates: "תאריכים",
+    preWizardHasFlights: "האם יש לך כרטיסי טיסה?", preWizardHasDomestic: "האם יש לך כרטיסי טיסות פנים?", preWizardHasHotels: "האם יש לך מלונות?", checkInOut: "צ'ק-אין / צ'ק-אאוט",
+    preWizardAiSectionLabel: "רוצה עזרה בתכנון? ספר לנו עוד", preWizardTripDates: "תאריכים",
     preWizardAiPendingName: "טיול בתכנון AI", preWizardAiDemoNotice: "זוהי הדגמה — במוצר האמיתי כאן יופעל סוכן AI שיתכנן עבורך מסלול מלא.",
     preWizardAddFlight: "הוסף טיסה", preWizardAddHotel: "הוסף מלון",
     preWizardSummary: "מוכן! בלחיצה על \"צור טיול\" ניצור עבורך מסגרת ראשית, מסגרת לטיסות הבינלאומיות, ומסגרת נפרדת לכל מלון — עם כל הרשומות ממוקמות לפי התאריכים שהזנת.",
@@ -329,7 +330,8 @@ const T_DICT = {
     preWizardHasPlan: "Do you already have a trip plan?", preWizardQName: "Trip name", preWizardTravelerCount: "Number of travelers", preWizardDestination: "Destination",
     preWizardPreferredDest: "Preferred destinations", preWizardAccommodationPrefs: "Accommodation preferences", preWizardNotes: "Notes, constraints and requirements for the trip plan",
     preWizardAiPitch: "I have AI capabilities to plan a route for you based on the parameters you entered. The trip name will be set after the AI results.", preWizardActivateAi: "Activate AI agent",
-    preWizardHasFlights: "Do you have flight tickets?", preWizardHasHotels: "Do you have hotels?", checkInOut: "Check-in / Check-out", preWizardTripDates: "Dates",
+    preWizardHasFlights: "Do you have flight tickets?", preWizardHasDomestic: "Do you have domestic flight tickets?", preWizardHasHotels: "Do you have hotels?", checkInOut: "Check-in / Check-out",
+    preWizardAiSectionLabel: "Want planning help? Tell us more", preWizardTripDates: "Dates",
     preWizardAiPendingName: "AI-planned trip", preWizardAiDemoNotice: "This is a demo — in the real product, an AI agent would plan a full itinerary for you here.",
     preWizardAddFlight: "Add flight", preWizardAddHotel: "Add hotel",
     preWizardSummary: "Ready! Clicking \"Create trip\" will create a main frame, a frame for international flights, and a separate frame for each hotel — with all records placed according to the dates you entered.",
@@ -2152,7 +2154,7 @@ export default function MyTripApp() {
     ],
   };
   const [preWizardOpen, setPreWizardOpen] = useState(false);
-  const [preWizardScreen, setPreWizardScreen] = useState(1);
+  const [preWizardScreen, setPreWizardScreen] = useState(0);
   const [preWizardData, setPreWizardData] = useState(PRE_WIZARD_DEFAULTS);
   const [preWizardLastSubmitted, setPreWizardLastSubmitted] = useState(null);
   const [preWizardRefDate, setPreWizardRefDate] = useState("");
@@ -2310,10 +2312,10 @@ export default function MyTripApp() {
     try { localStorage.setItem(SAVED_TRIPS_KEY, JSON.stringify(all)); } catch (e) {}
   }
   function preWizardNext() {
-    setPreWizardScreen((s) => Math.min(4, s + 1));
+    setPreWizardScreen((s) => Math.min(3, s + 1));
   }
   function preWizardBack() {
-    setPreWizardScreen((s) => Math.max(1, s - 1));
+    setPreWizardScreen((s) => Math.max(0, s - 1));
   }
   function togglePreWizardInterest(key) {
     setPreWizardData((d) => ({ ...d, interests: d.interests.includes(key) ? d.interests.filter((k) => k !== key) : [...d.interests, key] }));
@@ -2350,20 +2352,20 @@ export default function MyTripApp() {
   }
   function openPreWizard() {
     setPreWizardData(PRE_WIZARD_DEFAULTS);
-    setPreWizardScreen(1);
+    setPreWizardScreen(0);
     setPreWizardRefDate(PRE_WIZARD_DEFAULTS.planStartDate || "");
     setPreWizardOpen(true);
   }
   function openEditTripDetails() {
     const restored = preWizardLastSubmitted ? { ...PRE_WIZARD_DEFAULTS, ...preWizardLastSubmitted } : PRE_WIZARD_DEFAULTS;
     setPreWizardData(restored);
-    setPreWizardScreen(1);
+    setPreWizardScreen(0);
     setPreWizardRefDate(restored.planStartDate || "");
     setPreWizardOpen(true);
   }
   function closePreWizard() {
     setPreWizardOpen(false);
-    setPreWizardScreen(1);
+    setPreWizardScreen(0);
     setPreWizardRefDate("");
   }
   function updatePreWizardArrayItem(field, idx, patch) {
@@ -3352,7 +3354,7 @@ export default function MyTripApp() {
         .mt-wizard-subgroup { border:1px solid var(--border); border-radius:10px; padding:10px; margin-bottom:10px; background:var(--bg); }
         .mt-ai-suggest-box { border:1px solid var(--teal); border-radius:10px; padding:12px; margin-top:10px; background:var(--teal-tint); }
         .mt-wizard-qa { margin-bottom:14px; display:flex; align-items:center; gap:8px; }
-        .mt-wizard-stepper ~ .mt-modal-body .mt-field { margin-bottom:14px; }
+        .mt-modal-body .mt-field { margin-bottom:14px; }
         .mt-wizard-qa label { flex:1 1 0; font-weight:700; font-size:12.5px; color:var(--ink); text-align:right; line-height:1.3; }
         .mt-wizard-qa input, .mt-wizard-qa textarea, .mt-wizard-qa .mt-daterange-btn, .mt-wizard-qa .mt-datefield { flex:2 1 0; min-width:0; border:1px solid var(--border); border-radius:8px; padding:7px 9px; font-size:13px; font-family:inherit; box-sizing:border-box; text-align:right; color:var(--ink); }
         .mt-wizard-qa input:focus { outline:none; border-color:var(--teal); }
@@ -3655,96 +3657,77 @@ export default function MyTripApp() {
         <div className="mt-modal-backdrop" onClick={closePreWizard}>
           <div className="mt-modal" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
             <div className="mt-modal-header"><span className="mt-modal-title">{T.preWizardTitle}</span><button className="mt-btn ghost" onClick={closePreWizard}><X size={16} /></button></div>
-            <div className="mt-wizard-stepper">
-              {[1, 2, 3, 4].map((n) => (
-                <React.Fragment key={n}>
-                  <div className={"mt-wizard-step-circle" + (n <= preWizardScreen ? " active" : "")}>{n}</div>
-                  {n < 4 && <div className={"mt-wizard-step-line" + (n < preWizardScreen ? " active" : "")} />}
-                </React.Fragment>
-              ))}
-            </div>
+            {preWizardScreen > 0 && (
+              <div className="mt-wizard-stepper">
+                {[1, 2, 3].map((n) => (
+                  <React.Fragment key={n}>
+                    <div className={"mt-wizard-step-circle" + (n <= preWizardScreen ? " active" : "")}>{n}</div>
+                    {n < 3 && <div className={"mt-wizard-step-line" + (n < preWizardScreen ? " active" : "")} />}
+                  </React.Fragment>
+                ))}
+              </div>
+            )}
             <div className="mt-modal-body">
-              {preWizardScreen === 1 && (
+              {preWizardScreen === 0 && (
                 <>
-                  <div className="mt-wizard-qa">
-                    <label>{T.preWizardHasPlan}</label>
+                  <div className="mt-wizard-qa"><label>{T.preWizardQName}</label><input value={preWizardData.tripName} onChange={(e) => setPreWizardData({ ...preWizardData, tripName: e.target.value })} placeholder={T.wizardTripNameHint} /></div>
+                  <div className="mt-field">
+                    <label>{T.preWizardTravelerCount}</label>
                     <div className="mt-wizard-choices">
-                      <button className={"mt-wizard-choice" + (preWizardData.hasTripPlan === "yes" ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, hasTripPlan: "yes" })}>{T.yes}</button>
-                      <button className={"mt-wizard-choice" + (preWizardData.hasTripPlan === "no" ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, hasTripPlan: "no" })}>{T.no}</button>
+                      {["solo", "couple", "family", "group"].map((k) => (
+                        <button key={k} className={"mt-wizard-choice" + (preWizardData.travelerCount === k ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, travelerCount: k })}>{T["wizardTravelers_" + k]}</button>
+                      ))}
                     </div>
                   </div>
-                  {preWizardData.hasTripPlan === "yes" && (
-                    <>
-                      <div className="mt-wizard-qa"><label>{T.preWizardQName}</label><input value={preWizardData.tripName} onChange={(e) => setPreWizardData({ ...preWizardData, tripName: e.target.value })} placeholder={T.wizardTripNameHint} /></div>
-                      <div className="mt-field">
-                        <label>{T.preWizardTravelerCount}</label>
-                        <div className="mt-wizard-choices">
-                          {["solo", "couple", "family", "group"].map((k) => (
-                            <button key={k} className={"mt-wizard-choice" + (preWizardData.travelerCount === k ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, travelerCount: k })}>{T["wizardTravelers_" + k]}</button>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="mt-wizard-qa"><label>{T.preWizardDestination}</label><input value={preWizardData.destination} onChange={(e) => setPreWizardData({ ...preWizardData, destination: e.target.value })} /></div>
-                      <div className="mt-wizard-qa">
-                        <label>{T.preWizardTripDates}</label>
-                        <DateRangeField startDate={preWizardData.planStartDate} endDate={preWizardData.planEndDate} lang={lang} T={T} initialViewMonth={preWizardRefDate}
-                          onChange={(s, e) => { setPreWizardData({ ...preWizardData, planStartDate: s, planEndDate: e }); if (s) setPreWizardRefDate(s); }} />
-                      </div>
-                    </>
-                  )}
-                  {preWizardData.hasTripPlan === "no" && (
-                    <>
-                      <div className="mt-field">
-                        <label>{T.wizardTravelers}</label>
-                        <div className="mt-wizard-choices">
-                          {["solo", "couple", "family", "group"].map((k) => (
-                            <button key={k} className={"mt-wizard-choice" + (preWizardData.noPlanTravelerCount === k ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, noPlanTravelerCount: k })}>{T["wizardTravelers_" + k]}</button>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="mt-wizard-qa"><label>{T.preWizardPreferredDest}</label><input value={preWizardData.preferredDestinations} onChange={(e) => setPreWizardData({ ...preWizardData, preferredDestinations: e.target.value })} /></div>
-                      <div className="mt-field">
-                        <label>{T.wizardBudget}</label>
-                        <div className="mt-wizard-choices">
-                          {["low", "mid", "high"].map((k) => (
-                            <button key={k} className={"mt-wizard-choice" + (preWizardData.budgetLevel === k ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, budgetLevel: k })}>{T["wizardBudget_" + k]}</button>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="mt-field">
-                        <label>{T.wizardInterests}</label>
-                        <div className="mt-wizard-choices">
-                          {["history", "food", "nature", "nightlife", "shopping", "art", "adventure"].map((k) => (
-                            <button key={k} className={"mt-wizard-choice" + (preWizardData.interests.includes(k) ? " selected" : "")} onClick={() => togglePreWizardInterest(k)}>{T["wizardInterest_" + k]}</button>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="mt-field">
-                        <label>{T.wizardAccommodation}</label>
-                        <div className="mt-wizard-choices">
-                          {["hotel", "apartment", "hostel", "flexible"].map((k) => (
-                            <button key={k} className={"mt-wizard-choice" + (preWizardData.accommodationPrefs === k ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, accommodationPrefs: k })}>{T["wizardAccommodation_" + k]}</button>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="mt-field">
-                        <label>{T.wizardPace}</label>
-                        <div className="mt-wizard-choices">
-                          {["relaxed", "balanced", "packed"].map((k) => (
-                            <button key={k} className={"mt-wizard-choice" + (preWizardData.pace === k ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, pace: k })}>{T["wizardPace_" + k]}</button>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="mt-field"><label>{T.preWizardNotes}</label><textarea rows={5} value={preWizardData.planNotes} onChange={(e) => setPreWizardData({ ...preWizardData, planNotes: e.target.value })} /></div>
-                      <div className="mt-ai-suggest-box">
-                        <p className="mt-hint" style={{ margin: "0 0 8px" }}>{T.preWizardAiPitch}</p>
-                        <button className="mt-btn primary" style={{ width: "100%" }} onClick={activatePreWizardAiAgent}><Wand2 size={13} /> {T.preWizardActivateAi}</button>
-                      </div>
-                    </>
-                  )}
+                  <div className="mt-wizard-qa"><label>{T.preWizardDestination}</label><input value={preWizardData.destination} onChange={(e) => setPreWizardData({ ...preWizardData, destination: e.target.value })} /></div>
+                  <div className="mt-wizard-qa">
+                    <label>{T.preWizardTripDates}</label>
+                    <DateRangeField startDate={preWizardData.planStartDate} endDate={preWizardData.planEndDate} lang={lang} T={T} initialViewMonth={preWizardRefDate}
+                      onChange={(s, e) => { setPreWizardData({ ...preWizardData, planStartDate: s, planEndDate: e }); if (s) setPreWizardRefDate(s); }} />
+                  </div>
+                  <div className="divider" style={{ margin: "14px 0" }} />
+                  <div className="mt-section-label">{T.preWizardAiSectionLabel}</div>
+                  <div className="mt-wizard-qa"><label>{T.preWizardPreferredDest}</label><input value={preWizardData.preferredDestinations} onChange={(e) => setPreWizardData({ ...preWizardData, preferredDestinations: e.target.value })} /></div>
+                  <div className="mt-field">
+                    <label>{T.wizardBudget}</label>
+                    <div className="mt-wizard-choices">
+                      {["low", "mid", "high"].map((k) => (
+                        <button key={k} className={"mt-wizard-choice" + (preWizardData.budgetLevel === k ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, budgetLevel: k })}>{T["wizardBudget_" + k]}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="mt-field">
+                    <label>{T.wizardInterests}</label>
+                    <div className="mt-wizard-choices">
+                      {["history", "food", "nature", "nightlife", "shopping", "art", "adventure"].map((k) => (
+                        <button key={k} className={"mt-wizard-choice" + (preWizardData.interests.includes(k) ? " selected" : "")} onClick={() => togglePreWizardInterest(k)}>{T["wizardInterest_" + k]}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="mt-field">
+                    <label>{T.wizardAccommodation}</label>
+                    <div className="mt-wizard-choices">
+                      {["hotel", "apartment", "hostel", "flexible"].map((k) => (
+                        <button key={k} className={"mt-wizard-choice" + (preWizardData.accommodationPrefs === k ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, accommodationPrefs: k })}>{T["wizardAccommodation_" + k]}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="mt-field">
+                    <label>{T.wizardPace}</label>
+                    <div className="mt-wizard-choices">
+                      {["relaxed", "balanced", "packed"].map((k) => (
+                        <button key={k} className={"mt-wizard-choice" + (preWizardData.pace === k ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, pace: k })}>{T["wizardPace_" + k]}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="mt-field"><label>{T.preWizardNotes}</label><textarea rows={5} value={preWizardData.planNotes} onChange={(e) => setPreWizardData({ ...preWizardData, planNotes: e.target.value })} /></div>
+                  <div className="mt-ai-suggest-box">
+                    <p className="mt-hint" style={{ margin: "0 0 8px" }}>{T.preWizardAiPitch}</p>
+                    <button className="mt-btn primary" style={{ width: "100%" }} onClick={activatePreWizardAiAgent}><Wand2 size={13} /> {T.preWizardActivateAi}</button>
+                  </div>
                 </>
               )}
-              {preWizardScreen === 2 && (
+              {preWizardScreen === 1 && (
                 <>
                   <div className="mt-wizard-qa">
                     <label>{T.preWizardHasFlights}</label>
@@ -3759,9 +3742,8 @@ export default function MyTripApp() {
                         <div key={i} className="mt-wizard-subgroup">
                           <div className="mt-section-label" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                             <span>{T.preWizardFlightN.replace("{n}", i + 1)}</span>
-                            {preWizardData.flights.length > 1 && <button className="mt-btn ghost" style={{ padding: "2px 6px" }} onClick={() => removePreWizardFlight(i)}><X size={12} /></button>}
+                            {preWizardData.flights.length > 1 && <button className="mt-btn ghost" style={{ padding: "2px 6px", marginTop: "-8px" }} onClick={() => removePreWizardFlight(i)}><X size={12} /></button>}
                           </div>
-                          <div className="mt-wizard-qa"><label>{T.flightNumber}</label><input value={f.flightNumber} onChange={(e) => updatePreWizardArrayItem("flights", i, { flightNumber: e.target.value })} /></div>
                           <div className="mt-wizard-qa"><label>{T.from}</label><input value={f.from} onChange={(e) => updatePreWizardArrayItem("flights", i, { from: e.target.value })} /></div>
                           <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={f.fromAlias} onChange={(e) => updatePreWizardArrayItem("flights", i, { fromAlias: e.target.value })} /></div>
                           <div className="mt-wizard-qa"><label>{T.to}</label><input value={f.to} onChange={(e) => updatePreWizardArrayItem("flights", i, { to: e.target.value })} /></div>
@@ -3778,7 +3760,7 @@ export default function MyTripApp() {
                   )}
                 </>
               )}
-              {preWizardScreen === 3 && (
+              {preWizardScreen === 2 && (
                 <>
                   <div className="mt-wizard-qa">
                     <label>{T.preWizardHasDomestic}</label>
@@ -3793,9 +3775,8 @@ export default function MyTripApp() {
                         <div key={i} className="mt-wizard-subgroup">
                           <div className="mt-section-label" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                             <span>{T.preWizardFlightN.replace("{n}", i + 1)}</span>
-                            {preWizardData.domesticFlights.length > 1 && <button className="mt-btn ghost" style={{ padding: "2px 6px" }} onClick={() => removePreWizardDomesticFlight(i)}><X size={12} /></button>}
+                            {preWizardData.domesticFlights.length > 1 && <button className="mt-btn ghost" style={{ padding: "2px 6px", marginTop: "-8px" }} onClick={() => removePreWizardDomesticFlight(i)}><X size={12} /></button>}
                           </div>
-                          <div className="mt-wizard-qa"><label>{T.flightNumber}</label><input value={f.flightNumber} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { flightNumber: e.target.value })} /></div>
                           <div className="mt-wizard-qa"><label>{T.from}</label><input value={f.from} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { from: e.target.value })} /></div>
                           <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={f.fromAlias} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { fromAlias: e.target.value })} /></div>
                           <div className="mt-wizard-qa"><label>{T.to}</label><input value={f.to} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { to: e.target.value })} /></div>
@@ -3820,7 +3801,7 @@ export default function MyTripApp() {
                   )}
                 </>
               )}
-              {preWizardScreen === 4 && (
+              {preWizardScreen === 3 && (
                 <>
                   <div className="mt-wizard-qa">
                     <label>{T.preWizardHasHotels}</label>
@@ -3835,7 +3816,7 @@ export default function MyTripApp() {
                         <div key={i} className="mt-wizard-subgroup">
                           <div className="mt-section-label" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                             <span>{T.preWizardHotelN.replace("{n}", i + 1)}</span>
-                            {preWizardData.hotels.length > 1 && <button className="mt-btn ghost" style={{ padding: "2px 6px" }} onClick={() => removePreWizardHotel(i)}><X size={12} /></button>}
+                            {preWizardData.hotels.length > 1 && <button className="mt-btn ghost" style={{ padding: "2px 6px", marginTop: "-8px" }} onClick={() => removePreWizardHotel(i)}><X size={12} /></button>}
                           </div>
                           <div className="mt-wizard-qa"><label>{T.hotelName}</label><input value={h.name} onChange={(e) => updatePreWizardArrayItem("hotels", i, { name: e.target.value })} /></div>
                           <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={h.alias} onChange={(e) => updatePreWizardArrayItem("hotels", i, { alias: e.target.value })} /></div>
@@ -3855,9 +3836,9 @@ export default function MyTripApp() {
               )}
             </div>
             <div className="mt-modal-footer">
-              {preWizardScreen === 1 && <button className="mt-btn ghost" onClick={closePreWizard}>{T.skip}</button>}
-              {preWizardScreen > 1 && <button className="mt-btn ghost" onClick={preWizardBack}>{T.wizardBack}</button>}
-              {preWizardScreen < 4 ? (
+              {preWizardScreen === 0 && <button className="mt-btn ghost" onClick={closePreWizard}>{T.skip}</button>}
+              {preWizardScreen > 0 && <button className="mt-btn ghost" onClick={preWizardBack}>{T.wizardBack}</button>}
+              {preWizardScreen < 3 ? (
                 <button className="mt-btn primary" onClick={preWizardNext}>{T.wizardNext}</button>
               ) : (
                 <button className="mt-btn primary" onClick={confirmPreWizard}><Check size={13} /> {T.wizardCreate}</button>
