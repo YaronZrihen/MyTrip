@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useFloating, autoUpdate, offset, flip, shift, useClick, useDismiss, useInteractions } from "@floating-ui/react";
 import { DndContext, useDraggable, useDroppable, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
@@ -20,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "17.0.0";
+const APP_VERSION = "17.1.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -187,6 +188,8 @@ const T_DICT = {
     deleteFrameTitle: "מחיקת מסגרת", deleteFrameHint: "איך למחוק את המסגרת?",
     preFlightChecklist: "צ'ק ליסט קדם טיסה", checklistReservations: "הזמנות", checklistDocuments: "מסמכי נסיעה", checklistOther: "נוספים",
     helpCenterTitle: "מרכז עזרה",
+    fileManagerTitle: "ניהול קבצים", fileManagerFilter_all: "הכל", fileManagerFilter_byCategory: "לפי שייכות", fileManagerFilter_images: "תמונות", fileManagerFilter_documents: "מסמכים",
+    fileManagerEmpty: "עדיין לא הועלו קבצים. קבצים שתעלה בכל מקום באפליקציה (כמו צ'ק ליסט) יופיעו כאן.",
     checklistShopping: "רשימת קניות", checklistPacking: "ארגון ציוד לטיסה", checklistUpload: "העלה מסמך", checklistAddItem: "הוסף פריט...",
     checklistPackingSub: "{n} מתוך {total} הושלמו", checklistShoppingSub: "{n} פריטים", checklistShoppingEmpty: "הרשימה ריקה — הוסף פריט למטה",
     deleteFrameOnly: "מחק מסגרת בלבד (התוכן יעבור למסגרת האם)", deleteFrameWithContent: "מחק מסגרת ואת כל התוכן שבתוכה",
@@ -328,6 +331,8 @@ const T_DICT = {
     deleteFrameTitle: "Delete Frame", deleteFrameHint: "How would you like to delete this frame?",
     preFlightChecklist: "Pre-Flight Checklist", checklistReservations: "Reservations", checklistDocuments: "Travel Documents", checklistOther: "Additional",
     helpCenterTitle: "Help Center",
+    fileManagerTitle: "File Manager", fileManagerFilter_all: "All", fileManagerFilter_byCategory: "By Category", fileManagerFilter_images: "Images", fileManagerFilter_documents: "Documents",
+    fileManagerEmpty: "No files uploaded yet. Files you upload anywhere in the app (like the checklist) will appear here.",
     checklistShopping: "Shopping List", checklistPacking: "Flight Packing", checklistUpload: "Upload document", checklistAddItem: "Add item...",
     checklistPackingSub: "{n} of {total} done", checklistShoppingSub: "{n} items", checklistShoppingEmpty: "List is empty — add an item below",
     deleteFrameOnly: "Delete frame only (content moves to parent)", deleteFrameWithContent: "Delete frame and all its content",
@@ -1981,6 +1986,27 @@ function ChecklistAddRow({ cat, T, onAdd }) {
   );
 }
 
+function CHECKLIST_CAT_LABEL(cat, T) {
+  const map = {
+    reservations: T.checklistReservations, documents: T.checklistDocuments,
+    checkin: T.checklistOther, currency: T.checklistOther, airport: T.checklistOther,
+    packing: T.checklistPacking, shopping: T.checklistShopping,
+  };
+  return map[cat] || cat;
+}
+function FileManagerRow({ file, T, showCategory }) {
+  const Icon = file.type === "image" ? ImagePlus : FileUp;
+  return (
+    <div className="mt-checklist-row">
+      <span className="mt-file-manager-icon"><Icon size={15} /></span>
+      <span className="mt-file-manager-info">
+        <strong>{file.name}</strong>
+        <span>{file.sourceLabel}{showCategory ? ` · ${CHECKLIST_CAT_LABEL(file.sourceCat, T)}` : ""}</span>
+      </span>
+    </div>
+  );
+}
+
 function HelpButton({ topic, lang, T, onOpenFull, size = 15 }) {
   const [open, setOpen] = useState(false);
   const { refs, floatingStyles } = useFloating({
@@ -1998,15 +2024,16 @@ function HelpButton({ topic, lang, T, onOpenFull, size = 15 }) {
       <button ref={refs.setReference} type="button" className="mt-help-btn" onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }} title={lang === "he" ? "עזרה" : "Help"}>
         <HelpCircle size={size} />
       </button>
-      {open && (
+      {open && createPortal(
         <>
           <div className="mt-floating-backdrop" onClick={(e) => { e.stopPropagation(); setOpen(false); }} />
-          <div ref={refs.setFloating} style={{ ...floatingStyles, zIndex: 200 }} className="mt-floating-menu mt-help-popover" onClick={(e) => e.stopPropagation()}>
+          <div ref={refs.setFloating} style={{ ...floatingStyles, zIndex: 400 }} className="mt-floating-menu mt-help-popover" onClick={(e) => e.stopPropagation()}>
             <div className="mt-help-popover-title"><Icon size={14} /> {lang === "he" ? topicData.title_he : topicData.title_en}</div>
             <p className="mt-help-popover-text">{lang === "he" ? topicData.short_he : topicData.short_en}</p>
             <button className="mt-help-popover-more" onClick={() => { setOpen(false); onOpenFull(topic); }}>{lang === "he" ? "עוד בעזרה ←" : "More in Help →"}</button>
           </div>
-        </>
+        </>,
+        document.body
       )}
     </span>
   );
@@ -2332,6 +2359,9 @@ export default function MyTripApp() {
   const [checklist, setChecklist] = useState(CHECKLIST_DEFAULTS);
   const checklistFileInputRef = useRef(null);
   const [checklistUploadTarget, setChecklistUploadTarget] = useState(null);
+  const [managedFiles, setManagedFiles] = useState([]);
+  const [fileManagerOpen, setFileManagerOpen] = useState(false);
+  const [fileManagerFilter, setFileManagerFilter] = useState("all");
   const [helpCenterOpen, setHelpCenterOpen] = useState(false);
   const [helpCenterFocusTopic, setHelpCenterFocusTopic] = useState(null);
   const [packingListOpen, setPackingListOpen] = useState(false);
@@ -2514,6 +2544,10 @@ export default function MyTripApp() {
   function removeChecklistItem(cat, id) {
     setChecklist((c) => ({ ...c, [cat]: c[cat].filter((it) => it.id !== id) }));
   }
+  function inferFileType(filename) {
+    const ext = (filename.split(".").pop() || "").toLowerCase();
+    return ["jpg", "jpeg", "png", "gif", "webp", "heic", "bmp", "svg"].includes(ext) ? "image" : "document";
+  }
   function openChecklistUpload(cat, id) {
     setChecklistUploadTarget({ cat, id });
     if (checklistFileInputRef.current) { checklistFileInputRef.current.value = ""; checklistFileInputRef.current.click(); }
@@ -2522,11 +2556,18 @@ export default function MyTripApp() {
     const file = e.target.files && e.target.files[0];
     if (!file || !checklistUploadTarget) return;
     const { cat, id } = checklistUploadTarget;
+    const item = checklist[cat].find((it) => it.id === id);
+    const label = item ? (lang === "he" ? item.label_he : item.label_en) : "";
     setChecklist((c) => ({ ...c, [cat]: c[cat].map((it) => (it.id === id ? { ...it, doc: file.name } : it)) }));
+    setManagedFiles((prev) => [
+      ...prev.filter((f) => !(f.sourceCat === cat && f.sourceId === id)),
+      { id: uid(), name: file.name, type: inferFileType(file.name), sourceCat: cat, sourceId: id, sourceLabel: label, uploadedAt: Date.now() },
+    ]);
     setChecklistUploadTarget(null);
   }
   function removeChecklistDoc(cat, id) {
     setChecklist((c) => ({ ...c, [cat]: c[cat].map((it) => (it.id === id ? { ...it, doc: null } : it)) }));
+    setManagedFiles((prev) => prev.filter((f) => !(f.sourceCat === cat && f.sourceId === id)));
   }
   function openHelpTopic(topic) {
     setHelpCenterFocusTopic(topic);
@@ -3642,6 +3683,13 @@ export default function MyTripApp() {
         .mt-help-section { padding:12px 0; border-bottom:1px solid var(--border); transition:background .4s ease; }
         .mt-help-section.focused { background:var(--teal-tint); border-radius:8px; padding:12px 10px; }
         .mt-help-section-title { display:flex; align-items:center; gap:7px; font-size:14.5px; font-weight:700; color:var(--ink); margin-bottom:6px; }
+        .mt-file-manager-tabs { display:flex; gap:6px; padding:10px 16px 0; border-bottom:1px solid var(--border); }
+        .mt-file-manager-tab { border:none; background:none; padding:8px 10px; font-size:12px; font-weight:600; color:var(--muted); border-bottom:2px solid transparent; }
+        .mt-file-manager-tab.active { color:var(--teal-dark); border-bottom-color:var(--teal); }
+        .mt-file-manager-icon { width:30px; height:30px; border-radius:8px; background:var(--teal-tint); color:var(--teal-dark); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .mt-file-manager-info { display:flex; flex-direction:column; gap:2px; flex:1; overflow:hidden; }
+        .mt-file-manager-info strong { font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .mt-file-manager-info span { font-size:11px; color:var(--muted); }
         .mt-help-section-text { font-size:12.5px; color:var(--muted); line-height:1.6; margin:0; }
         .mt-checklist-add-row { display:flex; align-items:center; gap:6px; padding:8px 4px 14px; }
         .mt-checklist-add-row input { flex:1; border:1px solid var(--border); border-radius:8px; padding:7px 9px; font-size:13px; font-family:inherit; text-align:right; }
@@ -3824,6 +3872,7 @@ export default function MyTripApp() {
             <button className="mt-share-opt" onClick={() => { toggleReminders(); setActionsMenuOpen(false); }}><Bell size={14} /> {T.reminders}{remindersOn ? ` (${T.on})` : ""}</button>
             <button className="mt-share-opt" onClick={() => { setAiPanelOpen(true); setActionsMenuOpen(false); }}><Wand2 size={14} /> {T.aiAssistant}</button>
             <button className="mt-share-opt" onClick={() => { setChecklistOpen(true); setActionsMenuOpen(false); }}><CheckSquare size={14} /> {T.preFlightChecklist}</button>
+            <button className="mt-share-opt" onClick={() => { setFileManagerOpen(true); setActionsMenuOpen(false); }}><FileUp size={14} /> {T.fileManagerTitle}</button>
         </div>
       )}
       {demoNotice && (
@@ -4533,6 +4582,36 @@ export default function MyTripApp() {
       )}
 
       {/* frame modal */}
+      {fileManagerOpen && (
+        <div className="mt-modal-backdrop" onClick={() => setFileManagerOpen(false)}>
+          <div className="mt-modal" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
+            <div className="mt-modal-header"><span className="mt-modal-title">{T.fileManagerTitle}</span><button className="mt-btn ghost" onClick={() => setFileManagerOpen(false)}><X size={16} /></button></div>
+            <div className="mt-file-manager-tabs">
+              {["all", "byCategory", "images", "documents"].map((f) => (
+                <button key={f} className={"mt-file-manager-tab" + (fileManagerFilter === f ? " active" : "")} onClick={() => setFileManagerFilter(f)}>{T["fileManagerFilter_" + f]}</button>
+              ))}
+            </div>
+            <div className="mt-modal-body">
+              {managedFiles.length === 0 && <p className="mt-hint" style={{ margin: "10px 0" }}>{T.fileManagerEmpty}</p>}
+              {fileManagerFilter === "byCategory" ? (
+                Object.entries(
+                  managedFiles.reduce((acc, f) => { (acc[f.sourceCat] = acc[f.sourceCat] || []).push(f); return acc; }, {})
+                ).map(([cat, files]) => (
+                  <div key={cat}>
+                    <div className="mt-section-label">{CHECKLIST_CAT_LABEL(cat, T)}</div>
+                    {files.map((f) => <FileManagerRow key={f.id} file={f} T={T} />)}
+                  </div>
+                ))
+              ) : (
+                managedFiles
+                  .filter((f) => fileManagerFilter === "all" || (fileManagerFilter === "images" && f.type === "image") || (fileManagerFilter === "documents" && f.type === "document"))
+                  .map((f) => <FileManagerRow key={f.id} file={f} T={T} showCategory />)
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {helpCenterOpen && (
         <div className="mt-modal-backdrop" onClick={() => setHelpCenterOpen(false)}>
           <div className="mt-modal" style={{ maxWidth: 500 }} onClick={(e) => e.stopPropagation()}>
