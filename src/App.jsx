@@ -11,7 +11,7 @@ import {
   Smartphone, Monitor, AlertTriangle, GripVertical, Check, FolderPlus, Sparkles,
   Route, Waypoints, Download, Upload, MapPin, Search, CircleCheck, Clock, ArrowDownUp, Copy, StickyNote, TrainFront,
   Bus, Motorbike, Bike, Scooter, Sailboat, ShipWheel, Anchor, Kayak, Helicopter, Caravan, Building2, Landmark, Home,
-  CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2, MoreVertical, Menu, Calendar as CalendarIcon, Undo2, Redo2, Info, ExternalLink, Phone, Save, FolderOpen, ImagePlus, BookOpen, RefreshCw, Workflow, ArrowLeft, ArrowRight, CheckSquare, Paperclip, Briefcase
+  CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2, MoreVertical, Menu, Calendar as CalendarIcon, Undo2, Redo2, Info, ExternalLink, Phone, Save, FolderOpen, ImagePlus, BookOpen, RefreshCw, Workflow, ArrowLeft, ArrowRight, CheckSquare, Paperclip, Briefcase, Compass, FolderTree, LayoutGrid, HelpCircle
 } from "lucide-react";
 
 /* ---------------------------------------------------------------------- */
@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "16.2.0";
+const APP_VERSION = "17.0.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -31,7 +31,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 const DEFAULT_MAP_CENTER = [41.9, 12.49]; // Rome — reasonable default for this itinerary
-const ICONS = { Plane, PlaneTakeoff, Car, BedDouble, Footprints, Users, Sun, Ship, KeySquare, Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music, TrainFront, Bus, Motorbike, Bike, Scooter, Sailboat, ShipWheel, Anchor, Kayak, Helicopter, Caravan, Building2, Landmark, Home, MapPin };
+const ICONS = { Plane, PlaneTakeoff, Car, BedDouble, Footprints, Users, Sun, Ship, KeySquare, Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music, TrainFront, Bus, Motorbike, Bike, Scooter, Sailboat, ShipWheel, Anchor, Kayak, Helicopter, Caravan, Building2, Landmark, Home, MapPin, Compass, FolderTree, Wand2, CheckSquare, LayoutGrid, Share2 };
 const HE_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 const EN_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const FRAME_COLORS = ["#256D64", "#3E7CB1", "#8B6F47", "#7A5C9E", "#C1443A", "#5B8C5A"];
@@ -39,6 +39,72 @@ const CURRENCIES = ["₪", "$", "€", "£"];
 const CURRENCY_CODE_MAP = { "₪": "ILS", "$": "USD", "€": "EUR", "£": "GBP" };
 const FALLBACK_RATES = { ILS: 1, USD: 0.27, EUR: 0.25, GBP: 0.21 };
 
+const HELP_TOPICS = {
+  general: {
+    icon: "Compass",
+    title_he: "התחלה מהירה", title_en: "Getting Started",
+    short_he: "בנה את הטיול שלך ממסגרות (הטיול, מלונות, טיסות) ורשומות בתוכן (כל פעילות/נסיעה/לינה). לחץ '+ יום' כדי להתחיל.",
+    short_en: "Build your trip from frames (trip, hotels, flights) and records inside them (each activity/ride/stay). Click '+ Day' to start.",
+    full_he: "MyTrip Builder בנוי משתי שכבות: מסגרות (Frames) שמייצגות את הטיול עצמו, מלונות בודדים או קטעי טיסה — ורשומות (Records) בתוכן, שהן הפעילויות/נסיעות/לינות בכל יום. אפשר להתחיל מ'אשף הטיול' בתפריט הפעולות שיוצר עבורך שלד מלא אוטומטית, או לבנות ידנית: צור מסגרת, הוסף יום, והוסף רשומות בתוכו. כל רשומה כוללת סוג (טיסה/מלון/אטרקציה וכו'), מוצא ויעד, שעות, עלות והערות.",
+    full_en: "MyTrip Builder has two layers: Frames representing the trip itself, individual hotels, or flight legs — and Records inside them, the activities/rides/stays for each day. You can start from the 'Trip Wizard' in the actions menu which auto-generates a full skeleton, or build manually: create a frame, add a day, and add records inside it. Each record includes a type (flight/hotel/attraction etc.), origin and destination, times, cost, and notes.",
+  },
+  frames: {
+    icon: "FolderTree",
+    title_he: "מסגרות", title_en: "Frames",
+    short_he: "מסגרת היא קונטיינר לטיול, למלון או לטיסה. אפשר לקנן מסגרות זו בתוך זו, ולהגדיר סוג (בסיסית/טיול/טיסה/מלון) לעיצוב מותאם.",
+    short_en: "A frame is a container for a trip, hotel, or flight. Frames can be nested, and given a type (basic/trip/flight/hotel) for tailored styling.",
+    full_he: "מסגרות מאורגנות בהיררכיה: מסגרת ראשית (הטיול כולו) יכולה להכיל תת-מסגרות (מלון בודד, קטע טיסה). למסגרות מסוג 'טיול'/'טיסה'/'מלון' יש עיצוב כותרת מיוחד עם סמל, תגי תאריך וסך ימים. אפשר ליצור מסגרת חדשה מתפריט הפעולות, לגרור ולשחרר ימים בין מסגרות, ולמחוק מסגרת עם שתי אפשרויות: מחיקת המסגרת בלבד (התוכן עובר להורה) או מחיקה מלאה של המסגרת ותוכנה.",
+    full_en: "Frames are organized hierarchically: a main frame (the whole trip) can contain sub-frames (a single hotel, a flight leg). Frames of type 'trip'/'flight'/'hotel' get special header styling with an icon, date badges, and total days. Create a new frame from the actions menu, drag-and-drop days between frames, and delete a frame with two options: delete the frame only (content moves to parent) or fully delete the frame and its content.",
+  },
+  wizard: {
+    icon: "Wand2",
+    title_he: "אשף הטיול", title_en: "Trip Wizard",
+    short_he: "מבצע שאלות מונחות ובונה עבורך את שלד הטיול: פרטי בסיס, טיסות בינ״ל, טיסות פנים ומלונות — הכל בכמה לחיצות.",
+    short_en: "Asks guided questions and builds your trip skeleton for you: basics, international flights, domestic flights, and hotels — all in a few clicks.",
+    full_he: "האשף נפתח מתפריט פעולות ← אשף הטיול. במסך הראשון תבחר האם יש לך כבר תוכנית טיול קונקרטית (שם/מטיילים/יעד/תאריכים) או שתרצה עזרה בתכנון (תקציב/תחומי עניין/קצב/הערות). לאחר מכן שלושה שלבים ממוספרים: טיסות בינלאומיות, טיסות פנים (עם אפשרות הלוך-חזור), ומלונות. ניתן להוסיף כמה טיסות/מלונות שרוצים, ולערוך את פרטי הטיול שוב מאוחר יותר דרך אותו כפתור 'ערוך פרטי טיול'.",
+    full_en: "Open the wizard from Actions ← Trip Wizard. On the first screen, choose whether you already have a concrete plan (name/travelers/destination/dates) or want planning help (budget/interests/pace/notes). Then three numbered steps follow: international flights, domestic flights (with a round-trip option), and hotels. Add as many flights/hotels as you like, and edit trip details again later via the same 'Edit Trip Details' button.",
+  },
+  checklist: {
+    icon: "CheckSquare",
+    title_he: "צ'ק ליסט קדם טיסה", title_en: "Pre-Flight Checklist",
+    short_he: "רשימת מטלות לפני הטיסה: הזמנות, מסמכים, צ'ק-אין ועוד. ציוד לטיסה ורשימת קניות נמצאים בדפים נפרדים.",
+    short_en: "Pre-flight task list: reservations, documents, check-in and more. Flight packing and shopping list are on separate pages.",
+    full_he: "נגיש מתפריט פעולות ← כלים ← צ'ק ליסט קדם טיסה. פס ההתקדמות בראש הדף מציג אחוז השלמה (רשימת הקניות אינה נכללת בחישוב, וארגון הציוד לטיסה מוגבל ל-30% מסך ההתקדמות). ניתן לסמן כל פריט כהושלם, לצרף מסמך (חוץ מרשימת הציוד), ולהוסיף פריטים חדשים בכל קטגוריה. ארגון ציוד ורשימת קניות הם דפים נפרדים עם ניווט מהדף הראשי.",
+    full_en: "Access via Actions ← Tools ← Pre-Flight Checklist. The progress bar at the top shows completion percent (the shopping list is excluded, and flight packing is capped at 30% of total progress). Mark any item complete, attach a document (except for packing items), and add new items in any category. Packing and shopping are separate pages, navigated to from the main page.",
+  },
+  views: {
+    icon: "LayoutGrid",
+    title_he: "תצוגות", title_en: "Views",
+    short_he: "בחר בין תצוגת מחשב (טבלה), סלולר (כרטיסים) או זרימה (סמלים מופשטים) דרך תפריט ההגדרות.",
+    short_en: "Choose between desktop (table), mobile (cards), or flow (abstract icons) view from the settings menu.",
+    full_he: "תפריט ההגדרות מכיל קטגוריית 'תצוגות' עם שלוש אפשרויות: מחשב — טבלה מלאה עם כל העמודות; סלולר — כרטיסים מלאים לכל רשומה, מותאמים למסכים צרים; זרימה — הצגה מופשטת של רשימת הרשומות כסמלי סוג מחוברים בחיצים, לסקירה מהירה של מבנה היום.",
+    full_en: "The settings menu has a 'Views' category with three options: Desktop — full table with all columns; Mobile — full cards for each record, suited to narrow screens; Flow — an abstract display of records as connected type-icons with arrows, for a quick overview of the day's structure.",
+  },
+  types: {
+    icon: "Tag",
+    title_he: "סוגי רשומה", title_en: "Record Types",
+    short_he: "לכל רשומה יש סוג (טיסה, מלון, אטרקציה וכו') עם סמל וצבע. אפשר להוסיף סוג מותאם אישית דרך תפריט ההגדרות.",
+    short_en: "Each record has a type (flight, hotel, attraction, etc.) with an icon and color. Add a custom type via the settings menu.",
+    full_he: "סוג הרשומה קובע את הסמל, הצבע והשדות הרלוונטיים (למשל, מלון/אטרקציה לא דורשים 'מוצא'). ניתן לשנות סוג בלחיצה על סמל הרשומה ובחירה מרשימה, או להוסיף סוג חדש משלך דרך הגדרות ← הוסף סוג, עם בחירת סמל וצבע.",
+    full_en: "The record type determines its icon, color, and relevant fields (e.g. hotel/attraction don't require an 'origin'). Change a type by clicking the record's icon and choosing from the list, or add your own new type via Settings ← Add Type, choosing an icon and color.",
+  },
+  places: {
+    icon: "MapPin",
+    title_he: "אימות מיקום עם גוגל", title_en: "Google Place Verification",
+    short_he: "הקלד שם מקום ובחר מהצעות גוגל כדי לאמת אותו — כך תקבל תמונות, דירוג ומרחקים מדויקים.",
+    short_en: "Type a place name and pick from Google's suggestions to verify it — you'll get photos, ratings, and accurate distances.",
+    full_he: "בכל שדה מוצא/יעד ברשומה, הקלדה מפעילה חיפוש מקומות של גוגל. בחירה מהרשימה 'מאמתת' את המקום ומאפשרת: תצוגה מקדימה בריחוף/לחיצה על הסמל, חישוב מסלול ומרחק אוטומטי, ותצוגת פרטים מלאה של גוגל (דירוגים, תמונות, שעות פתיחה). מקום שלא אומת עדיין יוצג כטקסט חופשי בלבד, בלי הפרטים הנוספים.",
+    full_en: "In any origin/destination field on a record, typing triggers a Google Places search. Picking from the list 'verifies' the place and unlocks: hover/click preview on the icon, automatic route and distance calculation, and a full Google details view (ratings, photos, opening hours). An unverified place is shown as plain text only, without the extra details.",
+  },
+  sharing: {
+    icon: "Share2",
+    title_he: "שמירה, ייבוא וייצוא ושיתוף", title_en: "Save, Import/Export & Sharing",
+    short_he: "שמור/טען טיולים בשם, ייצא/ייבא קובץ גיבוי, ייצא PDF, או שתף כקובץ HTML עצמאי.",
+    short_en: "Save/load named trips, export/import a backup file, export to PDF, or share as a standalone HTML file.",
+    full_he: "תפריט פעולות ← שמירה, ייבוא וייצוא מרכז את כל האפשרויות: שמירת הטיול הנוכחי בשם לשימוש חוזר, טעינת טיול שמור, ייצוא/ייבוא קובץ JSON (גיבוי מלא), ייצוא PDF להדפסה, וייבוא מסלול מקובץ חיצוני. תפריט השיתוף מאפשר גם ייצוא כדף HTML עצמאי שאפשר לשלוח לכל אחד, גם בלי גישה לאפליקציה.",
+    full_en: "Actions ← Save, Import & Export centralizes everything: save the current trip under a name for reuse, load a saved trip, export/import a JSON file (full backup), export to PDF for printing, and import a route from an external file. The sharing menu also lets you export a standalone HTML page you can send to anyone, even without app access.",
+  },
+};
 const CATEGORY_COLORS = {
   "public-transport": "#3E7CB1", "road-transport": "#8B6F47", "sea-transport": "#2F7A8C",
   "air-transport": "#256D64", accommodation: "#D98E3F", activities: "#5B8C5A", other: "#7A5C9E",
@@ -120,6 +186,7 @@ const T_DICT = {
     save: "שמירה", cancel: "ביטול", delete: "מחיקה", addSub: "הוסף תת-רשומה",
     deleteFrameTitle: "מחיקת מסגרת", deleteFrameHint: "איך למחוק את המסגרת?",
     preFlightChecklist: "צ'ק ליסט קדם טיסה", checklistReservations: "הזמנות", checklistDocuments: "מסמכי נסיעה", checklistOther: "נוספים",
+    helpCenterTitle: "מרכז עזרה",
     checklistShopping: "רשימת קניות", checklistPacking: "ארגון ציוד לטיסה", checklistUpload: "העלה מסמך", checklistAddItem: "הוסף פריט...",
     checklistPackingSub: "{n} מתוך {total} הושלמו", checklistShoppingSub: "{n} פריטים", checklistShoppingEmpty: "הרשימה ריקה — הוסף פריט למטה",
     deleteFrameOnly: "מחק מסגרת בלבד (התוכן יעבור למסגרת האם)", deleteFrameWithContent: "מחק מסגרת ואת כל התוכן שבתוכה",
@@ -260,6 +327,7 @@ const T_DICT = {
     save: "Save", cancel: "Cancel", delete: "Delete", addSub: "Add sub-record",
     deleteFrameTitle: "Delete Frame", deleteFrameHint: "How would you like to delete this frame?",
     preFlightChecklist: "Pre-Flight Checklist", checklistReservations: "Reservations", checklistDocuments: "Travel Documents", checklistOther: "Additional",
+    helpCenterTitle: "Help Center",
     checklistShopping: "Shopping List", checklistPacking: "Flight Packing", checklistUpload: "Upload document", checklistAddItem: "Add item...",
     checklistPackingSub: "{n} of {total} done", checklistShoppingSub: "{n} items", checklistShoppingEmpty: "List is empty — add an item below",
     deleteFrameOnly: "Delete frame only (content moves to parent)", deleteFrameWithContent: "Delete frame and all its content",
@@ -1913,6 +1981,37 @@ function ChecklistAddRow({ cat, T, onAdd }) {
   );
 }
 
+function HelpButton({ topic, lang, T, onOpenFull, size = 15 }) {
+  const [open, setOpen] = useState(false);
+  const { refs, floatingStyles } = useFloating({
+    open, onOpenChange: setOpen,
+    placement: "bottom-end",
+    strategy: "fixed",
+    middleware: [offset(6), flip(), shift({ padding: 8 })],
+    whileElementsMounted: autoUpdate,
+  });
+  const topicData = HELP_TOPICS[topic];
+  if (!topicData) return null;
+  const Icon = ICONS[topicData.icon] || HelpCircle;
+  return (
+    <span style={{ position: "relative", display: "inline-flex" }}>
+      <button ref={refs.setReference} type="button" className="mt-help-btn" onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }} title={lang === "he" ? "עזרה" : "Help"}>
+        <HelpCircle size={size} />
+      </button>
+      {open && (
+        <>
+          <div className="mt-floating-backdrop" onClick={(e) => { e.stopPropagation(); setOpen(false); }} />
+          <div ref={refs.setFloating} style={{ ...floatingStyles, zIndex: 200 }} className="mt-floating-menu mt-help-popover" onClick={(e) => e.stopPropagation()}>
+            <div className="mt-help-popover-title"><Icon size={14} /> {lang === "he" ? topicData.title_he : topicData.title_en}</div>
+            <p className="mt-help-popover-text">{lang === "he" ? topicData.short_he : topicData.short_en}</p>
+            <button className="mt-help-popover-more" onClick={() => { setOpen(false); onOpenFull(topic); }}>{lang === "he" ? "עוד בעזרה ←" : "More in Help →"}</button>
+          </div>
+        </>
+      )}
+    </span>
+  );
+}
+
 function FrameDateBadge({ date, lang }) {
   return (
     <span className="mt-frame-date-badge">
@@ -2233,6 +2332,8 @@ export default function MyTripApp() {
   const [checklist, setChecklist] = useState(CHECKLIST_DEFAULTS);
   const checklistFileInputRef = useRef(null);
   const [checklistUploadTarget, setChecklistUploadTarget] = useState(null);
+  const [helpCenterOpen, setHelpCenterOpen] = useState(false);
+  const [helpCenterFocusTopic, setHelpCenterFocusTopic] = useState(null);
   const [packingListOpen, setPackingListOpen] = useState(false);
   const [shoppingListOpen, setShoppingListOpen] = useState(false);
   const checklistOtherItems = [
@@ -2426,6 +2527,14 @@ export default function MyTripApp() {
   }
   function removeChecklistDoc(cat, id) {
     setChecklist((c) => ({ ...c, [cat]: c[cat].map((it) => (it.id === id ? { ...it, doc: null } : it)) }));
+  }
+  function openHelpTopic(topic) {
+    setHelpCenterFocusTopic(topic);
+    setHelpCenterOpen(true);
+    setTimeout(() => {
+      const el = document.getElementById("help-topic-" + topic);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 60);
   }
   function activatePreWizardAiAgent() {
     const d = preWizardData;
@@ -3427,7 +3536,7 @@ export default function MyTripApp() {
         .mt-type-add-toggle { width:100%; display:flex; align-items:center; justify-content:center; gap:6px; padding:8px; border-radius:7px; background:none; border:none; font-size:12px; color:var(--teal); font-weight:600; flex-shrink:0; }
         .mt-type-add-toggle:hover { background:var(--bg); }
         .mt-type-cat-label { font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-weight:700; padding:8px 8px 3px; }
-        .mt-action-cat-label { font-size:14px; font-weight:700; color:var(--teal-dark); text-align:start; padding:10px 8px 4px; }
+        .mt-action-cat-label { font-size:14px; font-weight:700; color:var(--teal-dark); text-align:start; padding:10px 8px 4px; display:flex; align-items:center; gap:5px; justify-content:space-between; }
         .mt-type-menu button.opt { width:100%; display:flex; align-items:center; gap:8px; padding:7px 8px; border-radius:7px; background:none; border:none; font-size:12.5px; text-align:start; color:var(--ink); }
         .mt-type-menu button.opt.selected { background:var(--teal-tint); font-weight:600; color:var(--teal-dark); }
         .mt-type-menu button.opt.selected svg:last-child { color:var(--teal); }
@@ -3524,6 +3633,16 @@ export default function MyTripApp() {
         .mt-checklist-nav-text { display:flex; flex-direction:column; gap:2px; flex:1; }
         .mt-checklist-nav-text strong { font-size:13.5px; }
         .mt-checklist-nav-text span { font-size:11.5px; color:var(--muted); }
+        .mt-help-btn { border:none; background:none; color:var(--muted); padding:3px; display:flex; align-items:center; justify-content:center; border-radius:50%; flex-shrink:0; }
+        .mt-help-btn:hover { color:var(--teal); background:var(--teal-tint); }
+        .mt-help-popover { width:260px; padding:12px; box-shadow:0 8px 24px rgba(20,40,35,.18); border-radius:10px; background:var(--surface); }
+        .mt-help-popover-title { display:flex; align-items:center; gap:6px; font-size:13px; font-weight:700; color:var(--ink); margin-bottom:6px; }
+        .mt-help-popover-text { font-size:12px; color:var(--muted); line-height:1.5; margin:0 0 8px; }
+        .mt-help-popover-more { border:none; background:none; color:var(--teal-dark); font-size:12px; font-weight:700; padding:0; }
+        .mt-help-section { padding:12px 0; border-bottom:1px solid var(--border); transition:background .4s ease; }
+        .mt-help-section.focused { background:var(--teal-tint); border-radius:8px; padding:12px 10px; }
+        .mt-help-section-title { display:flex; align-items:center; gap:7px; font-size:14.5px; font-weight:700; color:var(--ink); margin-bottom:6px; }
+        .mt-help-section-text { font-size:12.5px; color:var(--muted); line-height:1.6; margin:0; }
         .mt-checklist-add-row { display:flex; align-items:center; gap:6px; padding:8px 4px 14px; }
         .mt-checklist-add-row input { flex:1; border:1px solid var(--border); border-radius:8px; padding:7px 9px; font-size:13px; font-family:inherit; text-align:right; }
         .mt-error { display:flex; gap:6px; align-items:flex-start; background:#FBEAE8; color:var(--danger); font-size:11.5px; padding:7px 9px; border-radius:8px; }
@@ -3628,6 +3747,7 @@ export default function MyTripApp() {
         <div className="mt-header-brand-group">
           <span className="mt-brand-name">{T.appName}</span>
           <div className="mt-brand-mark"><Plane /></div>
+          <HelpButton topic="general" lang={lang} T={T} onOpenFull={openHelpTopic} />
         </div>
       </div>
       {!headerCollapsed && (
@@ -3661,7 +3781,7 @@ export default function MyTripApp() {
 
       {settingsMenuOpen && (
         <div ref={settingsMenu.refs.setFloating} style={settingsMenu.floatingStyles} {...settingsMenu.getFloatingProps()} className="mt-floating-menu mt-kebab-menu" >
-            <div className="mt-action-cat-label">{T.catViews}</div>
+            <div className="mt-action-cat-label"><span>{T.catViews}</span><HelpButton topic="views" lang={lang} T={T} onOpenFull={openHelpTopic} size={13} /></div>
             <button className="mt-share-opt" onClick={() => { setViewMode("desktop"); setSettingsMenuOpen(false); }}>
               <Monitor size={14} /> {T.desktop}{viewMode === "desktop" && <Check size={13} style={{ marginInlineStart: "auto" }} />}
             </button>
@@ -3685,11 +3805,11 @@ export default function MyTripApp() {
 
       {actionsMenuOpen && (
         <div ref={actionsMenu.refs.setFloating} style={{ ...actionsMenu.floatingStyles, maxWidth: "min(240px, 92vw)" }} {...actionsMenu.getFloatingProps()} className="mt-floating-menu mt-kebab-menu">
-            <div className="mt-action-cat-label">{T.catNewFrame}</div>
+            <div className="mt-action-cat-label"><span>{T.catNewFrame}</span><HelpButton topic="frames" lang={lang} T={T} onOpenFull={openHelpTopic} size={13} /></div>
             <button className="mt-share-opt" onClick={() => { openFrameModal(null, null); setActionsMenuOpen(false); }}><FolderPlus size={14} /> {T.newFrame}</button>
             <button className="mt-share-opt" onClick={() => { openPreWizard(); setActionsMenuOpen(false); }}><Wand2 size={14} /> {T.tripWizard}</button>
             <button className="mt-share-opt" onClick={() => { openEditTripDetails(); setActionsMenuOpen(false); }}><Pencil size={14} /> {T.editTripDetails}</button>
-            <div className="mt-action-cat-label">{T.catSaveExport}</div>
+            <div className="mt-action-cat-label"><span>{T.catSaveExport}</span><HelpButton topic="sharing" lang={lang} T={T} onOpenFull={openHelpTopic} size={13} /></div>
             <button className="mt-share-opt" onClick={openSaveTripModal}><Save size={14} /> {T.saveTripByName}</button>
             <button className="mt-share-opt" onClick={openLoadTripModal}><FolderOpen size={14} /> {T.loadSavedTrip}</button>
             <button className="mt-share-opt" onClick={() => { exportToFile(); setActionsMenuOpen(false); }}><Download size={14} /> {T.exportFile}</button>
@@ -3783,7 +3903,7 @@ export default function MyTripApp() {
       {preWizardOpen && (
         <div className="mt-modal-backdrop" onClick={closePreWizard}>
           <div className="mt-modal" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
-            <div className="mt-modal-header"><span className="mt-modal-title">{T.preWizardTitle}</span><button className="mt-btn ghost" onClick={closePreWizard}><X size={16} /></button></div>
+            <div className="mt-modal-header"><span style={{ display: "flex", alignItems: "center", gap: 6 }}><span className="mt-modal-title">{T.preWizardTitle}</span><HelpButton topic="wizard" lang={lang} T={T} onOpenFull={openHelpTopic} /></span><button className="mt-btn ghost" onClick={closePreWizard}><X size={16} /></button></div>
             {preWizardScreen > 0 && (
               <div className="mt-wizard-stepper">
                 {[1, 2, 3].map((n) => (
@@ -4062,7 +4182,7 @@ export default function MyTripApp() {
 
       {addTypeOpen && (
         <div ref={addTypeMenu.refs.setFloating} style={{ ...addTypeMenu.floatingStyles, minWidth: 200 }} {...addTypeMenu.getFloatingProps()} className="mt-floating-menu">
-            <div className="mt-menu-head"><strong>{T.newType}</strong><button className="mt-btn ghost" style={{ padding: "2px 6px" }} onClick={() => setAddTypeOpen(false)}><X size={14} /></button></div>
+            <div className="mt-menu-head"><span style={{ display: "flex", alignItems: "center", gap: 5 }}><strong>{T.newType}</strong><HelpButton topic="types" lang={lang} T={T} onOpenFull={openHelpTopic} size={13} /></span><button className="mt-btn ghost" style={{ padding: "2px 6px" }} onClick={() => setAddTypeOpen(false)}><X size={14} /></button></div>
             <input type="text" placeholder={T.typeName} value={addTypeDraft.name} onChange={(e) => setAddTypeDraft({ ...addTypeDraft, name: e.target.value })} style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 6, padding: "5px 7px", fontSize: 12.5, marginBottom: 8, color: "var(--ink)", background: "#fff" }} />
             <div className="mt-icon-pick-row">
               {ICON_PALETTE.map((ic) => { const PI = ICONS[ic]; return (
@@ -4192,7 +4312,7 @@ export default function MyTripApp() {
       {cardDraft && (
         <div className="mt-modal-backdrop" onClick={closeCard}>
           <div className="mt-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="mt-modal-header"><span className="mt-modal-title">{T.editRecord}</span><button className="mt-btn ghost" onClick={closeCard}><X size={16} /></button></div>
+            <div className="mt-modal-header"><span style={{ display: "flex", alignItems: "center", gap: 6 }}><span className="mt-modal-title">{T.editRecord}</span><HelpButton topic="places" lang={lang} T={T} onOpenFull={openHelpTopic} /></span><button className="mt-btn ghost" onClick={closeCard}><X size={16} /></button></div>
             <div className="mt-modal-body">
               <div className="mt-field">
                 <label>{T.frame}</label>
@@ -4413,10 +4533,29 @@ export default function MyTripApp() {
       )}
 
       {/* frame modal */}
+      {helpCenterOpen && (
+        <div className="mt-modal-backdrop" onClick={() => setHelpCenterOpen(false)}>
+          <div className="mt-modal" style={{ maxWidth: 500 }} onClick={(e) => e.stopPropagation()}>
+            <div className="mt-modal-header"><span className="mt-modal-title">{T.helpCenterTitle}</span><button className="mt-btn ghost" onClick={() => setHelpCenterOpen(false)}><X size={16} /></button></div>
+            <div className="mt-modal-body">
+              {Object.entries(HELP_TOPICS).map(([key, topicData]) => {
+                const Icon = ICONS[topicData.icon] || HelpCircle;
+                return (
+                  <div key={key} id={"help-topic-" + key} className={"mt-help-section" + (helpCenterFocusTopic === key ? " focused" : "")}>
+                    <div className="mt-help-section-title"><Icon size={16} /> {lang === "he" ? topicData.title_he : topicData.title_en}</div>
+                    <p className="mt-help-section-text">{lang === "he" ? topicData.full_he : topicData.full_en}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {checklistOpen && (
         <div className="mt-modal-backdrop" onClick={() => setChecklistOpen(false)}>
           <div className="mt-modal" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
-            <div className="mt-modal-header"><span className="mt-modal-title">{T.preFlightChecklist}</span><button className="mt-btn ghost" onClick={() => setChecklistOpen(false)}><X size={16} /></button></div>
+            <div className="mt-modal-header"><span style={{ display: "flex", alignItems: "center", gap: 6 }}><span className="mt-modal-title">{T.preFlightChecklist}</span><HelpButton topic="checklist" lang={lang} T={T} onOpenFull={openHelpTopic} /></span><button className="mt-btn ghost" onClick={() => setChecklistOpen(false)}><X size={16} /></button></div>
             <div className="mt-checklist-progress-wrap">
               <div className="mt-checklist-progress-track"><div className={"mt-checklist-progress-fill" + (checklistProgressPct >= 100 ? " complete" : "")} style={{ width: `${checklistProgressPct}%` }} /></div>
               <span className={"mt-checklist-progress-pct" + (checklistProgressPct >= 100 ? " complete" : "")}>{checklistProgressPct}%</span>
@@ -4527,7 +4666,10 @@ export default function MyTripApp() {
         <div className="mt-modal-backdrop" onClick={closeFrameModal}>
           <div className="mt-modal" onClick={(e) => e.stopPropagation()}>
             <div className="mt-modal-header">
-              <span className="mt-modal-title">{frameDraft.id ? T.frameModalEdit : T.frameModalNew}</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span className="mt-modal-title">{frameDraft.id ? T.frameModalEdit : T.frameModalNew}</span>
+                <HelpButton topic="frames" lang={lang} T={T} onOpenFull={openHelpTopic} />
+              </span>
               <button className="mt-btn ghost" onClick={closeFrameModal}><X size={16} /></button>
             </div>
             <div className="mt-modal-body">
