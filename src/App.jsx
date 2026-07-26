@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "17.1.0";
+const APP_VERSION = "17.1.2";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -477,7 +477,9 @@ function useFloatingMenu(open, onOpenChange) {
     whileElementsMounted: autoUpdate,
   });
   const click = useClick(context);
-  const dismiss = useDismiss(context);
+  const dismiss = useDismiss(context, {
+    outsidePress: (event) => !event.target.closest(".mt-help-popover, .mt-help-btn"),
+  });
   const { getReferenceProps, getFloatingProps } = useInteractions([click, dismiss]);
   return { refs, floatingStyles, getReferenceProps, getFloatingProps };
 }
@@ -2007,8 +2009,9 @@ function FileManagerRow({ file, T, showCategory }) {
   );
 }
 
-function HelpButton({ topic, lang, T, onOpenFull, size = 15 }) {
-  const [open, setOpen] = useState(false);
+function HelpButton({ topic, lang, T, onOpenFull, size = 15, openTopic, setOpenTopic }) {
+  const open = openTopic === topic;
+  const setOpen = (v) => setOpenTopic(v ? topic : null);
   const { refs, floatingStyles } = useFloating({
     open, onOpenChange: setOpen,
     placement: "bottom-end",
@@ -2021,16 +2024,16 @@ function HelpButton({ topic, lang, T, onOpenFull, size = 15 }) {
   const Icon = ICONS[topicData.icon] || HelpCircle;
   return (
     <span style={{ position: "relative", display: "inline-flex" }}>
-      <button ref={refs.setReference} type="button" className="mt-help-btn" onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }} title={lang === "he" ? "עזרה" : "Help"}>
+      <button ref={refs.setReference} type="button" className="mt-help-btn" onClick={(e) => { e.stopPropagation(); setOpenTopic(open ? null : topic); }} title={lang === "he" ? "עזרה" : "Help"}>
         <HelpCircle size={size} />
       </button>
       {open && createPortal(
         <>
-          <div className="mt-floating-backdrop" onClick={(e) => { e.stopPropagation(); setOpen(false); }} />
+          <div className="mt-floating-backdrop" onClick={(e) => { e.stopPropagation(); setOpenTopic(null); }} />
           <div ref={refs.setFloating} style={{ ...floatingStyles, zIndex: 400 }} className="mt-floating-menu mt-help-popover" onClick={(e) => e.stopPropagation()}>
             <div className="mt-help-popover-title"><Icon size={14} /> {lang === "he" ? topicData.title_he : topicData.title_en}</div>
             <p className="mt-help-popover-text">{lang === "he" ? topicData.short_he : topicData.short_en}</p>
-            <button className="mt-help-popover-more" onClick={() => { setOpen(false); onOpenFull(topic); }}>{lang === "he" ? "עוד בעזרה ←" : "More in Help →"}</button>
+            <button className="mt-help-popover-more" onClick={() => { setOpenTopic(null); onOpenFull(topic); }}>{lang === "he" ? "עוד בעזרה ←" : "More in Help →"}</button>
           </div>
         </>,
         document.body
@@ -2363,6 +2366,9 @@ export default function MyTripApp() {
   const [fileManagerOpen, setFileManagerOpen] = useState(false);
   const [fileManagerFilter, setFileManagerFilter] = useState("all");
   const [helpCenterOpen, setHelpCenterOpen] = useState(false);
+  const [helpPopoverOpen, setHelpPopoverOpen] = useState(null);
+  useEffect(() => { if (!actionsMenuOpen) setHelpPopoverOpen(null); }, [actionsMenuOpen]);
+  useEffect(() => { if (!addTypeOpen) setHelpPopoverOpen(null); }, [addTypeOpen]);
   const [helpCenterFocusTopic, setHelpCenterFocusTopic] = useState(null);
   const [packingListOpen, setPackingListOpen] = useState(false);
   const [shoppingListOpen, setShoppingListOpen] = useState(false);
@@ -3795,7 +3801,7 @@ export default function MyTripApp() {
         <div className="mt-header-brand-group">
           <span className="mt-brand-name">{T.appName}</span>
           <div className="mt-brand-mark"><Plane /></div>
-          <HelpButton topic="general" lang={lang} T={T} onOpenFull={openHelpTopic} />
+          <HelpButton topic="general" lang={lang} T={T} onOpenFull={openHelpTopic} openTopic={helpPopoverOpen} setOpenTopic={setHelpPopoverOpen} />
         </div>
       </div>
       {!headerCollapsed && (
@@ -3829,7 +3835,7 @@ export default function MyTripApp() {
 
       {settingsMenuOpen && (
         <div ref={settingsMenu.refs.setFloating} style={settingsMenu.floatingStyles} {...settingsMenu.getFloatingProps()} className="mt-floating-menu mt-kebab-menu" >
-            <div className="mt-action-cat-label"><span>{T.catViews}</span><HelpButton topic="views" lang={lang} T={T} onOpenFull={openHelpTopic} size={13} /></div>
+            <div className="mt-action-cat-label"><span>{T.catViews}</span><HelpButton topic="views" lang={lang} T={T} onOpenFull={openHelpTopic} size={13} openTopic={helpPopoverOpen} setOpenTopic={setHelpPopoverOpen} /></div>
             <button className="mt-share-opt" onClick={() => { setViewMode("desktop"); setSettingsMenuOpen(false); }}>
               <Monitor size={14} /> {T.desktop}{viewMode === "desktop" && <Check size={13} style={{ marginInlineStart: "auto" }} />}
             </button>
@@ -3853,11 +3859,11 @@ export default function MyTripApp() {
 
       {actionsMenuOpen && (
         <div ref={actionsMenu.refs.setFloating} style={{ ...actionsMenu.floatingStyles, maxWidth: "min(240px, 92vw)" }} {...actionsMenu.getFloatingProps()} className="mt-floating-menu mt-kebab-menu">
-            <div className="mt-action-cat-label"><span>{T.catNewFrame}</span><HelpButton topic="frames" lang={lang} T={T} onOpenFull={openHelpTopic} size={13} /></div>
+            <div className="mt-action-cat-label"><span>{T.catNewFrame}</span><HelpButton topic="frames" lang={lang} T={T} onOpenFull={openHelpTopic} size={13} openTopic={helpPopoverOpen} setOpenTopic={setHelpPopoverOpen} /></div>
             <button className="mt-share-opt" onClick={() => { openFrameModal(null, null); setActionsMenuOpen(false); }}><FolderPlus size={14} /> {T.newFrame}</button>
             <button className="mt-share-opt" onClick={() => { openPreWizard(); setActionsMenuOpen(false); }}><Wand2 size={14} /> {T.tripWizard}</button>
             <button className="mt-share-opt" onClick={() => { openEditTripDetails(); setActionsMenuOpen(false); }}><Pencil size={14} /> {T.editTripDetails}</button>
-            <div className="mt-action-cat-label"><span>{T.catSaveExport}</span><HelpButton topic="sharing" lang={lang} T={T} onOpenFull={openHelpTopic} size={13} /></div>
+            <div className="mt-action-cat-label"><span>{T.catSaveExport}</span><HelpButton topic="sharing" lang={lang} T={T} onOpenFull={openHelpTopic} size={13} openTopic={helpPopoverOpen} setOpenTopic={setHelpPopoverOpen} /></div>
             <button className="mt-share-opt" onClick={openSaveTripModal}><Save size={14} /> {T.saveTripByName}</button>
             <button className="mt-share-opt" onClick={openLoadTripModal}><FolderOpen size={14} /> {T.loadSavedTrip}</button>
             <button className="mt-share-opt" onClick={() => { exportToFile(); setActionsMenuOpen(false); }}><Download size={14} /> {T.exportFile}</button>
@@ -3952,7 +3958,7 @@ export default function MyTripApp() {
       {preWizardOpen && (
         <div className="mt-modal-backdrop" onClick={closePreWizard}>
           <div className="mt-modal" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
-            <div className="mt-modal-header"><span style={{ display: "flex", alignItems: "center", gap: 6 }}><span className="mt-modal-title">{T.preWizardTitle}</span><HelpButton topic="wizard" lang={lang} T={T} onOpenFull={openHelpTopic} /></span><button className="mt-btn ghost" onClick={closePreWizard}><X size={16} /></button></div>
+            <div className="mt-modal-header"><span style={{ display: "flex", alignItems: "center", gap: 6 }}><span className="mt-modal-title">{T.preWizardTitle}</span><HelpButton topic="wizard" lang={lang} T={T} onOpenFull={openHelpTopic} openTopic={helpPopoverOpen} setOpenTopic={setHelpPopoverOpen} /></span><button className="mt-btn ghost" onClick={closePreWizard}><X size={16} /></button></div>
             {preWizardScreen > 0 && (
               <div className="mt-wizard-stepper">
                 {[1, 2, 3].map((n) => (
@@ -4231,7 +4237,7 @@ export default function MyTripApp() {
 
       {addTypeOpen && (
         <div ref={addTypeMenu.refs.setFloating} style={{ ...addTypeMenu.floatingStyles, minWidth: 200 }} {...addTypeMenu.getFloatingProps()} className="mt-floating-menu">
-            <div className="mt-menu-head"><span style={{ display: "flex", alignItems: "center", gap: 5 }}><strong>{T.newType}</strong><HelpButton topic="types" lang={lang} T={T} onOpenFull={openHelpTopic} size={13} /></span><button className="mt-btn ghost" style={{ padding: "2px 6px" }} onClick={() => setAddTypeOpen(false)}><X size={14} /></button></div>
+            <div className="mt-menu-head"><span style={{ display: "flex", alignItems: "center", gap: 5 }}><strong>{T.newType}</strong><HelpButton topic="types" lang={lang} T={T} onOpenFull={openHelpTopic} size={13} openTopic={helpPopoverOpen} setOpenTopic={setHelpPopoverOpen} /></span><button className="mt-btn ghost" style={{ padding: "2px 6px" }} onClick={() => setAddTypeOpen(false)}><X size={14} /></button></div>
             <input type="text" placeholder={T.typeName} value={addTypeDraft.name} onChange={(e) => setAddTypeDraft({ ...addTypeDraft, name: e.target.value })} style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 6, padding: "5px 7px", fontSize: 12.5, marginBottom: 8, color: "var(--ink)", background: "#fff" }} />
             <div className="mt-icon-pick-row">
               {ICON_PALETTE.map((ic) => { const PI = ICONS[ic]; return (
@@ -4361,7 +4367,7 @@ export default function MyTripApp() {
       {cardDraft && (
         <div className="mt-modal-backdrop" onClick={closeCard}>
           <div className="mt-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="mt-modal-header"><span style={{ display: "flex", alignItems: "center", gap: 6 }}><span className="mt-modal-title">{T.editRecord}</span><HelpButton topic="places" lang={lang} T={T} onOpenFull={openHelpTopic} /></span><button className="mt-btn ghost" onClick={closeCard}><X size={16} /></button></div>
+            <div className="mt-modal-header"><span style={{ display: "flex", alignItems: "center", gap: 6 }}><span className="mt-modal-title">{T.editRecord}</span><HelpButton topic="places" lang={lang} T={T} onOpenFull={openHelpTopic} openTopic={helpPopoverOpen} setOpenTopic={setHelpPopoverOpen} /></span><button className="mt-btn ghost" onClick={closeCard}><X size={16} /></button></div>
             <div className="mt-modal-body">
               <div className="mt-field">
                 <label>{T.frame}</label>
@@ -4634,7 +4640,7 @@ export default function MyTripApp() {
       {checklistOpen && (
         <div className="mt-modal-backdrop" onClick={() => setChecklistOpen(false)}>
           <div className="mt-modal" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
-            <div className="mt-modal-header"><span style={{ display: "flex", alignItems: "center", gap: 6 }}><span className="mt-modal-title">{T.preFlightChecklist}</span><HelpButton topic="checklist" lang={lang} T={T} onOpenFull={openHelpTopic} /></span><button className="mt-btn ghost" onClick={() => setChecklistOpen(false)}><X size={16} /></button></div>
+            <div className="mt-modal-header"><span style={{ display: "flex", alignItems: "center", gap: 6 }}><span className="mt-modal-title">{T.preFlightChecklist}</span><HelpButton topic="checklist" lang={lang} T={T} onOpenFull={openHelpTopic} openTopic={helpPopoverOpen} setOpenTopic={setHelpPopoverOpen} /></span><button className="mt-btn ghost" onClick={() => setChecklistOpen(false)}><X size={16} /></button></div>
             <div className="mt-checklist-progress-wrap">
               <div className="mt-checklist-progress-track"><div className={"mt-checklist-progress-fill" + (checklistProgressPct >= 100 ? " complete" : "")} style={{ width: `${checklistProgressPct}%` }} /></div>
               <span className={"mt-checklist-progress-pct" + (checklistProgressPct >= 100 ? " complete" : "")}>{checklistProgressPct}%</span>
@@ -4747,7 +4753,7 @@ export default function MyTripApp() {
             <div className="mt-modal-header">
               <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <span className="mt-modal-title">{frameDraft.id ? T.frameModalEdit : T.frameModalNew}</span>
-                <HelpButton topic="frames" lang={lang} T={T} onOpenFull={openHelpTopic} />
+                <HelpButton topic="frames" lang={lang} T={T} onOpenFull={openHelpTopic} openTopic={helpPopoverOpen} setOpenTopic={setHelpPopoverOpen} />
               </span>
               <button className="mt-btn ghost" onClick={closeFrameModal}><X size={16} /></button>
             </div>
