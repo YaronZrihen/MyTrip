@@ -11,7 +11,7 @@ import {
   Smartphone, Monitor, AlertTriangle, GripVertical, Check, FolderPlus, Sparkles,
   Route, Waypoints, Download, Upload, MapPin, Search, CircleCheck, Clock, ArrowDownUp, Copy, StickyNote, TrainFront,
   Bus, Motorbike, Bike, Scooter, Sailboat, ShipWheel, Anchor, Kayak, Helicopter, Caravan, Building2, Landmark, Home,
-  CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2, MoreVertical, Menu, Calendar as CalendarIcon, Undo2, Redo2, Info, ExternalLink, Phone, Save, FolderOpen, ImagePlus, BookOpen, RefreshCw, Workflow, ArrowLeft, ArrowRight
+  CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2, MoreVertical, Menu, Calendar as CalendarIcon, Undo2, Redo2, Info, ExternalLink, Phone, Save, FolderOpen, ImagePlus, BookOpen, RefreshCw, Workflow, ArrowLeft, ArrowRight, CheckSquare, Paperclip
 } from "lucide-react";
 
 /* ---------------------------------------------------------------------- */
@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "15.2.1";
+const APP_VERSION = "16.0.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -119,6 +119,8 @@ const T_DICT = {
     desktop: "מחשב", mobile: "סלולר", flowView: "תצוגת זרימה", lang: "English", editRecord: "כרטיס רשומה",
     save: "שמירה", cancel: "ביטול", delete: "מחיקה", addSub: "הוסף תת-רשומה",
     deleteFrameTitle: "מחיקת מסגרת", deleteFrameHint: "איך למחוק את המסגרת?",
+    preFlightChecklist: "צ'ק ליסט קדם טיסה", checklistReservations: "הזמנות", checklistDocuments: "מסמכי נסיעה", checklistOther: "נוספים",
+    checklistShopping: "רשימת קניות", checklistPacking: "ארגון ציוד לטיסה", checklistUpload: "העלה מסמך", checklistAddItem: "הוסף פריט...",
     deleteFrameOnly: "מחק מסגרת בלבד (התוכן יעבור למסגרת האם)", deleteFrameWithContent: "מחק מסגרת ואת כל התוכן שבתוכה",
     type: "סוג", from: "מוצא", to: "יעד", start: "בשעה", end: "עד שעה", overnight: "חוצה חצות",
     requiresTicket: "דורש רכישת כרטיס כניסה", calcRoute: "חשב מסלול",
@@ -256,6 +258,8 @@ const T_DICT = {
     desktop: "Desktop", mobile: "Mobile", flowView: "Flow view", lang: "עברית", editRecord: "Record card",
     save: "Save", cancel: "Cancel", delete: "Delete", addSub: "Add sub-record",
     deleteFrameTitle: "Delete Frame", deleteFrameHint: "How would you like to delete this frame?",
+    preFlightChecklist: "Pre-Flight Checklist", checklistReservations: "Reservations", checklistDocuments: "Travel Documents", checklistOther: "Additional",
+    checklistShopping: "Shopping List", checklistPacking: "Flight Packing", checklistUpload: "Upload document", checklistAddItem: "Add item...",
     deleteFrameOnly: "Delete frame only (content moves to parent)", deleteFrameWithContent: "Delete frame and all its content",
     type: "Type", from: "Origin", to: "Destination", start: "At", end: "Until", overnight: "Crosses midnight",
     requiresTicket: "Requires entrance ticket", calcRoute: "Calculate route",
@@ -1875,6 +1879,38 @@ function FrameSummaryRow({ frame, ctx }) {
   );
 }
 
+function ChecklistRow({ item, cat, lang, T, onToggle, onUpload, onRemoveDoc, onRemove }) {
+  const label = lang === "he" ? item.label_he : item.label_en;
+  return (
+    <div className="mt-checklist-row">
+      <label className="mt-checkbox-row" style={{ flex: 1 }}>
+        <input type="checkbox" checked={!!item.checked} onChange={() => onToggle(cat, item.id)} />
+        <span className={item.checked ? "mt-checklist-done" : ""}>{label}</span>
+      </label>
+      {item.doc ? (
+        <span className="mt-checklist-doc-chip">
+          <Paperclip size={12} /> {item.doc}
+          <button className="mt-checklist-doc-x" onClick={() => onRemoveDoc(cat, item.id)}><X size={11} /></button>
+        </span>
+      ) : (
+        <button className="mt-btn ghost mt-checklist-upload-btn" onClick={() => onUpload(cat, item.id)}><Paperclip size={12} /> {T.checklistUpload}</button>
+      )}
+      {onRemove && <button className="mt-btn ghost" style={{ padding: "2px 6px" }} onClick={() => onRemove(cat, item.id)}><X size={12} /></button>}
+    </div>
+  );
+}
+function ChecklistAddRow({ cat, T, onAdd }) {
+  const [val, setVal] = useState("");
+  function submit() { onAdd(cat, val); setVal(""); }
+  return (
+    <div className="mt-checklist-add-row">
+      <input value={val} onChange={(e) => setVal(e.target.value)} placeholder={T.checklistAddItem}
+        onKeyDown={(e) => { if (e.key === "Enter") submit(); }} />
+      <button className="mt-btn ghost" onClick={submit}><Plus size={13} /></button>
+    </div>
+  );
+}
+
 function FrameDateBadge({ date, lang }) {
   return (
     <span className="mt-frame-date-badge">
@@ -2162,6 +2198,28 @@ export default function MyTripApp() {
   const [frameMenuOpenId, setFrameMenuOpenId] = useState(null);
   const [frameDraft, setFrameDraft] = useState(null);
   const [deleteFrameConfirmId, setDeleteFrameConfirmId] = useState(null);
+  const CHECKLIST_DEFAULTS = {
+    reservations: [
+      { id: "flight", label_he: "טיסות", label_en: "Flights", checked: false, doc: null },
+      { id: "domesticFlight", label_he: "טיסות פנים", label_en: "Domestic flights", checked: false, doc: null },
+      { id: "hotel", label_he: "מלון", label_en: "Hotel", checked: false, doc: null },
+    ],
+    documents: [
+      { id: "passport", label_he: "דרכון", label_en: "Passport", checked: false, doc: null },
+      { id: "visa", label_he: "ויזה", label_en: "Visa", checked: false, doc: null },
+      { id: "medical", label_he: "מסמך רפואי", label_en: "Medical document", checked: false, doc: null },
+      { id: "license", label_he: "רישיון בינלאומי", label_en: "International license", checked: false, doc: null },
+    ],
+    checkin: [{ id: "checkin", label_he: "צ'ק אין טיסות", label_en: "Flight check-in", checked: false, doc: null }],
+    currency: [{ id: "currency", label_he: "המרת כסף", label_en: "Currency exchange", checked: false, doc: null }],
+    airport: [{ id: "airport", label_he: "דרכי הגעה לשדה", label_en: "Ways to the airport", checked: false, doc: null }],
+    shopping: [],
+    packing: [],
+  };
+  const [checklistOpen, setChecklistOpen] = useState(false);
+  const [checklist, setChecklist] = useState(CHECKLIST_DEFAULTS);
+  const checklistFileInputRef = useRef(null);
+  const [checklistUploadTarget, setChecklistUploadTarget] = useState(null);
   const [addDayCtx, setAddDayCtx] = useState(null); // { fid, date }
   const [locPicker, setLocPicker] = useState(null); // { field, query, results, loading }
   const [dragId, setDragId] = useState(null);
@@ -2319,6 +2377,30 @@ export default function MyTripApp() {
   }
   function togglePreWizardInterest(key) {
     setPreWizardData((d) => ({ ...d, interests: d.interests.includes(key) ? d.interests.filter((k) => k !== key) : [...d.interests, key] }));
+  }
+  function toggleChecklistItem(cat, id) {
+    setChecklist((c) => ({ ...c, [cat]: c[cat].map((it) => (it.id === id ? { ...it, checked: !it.checked } : it)) }));
+  }
+  function addChecklistSubItem(cat, text) {
+    if (!text || !text.trim()) return;
+    setChecklist((c) => ({ ...c, [cat]: [...c[cat], { id: uid(), label_he: text, label_en: text, checked: false, doc: null }] }));
+  }
+  function removeChecklistItem(cat, id) {
+    setChecklist((c) => ({ ...c, [cat]: c[cat].filter((it) => it.id !== id) }));
+  }
+  function openChecklistUpload(cat, id) {
+    setChecklistUploadTarget({ cat, id });
+    if (checklistFileInputRef.current) { checklistFileInputRef.current.value = ""; checklistFileInputRef.current.click(); }
+  }
+  function handleChecklistFileSelected(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file || !checklistUploadTarget) return;
+    const { cat, id } = checklistUploadTarget;
+    setChecklist((c) => ({ ...c, [cat]: c[cat].map((it) => (it.id === id ? { ...it, doc: file.name } : it)) }));
+    setChecklistUploadTarget(null);
+  }
+  function removeChecklistDoc(cat, id) {
+    setChecklist((c) => ({ ...c, [cat]: c[cat].map((it) => (it.id === id ? { ...it, doc: null } : it)) }));
   }
   function activatePreWizardAiAgent() {
     const d = preWizardData;
@@ -3400,6 +3482,13 @@ export default function MyTripApp() {
         .mt-field-inline { display:flex; gap:3px; align-items:flex-end; }
         .mt-field-inline > div:first-child { flex:1; }
         .mt-checkbox-row { display:flex; align-items:center; gap:7px; font-size:12.5px; }
+        .mt-checklist-row { display:flex; align-items:center; gap:8px; padding:8px 4px; border-bottom:1px solid var(--border); }
+        .mt-checklist-done { text-decoration:line-through; color:var(--muted); }
+        .mt-checklist-doc-chip { display:flex; align-items:center; gap:4px; background:var(--teal-tint); color:var(--teal-dark); font-size:11px; font-weight:600; padding:4px 8px; border-radius:20px; white-space:nowrap; }
+        .mt-checklist-doc-x { border:none; background:none; color:var(--teal-dark); padding:0; display:flex; }
+        .mt-checklist-upload-btn { font-size:11.5px; padding:5px 9px; white-space:nowrap; }
+        .mt-checklist-add-row { display:flex; align-items:center; gap:6px; padding:8px 4px 14px; }
+        .mt-checklist-add-row input { flex:1; border:1px solid var(--border); border-radius:8px; padding:7px 9px; font-size:13px; font-family:inherit; text-align:right; }
         .mt-error { display:flex; gap:6px; align-items:flex-start; background:#FBEAE8; color:var(--danger); font-size:11.5px; padding:7px 9px; border-radius:8px; }
         .mt-error svg { width:13px; height:13px; flex-shrink:0; margin-top:1px; }
         .mt-hint { font-size:11px; color:var(--muted); }
@@ -3577,6 +3666,7 @@ export default function MyTripApp() {
             <div className="mt-action-cat-label">{T.catTools}</div>
             <button className="mt-share-opt" onClick={() => { toggleReminders(); setActionsMenuOpen(false); }}><Bell size={14} /> {T.reminders}{remindersOn ? ` (${T.on})` : ""}</button>
             <button className="mt-share-opt" onClick={() => { setAiPanelOpen(true); setActionsMenuOpen(false); }}><Wand2 size={14} /> {T.aiAssistant}</button>
+            <button className="mt-share-opt" onClick={() => { setChecklistOpen(true); setActionsMenuOpen(false); }}><CheckSquare size={14} /> {T.preFlightChecklist}</button>
         </div>
       )}
       {demoNotice && (
@@ -4286,6 +4376,52 @@ export default function MyTripApp() {
       )}
 
       {/* frame modal */}
+      {checklistOpen && (
+        <div className="mt-modal-backdrop" onClick={() => setChecklistOpen(false)}>
+          <div className="mt-modal" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
+            <div className="mt-modal-header"><span className="mt-modal-title">{T.preFlightChecklist}</span><button className="mt-btn ghost" onClick={() => setChecklistOpen(false)}><X size={16} /></button></div>
+            <div className="mt-modal-body">
+              <input ref={checklistFileInputRef} type="file" style={{ display: "none" }} onChange={handleChecklistFileSelected} />
+              <div className="mt-section-label">{T.checklistReservations}</div>
+              {checklist.reservations.map((it) => (
+                <ChecklistRow key={it.id} item={it} cat="reservations" lang={lang} T={T}
+                  onToggle={toggleChecklistItem} onUpload={openChecklistUpload} onRemoveDoc={removeChecklistDoc} />
+              ))}
+              <div className="mt-section-label">{T.checklistDocuments}</div>
+              {checklist.documents.map((it) => (
+                <ChecklistRow key={it.id} item={it} cat="documents" lang={lang} T={T}
+                  onToggle={toggleChecklistItem} onUpload={openChecklistUpload} onRemoveDoc={removeChecklistDoc} />
+              ))}
+              <div className="mt-section-label">{T.checklistOther}</div>
+              {checklist.checkin.map((it) => (
+                <ChecklistRow key={it.id} item={it} cat="checkin" lang={lang} T={T}
+                  onToggle={toggleChecklistItem} onUpload={openChecklistUpload} onRemoveDoc={removeChecklistDoc} />
+              ))}
+              {checklist.currency.map((it) => (
+                <ChecklistRow key={it.id} item={it} cat="currency" lang={lang} T={T}
+                  onToggle={toggleChecklistItem} onUpload={openChecklistUpload} onRemoveDoc={removeChecklistDoc} />
+              ))}
+              {checklist.airport.map((it) => (
+                <ChecklistRow key={it.id} item={it} cat="airport" lang={lang} T={T}
+                  onToggle={toggleChecklistItem} onUpload={openChecklistUpload} onRemoveDoc={removeChecklistDoc} />
+              ))}
+              <div className="mt-section-label">{T.checklistShopping}</div>
+              {checklist.shopping.map((it) => (
+                <ChecklistRow key={it.id} item={it} cat="shopping" lang={lang} T={T}
+                  onToggle={toggleChecklistItem} onUpload={openChecklistUpload} onRemoveDoc={removeChecklistDoc} onRemove={removeChecklistItem} />
+              ))}
+              <ChecklistAddRow cat="shopping" T={T} onAdd={addChecklistSubItem} />
+              <div className="mt-section-label">{T.checklistPacking}</div>
+              {checklist.packing.map((it) => (
+                <ChecklistRow key={it.id} item={it} cat="packing" lang={lang} T={T}
+                  onToggle={toggleChecklistItem} onUpload={openChecklistUpload} onRemoveDoc={removeChecklistDoc} onRemove={removeChecklistItem} />
+              ))}
+              <ChecklistAddRow cat="packing" T={T} onAdd={addChecklistSubItem} />
+            </div>
+          </div>
+        </div>
+      )}
+
       {deleteFrameConfirmId && (
         <div className="mt-modal-backdrop" onClick={() => setDeleteFrameConfirmId(null)}>
           <div className="mt-modal" style={{ maxWidth: 380 }} onClick={(e) => e.stopPropagation()}>
