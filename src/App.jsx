@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "17.1.3";
+const APP_VERSION = "17.1.5";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -2029,7 +2029,7 @@ function HelpButton({ topic, lang, T, onOpenFull, size = 15, openTopic, setOpenT
       </button>
       {open && createPortal(
         <>
-          <div className="mt-floating-backdrop" onClick={(e) => { e.stopPropagation(); setOpenTopic(null); }} />
+          <div className="mt-floating-backdrop" onClick={(e) => { e.stopPropagation(); setOpenTopic(null); }} style={{ background: "rgba(20,35,32,.4)" }} />
           <div ref={refs.setFloating} style={{ ...floatingStyles, zIndex: 400 }} className="mt-floating-menu mt-help-popover" onClick={(e) => e.stopPropagation()}>
             <div className="mt-help-popover-title"><Icon size={14} /> {lang === "he" ? topicData.title_he : topicData.title_en}</div>
             <p className="mt-help-popover-text">{lang === "he" ? topicData.short_he : topicData.short_en}</p>
@@ -3375,7 +3375,8 @@ export default function MyTripApp() {
       <div className="mytrip-app" dir={dir}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&display=swap');
-        .mytrip-app { --bg:#F5F8F6; --surface:#FFFFFF; --ink:#1E2A28; --muted:#6B7C76; --border:#DEE7E2; --teal:#256D64; --teal-dark:#174C45; --teal-tint:#E6F0EE; --amber:#D98E3F; --amber-tint:#FBEEDD; --danger:#C1443A;
+        :root { --bg:#F5F8F6; --surface:#FFFFFF; --ink:#1E2A28; --muted:#6B7C76; --border:#DEE7E2; --teal:#256D64; --teal-dark:#174C45; --teal-tint:#E6F0EE; --amber:#D98E3F; --amber-tint:#FBEEDD; --danger:#C1443A; }
+        .mytrip-app {
           font-family:'Heebo',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; font-variant-numeric:tabular-nums; color-scheme:light; }
         .mytrip-app * { box-sizing:border-box; }
         .mytrip-app button { font-family:inherit; cursor:pointer; }
