@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "17.1.2";
+const APP_VERSION = "17.1.3";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1369,8 +1369,8 @@ function FrameInlineDatePicker({ frame, ctx }) {
       </button>
       {open && (
         <>
-          <div className="mt-floating-backdrop" style={{ zIndex: 190 }} onClick={(e) => { e.stopPropagation(); setOpen(false); }} />
-          <div ref={refs.setFloating} style={{ ...floatingStyles, zIndex: 200 }} className="mt-floating-menu mt-daterange-cal" dir="ltr" onClick={(e) => e.stopPropagation()}>
+          <div className="mt-floating-backdrop" style={{ zIndex: 390 }} onClick={(e) => { e.stopPropagation(); setOpen(false); }} />
+          <div ref={refs.setFloating} style={{ ...floatingStyles, zIndex: 400 }} className="mt-floating-menu mt-daterange-cal" dir="ltr" onClick={(e) => e.stopPropagation()}>
             <div className="mt-cal-header">
               <button type="button" onClick={() => shiftMonth(-1)}><ChevronLeft size={16} /></button>
               <strong>{monthLabel}</strong>
@@ -1429,8 +1429,8 @@ function DateField({ value, onChange, lang, T, initialViewMonth }) {
       </button>
       {open && (
         <>
-          <div className="mt-floating-backdrop" style={{ zIndex: 190 }} onClick={() => setOpen(false)} />
-          <div ref={refs.setFloating} style={{ ...floatingStyles, zIndex: 200 }} className="mt-floating-menu mt-daterange-cal" dir="ltr">
+          <div className="mt-floating-backdrop" style={{ zIndex: 390 }} onClick={() => setOpen(false)} />
+          <div ref={refs.setFloating} style={{ ...floatingStyles, zIndex: 400 }} className="mt-floating-menu mt-daterange-cal" dir="ltr">
             <div className="mt-cal-header">
               <button type="button" onClick={() => shiftMonth(-1)}><ChevronLeft size={16} /></button>
               <strong>{monthLabel}</strong>
@@ -1499,8 +1499,8 @@ function DateRangeField({ startDate, endDate, onChange, lang, T, initialViewMont
       </button>
       {open && (
         <>
-          <div className="mt-floating-backdrop" style={{ zIndex: 190 }} onClick={() => setOpen(false)} />
-          <div ref={refs.setFloating} style={{ ...floatingStyles, zIndex: 200 }} className="mt-floating-menu mt-daterange-cal" dir="ltr">
+          <div className="mt-floating-backdrop" style={{ zIndex: 390 }} onClick={() => setOpen(false)} />
+          <div ref={refs.setFloating} style={{ ...floatingStyles, zIndex: 400 }} className="mt-floating-menu mt-daterange-cal" dir="ltr">
             <div className="mt-cal-header">
               <button type="button" onClick={() => shiftMonth(-1)}><ChevronLeft size={16} /></button>
               <strong>{monthLabel}</strong>
@@ -3407,7 +3407,7 @@ export default function MyTripApp() {
         .mt-avatar { width:26px; height:26px; border-radius:50%; background:var(--teal-tint); color:var(--teal-dark); display:flex; align-items:center; justify-content:center; border:1px solid var(--border); }
         .mt-toolbar-group { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
         .mt-floating-menu { background:var(--surface); color:var(--ink); border:1px solid var(--border); border-radius:10px; box-shadow:0 12px 32px rgba(20,40,35,.18); padding:10px; z-index:200; max-width:92vw; max-height:70vh; overflow-y:auto; }
-        .mt-floating-backdrop { position:fixed; inset:0; z-index:190; background:transparent; }
+        .mt-floating-backdrop { position:fixed; inset:0; z-index:390; background:transparent; }
         .mt-menu-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:7px; }
         .mt-menu-head strong { font-size:12.5px; }
         .mt-share-opt { width:100%; display:flex; align-items:center; gap:8px; padding:8px; border-radius:7px; background:none; border:none; font-size:12.5px; text-align:start; color:var(--ink); }
@@ -3647,7 +3647,7 @@ export default function MyTripApp() {
         .mt-loc-alias-cell input:focus { outline:none; border-color:var(--teal); }
         .mt-info-icon-btn { border:none; background:none; color:var(--muted); display:inline-flex; padding:1px; vertical-align:middle; }
         .mt-info-icon-btn:hover { color:var(--teal); }
-        .mt-info-popup { z-index:260; background:var(--surface); border:1px solid var(--border); border-radius:8px; box-shadow:0 8px 24px rgba(20,40,35,.18); padding:9px 11px; font-size:12px; max-width:300px; color:var(--ink); line-height:1.5; }
+        .mt-info-popup { z-index:400; background:var(--surface); border:1px solid var(--border); border-radius:8px; box-shadow:0 8px 24px rgba(20,40,35,.18); padding:9px 11px; font-size:12px; max-width:300px; color:var(--ink); line-height:1.5; }
         .mt-info-popup-widget { margin:-9px -11px 0; overflow:hidden; border-radius:8px 8px 0 0; }
         .mt-info-popup a { color:var(--teal); font-weight:600; }
         .mt-star-picker { display:flex; gap:3px; }
@@ -3884,7 +3884,7 @@ export default function MyTripApp() {
       {demoNotice && (
         <>
           <div className="mt-floating-backdrop" onClick={() => setDemoNotice(null)} />
-          <div className="mt-floating-menu" style={{ top: "40vh", insetInlineStart: "50%", transform: "translateX(50%)", maxWidth: 300, textAlign: "center" }}>
+          <div className="mt-floating-menu" style={{ top: "40vh", insetInlineStart: "50%", transform: "translateX(50%)", maxWidth: 300, textAlign: "center", zIndex: 400 }}>
             <p style={{ fontSize: 12.5, margin: "4px 0 10px" }}>{demoNotice}</p>
             <button className="mt-btn primary" style={{ width: "100%" }} onClick={() => setDemoNotice(null)}>{T.ok}</button>
           </div>
