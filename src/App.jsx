@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "18.3.1";
+const APP_VERSION = "18.3.2";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -2078,10 +2078,17 @@ function TypeFieldPicker({ typeId, types, lang, T, onChange, kindFilter, placeho
   const selected = typeMeta(typeId, types, T, lang);
   const SelIcon = ICONS[selected.icon] || Tag;
   const optionTypes = kindFilter ? types.filter((t) => t.kind === kindFilter) : types;
+  const { refs, floatingStyles } = useFloating({
+    open, onOpenChange: setOpen,
+    placement: "bottom-start",
+    strategy: "fixed",
+    middleware: [offset(6), flip(), shift({ padding: 8 })],
+    whileElementsMounted: autoUpdate,
+  });
   function close() { setOpen(false); setSearch(""); }
   return (
     <span style={{ position: "relative", display: "block" }}>
-      <button type="button" className="mt-type-field-btn" onClick={() => setOpen(true)}>
+      <button type="button" className="mt-type-field-btn" ref={refs.setReference} onClick={() => setOpen((v) => !v)}>
         {typeId && typeId !== "unset" ? (
           <>
             <span className="mt-type-icon" style={{ background: selected.color, width: 20, height: 20 }}><SelIcon size={11} /></span>
@@ -2093,13 +2100,13 @@ function TypeFieldPicker({ typeId, types, lang, T, onChange, kindFilter, placeho
         <ChevronDown size={13} style={{ marginInlineStart: "auto" }} />
       </button>
       {open && (
-        <div className="mt-modal-backdrop" onClick={close}>
-          <div dir={lang === "he" ? "rtl" : "ltr"} className="mt-modal mt-type-modal" onClick={(e) => e.stopPropagation()}>
+        <>
+          <div className="mt-floating-backdrop" onClick={close} />
+          <div ref={refs.setFloating} dir={lang === "he" ? "rtl" : "ltr"} style={{ ...floatingStyles, zIndex: 400 }} className="mt-floating-menu mt-type-menu" onClick={(e) => e.stopPropagation()}>
             <div className="mt-type-search-wrap">
               <Search size={13} />
               <input autoFocus className="mt-type-search" placeholder={T.searchTypes} value={search} onChange={(e) => setSearch(e.target.value)} />
               {search && <button className="mt-type-search-clear" onClick={() => setSearch("")}><X size={12} /></button>}
-              <button className="mt-btn ghost" style={{ padding: "4px 6px" }} onClick={close}><X size={16} /></button>
             </div>
             <div className="mt-type-list">
               {groupTypesByCategory(optionTypes)
@@ -2123,7 +2130,7 @@ function TypeFieldPicker({ typeId, types, lang, T, onChange, kindFilter, placeho
                 ))}
             </div>
           </div>
-        </div>
+        </>
       )}
     </span>
   );
