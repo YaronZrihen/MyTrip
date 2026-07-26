@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "18.4.0";
+const APP_VERSION = "18.5.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -184,7 +184,7 @@ const T_DICT = {
     exportFile: "שמור לקובץ", importFile: "ייבוא מקובץ", importSuccess: "הייבוא הצליח", importError: "הקובץ אינו תקין",
     login: "התחברות עם Google", logout: "יציאה",
     desktop: "מחשב", mobile: "סלולר", flowView: "תצוגת זרימה", lang: "English", editRecord: "כרטיס רשומה",
-    save: "שמירה", cancel: "ביטול", delete: "מחיקה", addSub: "הוסף תת-רשומה",
+    save: "שמירה", cancel: "ביטול", delete: "מחיקה", addSub: "תת רשומה", selectTime: "בחר שעה", done: "אישור",
     deleteFrameTitle: "מחיקת מסגרת", deleteFrameHint: "איך למחוק את המסגרת?",
     preFlightChecklist: "צ'ק ליסט קדם טיסה", checklistReservations: "הזמנות", checklistDocuments: "מסמכי נסיעה", checklistOther: "נוספים",
     helpCenterTitle: "מרכז עזרה",
@@ -328,7 +328,7 @@ const T_DICT = {
     exportFile: "Save to file", importFile: "Import from file", importSuccess: "Import successful", importError: "This file isn't valid",
     login: "Sign in with Google", logout: "Sign out",
     desktop: "Desktop", mobile: "Mobile", flowView: "Flow view", lang: "עברית", editRecord: "Record card",
-    save: "Save", cancel: "Cancel", delete: "Delete", addSub: "Add sub-record",
+    save: "Save", cancel: "Cancel", delete: "Delete", addSub: "Sub-record", selectTime: "Select time", done: "Done",
     deleteFrameTitle: "Delete Frame", deleteFrameHint: "How would you like to delete this frame?",
     preFlightChecklist: "Pre-Flight Checklist", checklistReservations: "Reservations", checklistDocuments: "Travel Documents", checklistOther: "Additional",
     helpCenterTitle: "Help Center",
@@ -1306,9 +1306,9 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
           {lang !== "he" && toVerified && <a className="mt-loc-badge" href={row.toVerifiedUrl} target="_blank" rel="noreferrer" title={T.openMap}><MapPin size={11} /></a>}
         </span>
       );
-      case "startTime": return <input className="mt-editable mt-time" type="time" value={row.startTime} onChange={(e) => updateRow(row.id, { startTime: e.target.value })} />;
+      case "startTime": return <TimeField value={row.startTime} onChange={(e) => updateRow(row.id, { startTime: e.target.value })} T={T} className="mt-editable mt-time" />;
       case "duration": return <span title={dur === null ? "" : dur} style={{ color: dur === null ? "var(--danger)" : "var(--muted)", fontSize: 12 }}>{dur === null ? "!" : dur}</span>;
-      case "endTime": return <input className={"mt-editable mt-time" + (row.endTimeAuto ? " mt-computed-field" : "")} type="time" value={row.endTime} title={row.endTimeAuto ? T.computedEndTimeHint : undefined} onChange={(e) => updateRow(row.id, { endTime: e.target.value, endTimeAuto: false })} />;
+      case "endTime": return <TimeField value={row.endTime} onChange={(e) => updateRow(row.id, { endTime: e.target.value, endTimeAuto: false })} T={T} className={"mt-editable mt-time" + (row.endTimeAuto ? " mt-computed-field" : "")} title={row.endTimeAuto ? T.computedEndTimeHint : undefined} />;
       case "route": return (
         <span className="mt-route-mini">
           {routeUrl && <a className="mt-link-icon" href={routeUrl} target="_blank" rel="noreferrer" title={T.routeTooltip}><Route size={14} /></a>}
@@ -2069,6 +2069,56 @@ function FileManagerRow({ file, T, showCategory }) {
         <span>{file.sourceLabel}{showCategory ? ` · ${CHECKLIST_CAT_LABEL(file.sourceCat, T)}` : ""}</span>
       </span>
     </div>
+  );
+}
+
+function TimeField({ value, onChange, T, className, title }) {
+  const [open, setOpen] = useState(false);
+  const [h, m] = (value || "").split(":");
+  const hh = h || "00", mm = m || "00";
+  const hourListRef = useRef(null);
+  const minListRef = useRef(null);
+  function pick(newH, newM) { onChange({ target: { value: `${newH}:${newM}` } }); }
+  function openPicker() {
+    setOpen(true);
+    setTimeout(() => {
+      if (hourListRef.current) { const el = hourListRef.current.querySelector(".selected"); if (el) el.scrollIntoView({ block: "center" }); }
+      if (minListRef.current) { const el = minListRef.current.querySelector(".selected"); if (el) el.scrollIntoView({ block: "center" }); }
+    }, 30);
+  }
+  const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
+  const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"));
+  return (
+    <span style={{ position: "relative", display: "block" }}>
+      <button type="button" className={"mt-type-field-btn" + (className ? " " + className : "")} title={title} onClick={openPicker}>
+        <Clock size={14} />
+        <span className="mt-type-text" dir="ltr">{value || "--:--"}</span>
+      </button>
+      {open && (
+        <div className="mt-modal-backdrop" onClick={() => setOpen(false)}>
+          <div className="mt-modal mt-time-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="mt-time-modal-header">
+              <span>{T.selectTime}</span>
+              <button className="mt-btn ghost" style={{ padding: "4px 6px" }} onClick={() => setOpen(false)}><X size={16} /></button>
+            </div>
+            <div className="mt-time-cols">
+              <div className="mt-time-col" ref={hourListRef}>
+                {HOURS.map((hv) => (
+                  <button key={hv} className={"mt-time-opt" + (hv === hh ? " selected" : "")} onClick={() => pick(hv, mm)}>{hv}</button>
+                ))}
+              </div>
+              <div className="mt-time-sep">:</div>
+              <div className="mt-time-col" ref={minListRef}>
+                {MINUTES.map((mv) => (
+                  <button key={mv} className={"mt-time-opt" + (mv === mm ? " selected" : "")} onClick={() => pick(hh, mv)}>{mv}</button>
+                ))}
+              </div>
+            </div>
+            <button className="mt-btn primary" style={{ width: "100%" }} onClick={() => setOpen(false)}><Check size={13} /> {T.done}</button>
+          </div>
+        </div>
+      )}
+    </span>
   );
 }
 
@@ -3662,6 +3712,14 @@ export default function MyTripApp() {
         .mt-type-field-btn { display:flex; align-items:center; gap:7px; width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 10px; background:var(--surface); font-size:13px; font-weight:500; color:var(--ink); box-sizing:border-box; }
         .mt-type-field-btn:hover { border-color:var(--teal); }
         .mt-type-modal { max-width:340px; width:92vw; max-height:70vh; display:flex; flex-direction:column; padding:12px; }
+        .mt-time-modal { max-width:260px; width:88vw; padding:14px; }
+        .mt-time-modal-header { display:flex; align-items:center; justify-content:space-between; font-weight:700; font-size:13.5px; margin-bottom:10px; }
+        .mt-time-cols { display:flex; align-items:center; justify-content:center; gap:6px; height:220px; margin-bottom:12px; }
+        .mt-time-col { display:flex; flex-direction:column; overflow-y:auto; overscroll-behavior:contain; height:100%; width:64px; scroll-snap-type:y proximity; border-radius:8px; background:var(--bg); }
+        .mt-time-sep { font-size:20px; font-weight:700; color:var(--muted); }
+        .mt-time-opt { border:none; background:none; padding:8px 0; font-size:16px; font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; scroll-snap-align:center; border-radius:6px; }
+        .mt-time-opt:hover { background:var(--teal-tint); }
+        .mt-time-opt.selected { background:var(--teal); color:#fff; }
         .mt-type-modal .mt-type-search-wrap { margin-bottom:8px; }
         .mt-type-modal .mt-type-list { overflow-y:auto; flex:1; overscroll-behavior:contain; }
         .mt-arrival-btn { border:1px solid var(--border); background:var(--surface); color:var(--muted); border-radius:6px; padding:3px; display:flex; align-items:center; justify-content:center; margin-inline-start:4px; }
@@ -3844,7 +3902,7 @@ export default function MyTripApp() {
         .mt-weather-spin { animation:mt-spin 1.2s linear infinite; }
         @keyframes mt-spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
         .mt-verified-row { display:flex; align-items:center; gap:5px; font-size:11px; color:#3E8E5A; margin-top:3px; }
-        .mt-modal-footer { display:flex; justify-content:flex-end; gap:7px; padding:13px 18px; border-top:1px solid var(--border); position:sticky; bottom:0; background:var(--surface); flex-wrap:wrap; }
+        .mt-modal-footer { display:flex; justify-content:flex-end; align-items:center; gap:6px; padding:11px 14px; border-top:1px solid var(--border); position:sticky; bottom:0; background:var(--surface); flex-wrap:nowrap; overflow-x:auto; }
         .mt-btn { border-radius:8px; padding:7px 14px; font-size:12.5px; font-weight:600; border:1px solid var(--border); background:#fff; display:inline-flex; align-items:center; gap:5px; }
         .mt-btn-icon { padding:6px 6px; flex-shrink:0; }
         .mt-btn.primary { background:var(--teal); color:#fff; border-color:var(--teal); }
@@ -4344,7 +4402,7 @@ export default function MyTripApp() {
                   </div>
                   <div className="mt-field-row">
                     <div className="mt-field"><label>{T.addDayDate}</label><DateField value={routeImportDate} lang={lang} T={T} onChange={(e) => setRouteImportDate(e.target.value)} /></div>
-                    <div className="mt-field"><label>{T.start}</label><input type="time" value={routeImportStartTime} onChange={(e) => setRouteImportStartTime(e.target.value)} /></div>
+                    <div className="mt-field"><label>{T.start}</label><TimeField value={routeImportStartTime} onChange={(e) => setRouteImportStartTime(e.target.value)} T={T} /></div>
                   </div>
                 </>
               )}
@@ -4524,7 +4582,7 @@ export default function MyTripApp() {
 
               <div className="mt-field">
                 <label>{T.type}</label>
-                <TypeFieldPicker typeId={cardDraft.typeId} types={types} lang={lang} T={T} onChange={(newType) => {
+                <TypeFieldPicker typeId={cardDraft.typeId} types={types} lang={lang} T={T} kindFilter="desc" onChange={(newType) => {
                   if (noOriginNeeded(newType)) setCardDraft({ ...cardDraft, typeId: newType, from: "", fromAlias: "", fromLat: null, fromLon: null, fromVerifiedUrl: "", fromVerifiedText: "", fromPlaceId: null });
                   else setCardDraft({ ...cardDraft, typeId: newType });
                 }} />
@@ -4596,6 +4654,8 @@ export default function MyTripApp() {
                 </div>
               </div>
 
+              <label className="mt-checkbox-row"><input type="checkbox" checked={cardDraft.toFee === "yes"} onChange={(e) => setCardDraft({ ...cardDraft, toFee: e.target.checked ? "yes" : null })} />{T.requiresTicket}</label>
+
               {noOriginNeeded(cardDraft.typeId) && (
                 <div className="mt-field">
                   <label>{T.arrivalMethod}</label>
@@ -4608,8 +4668,8 @@ export default function MyTripApp() {
               </div>
 
               <div className="mt-field-row">
-                <div className="mt-field"><label>{T.start}</label><input type="time" value={cardDraft.startTime} onChange={(e) => setCardDraft({ ...cardDraft, startTime: e.target.value })} /></div>
-                <div className="mt-field"><label>{T.end}</label><input type="time" className={cardDraft.endTimeAuto ? "mt-computed-field" : ""} title={cardDraft.endTimeAuto ? T.computedEndTimeHint : undefined} value={cardDraft.endTime} onChange={(e) => setCardDraft({ ...cardDraft, endTime: e.target.value, endTimeAuto: false })} /></div>
+                <div className="mt-field"><label>{T.start}</label><TimeField value={cardDraft.startTime} onChange={(e) => setCardDraft({ ...cardDraft, startTime: e.target.value })} T={T} /></div>
+                <div className="mt-field"><label>{T.end}</label><TimeField value={cardDraft.endTime} onChange={(e) => setCardDraft({ ...cardDraft, endTime: e.target.value, endTimeAuto: false })} T={T} className={cardDraft.endTimeAuto ? "mt-computed-field" : ""} title={cardDraft.endTimeAuto ? T.computedEndTimeHint : undefined} /></div>
               </div>
               <label className="mt-checkbox-row"><input type="checkbox" checked={!!cardDraft.overnight} onChange={(e) => setCardDraft({ ...cardDraft, overnight: e.target.checked })} />{T.overnight}</label>
               {cardHasTimeError && <div className="mt-error"><AlertTriangle /> {T.timeError}</div>}
@@ -4635,7 +4695,6 @@ export default function MyTripApp() {
                 </div>
               )}
 
-              <label className="mt-checkbox-row"><input type="checkbox" checked={cardDraft.toFee === "yes"} onChange={(e) => setCardDraft({ ...cardDraft, toFee: e.target.checked ? "yes" : null })} />{T.requiresTicket}</label>
 
               <div className="mt-weather-row">
                 <span className="mt-link-icon mt-weather-icon-btn" title={T.weatherAtArrival}>
@@ -4706,7 +4765,7 @@ export default function MyTripApp() {
                   <Plus size={13} /> {T.addSub}
                 </button>
               )}
-              <button className="mt-btn danger" onClick={() => { deleteRow(cardRowId); closeCard(); }}><Trash2 size={13} /> {T.delete}</button>
+              <button className="mt-btn danger" style={{ padding: "6px 8px" }} title={T.delete} onClick={() => { deleteRow(cardRowId); closeCard(); }}><Trash2 size={13} /></button>
               <button className="mt-btn ghost" onClick={closeCard}>{T.cancel}</button>
               <button className="mt-btn primary" disabled={!cardDraft.date || cardHasTimeError || !!cardFrameIssue} onClick={saveCard}><Check size={13} /> {T.save}</button>
             </div>
