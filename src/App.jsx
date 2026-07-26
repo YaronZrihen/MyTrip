@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "16.1.0";
+const APP_VERSION = "16.1.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -3508,7 +3508,7 @@ export default function MyTripApp() {
         .mt-checklist-doc-chip { display:flex; align-items:center; gap:4px; background:var(--teal-tint); color:var(--teal-dark); font-size:11px; font-weight:600; padding:4px 8px; border-radius:20px; white-space:nowrap; }
         .mt-checklist-doc-x { border:none; background:none; color:var(--teal-dark); padding:0; display:flex; }
         .mt-checklist-upload-btn { padding:6px; display:flex; align-items:center; justify-content:center; }
-        .mt-checklist-progress-wrap { display:flex; align-items:center; gap:10px; padding:12px 20px 4px; }
+        .mt-checklist-progress-wrap { display:flex; align-items:center; gap:10px; padding:12px 20px 10px; position:sticky; top:0; z-index:5; background:var(--surface); border-bottom:1px solid var(--border); }
         .mt-checklist-progress-track { flex:1; height:8px; border-radius:4px; background:var(--border); overflow:hidden; }
         .mt-checklist-progress-fill { height:100%; background:var(--teal); border-radius:4px; transition:width .3s ease; }
         .mt-checklist-progress-pct { font-size:12.5px; font-weight:700; color:var(--teal-dark); min-width:34px; text-align:left; }
