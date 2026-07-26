@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "17.2.0";
+const APP_VERSION = "18.1.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -111,38 +111,38 @@ const CATEGORY_COLORS = {
   "air-transport": "#256D64", accommodation: "#D98E3F", activities: "#5B8C5A", other: "#7A5C9E",
 };
 const DEFAULT_TYPES = [
-  { id: "train", name_he: "רכבת", name_en: "Train", icon: "TrainFront", color: CATEGORY_COLORS["public-transport"], category: "public-transport" },
-  { id: "high-speed-train", name_he: "רכבת מהירה", name_en: "High-speed train", icon: "TrainFront", color: CATEGORY_COLORS["public-transport"], category: "public-transport" },
-  { id: "bus", name_he: "אוטובוס", name_en: "Bus", icon: "Bus", color: CATEGORY_COLORS["public-transport"], category: "public-transport" },
-  { id: "taxi", name_he: "מונית", name_en: "Taxi", icon: "Car", color: CATEGORY_COLORS["public-transport"], category: "public-transport" },
+  { id: "train", name_he: "רכבת", name_en: "Train", icon: "TrainFront", color: CATEGORY_COLORS["public-transport"], category: "public-transport", kind: "arrival" },
+  { id: "high-speed-train", name_he: "רכבת מהירה", name_en: "High-speed train", icon: "TrainFront", color: CATEGORY_COLORS["public-transport"], category: "public-transport", kind: "arrival" },
+  { id: "bus", name_he: "אוטובוס", name_en: "Bus", icon: "Bus", color: CATEGORY_COLORS["public-transport"], category: "public-transport", kind: "arrival" },
+  { id: "taxi", name_he: "מונית", name_en: "Taxi", icon: "Car", color: CATEGORY_COLORS["public-transport"], category: "public-transport", kind: "arrival" },
 
-  { id: "car-rental", name_he: "השכרת רכב", name_en: "Car rental", icon: "KeySquare", color: CATEGORY_COLORS["road-transport"], category: "road-transport" },
-  { id: "caravan", name_he: "קראוון", name_en: "Caravan", icon: "Caravan", color: CATEGORY_COLORS["road-transport"], category: "road-transport" },
-  { id: "motorcycle", name_he: "אופנוע", name_en: "Motorcycle", icon: "Motorbike", color: CATEGORY_COLORS["road-transport"], category: "road-transport" },
-  { id: "bicycle", name_he: "אופניים", name_en: "Bicycle", icon: "Bike", color: CATEGORY_COLORS["road-transport"], category: "road-transport" },
-  { id: "walking", name_he: "הליכה רגלית", name_en: "Walking", icon: "Footprints", color: CATEGORY_COLORS["road-transport"], category: "road-transport" },
-  { id: "scooter", name_he: "קורקינט", name_en: "Scooter", icon: "Scooter", color: CATEGORY_COLORS["road-transport"], category: "road-transport" },
+  { id: "car-rental", name_he: "השכרת רכב", name_en: "Car rental", icon: "KeySquare", color: CATEGORY_COLORS["road-transport"], category: "road-transport", kind: "arrival" },
+  { id: "caravan", name_he: "קראוון", name_en: "Caravan", icon: "Caravan", color: CATEGORY_COLORS["road-transport"], category: "road-transport", kind: "arrival" },
+  { id: "motorcycle", name_he: "אופנוע", name_en: "Motorcycle", icon: "Motorbike", color: CATEGORY_COLORS["road-transport"], category: "road-transport", kind: "arrival" },
+  { id: "bicycle", name_he: "אופניים", name_en: "Bicycle", icon: "Bike", color: CATEGORY_COLORS["road-transport"], category: "road-transport", kind: "arrival" },
+  { id: "walking", name_he: "הליכה רגלית", name_en: "Walking", icon: "Footprints", color: CATEGORY_COLORS["road-transport"], category: "road-transport", kind: "arrival" },
+  { id: "scooter", name_he: "קורקינט", name_en: "Scooter", icon: "Scooter", color: CATEGORY_COLORS["road-transport"], category: "road-transport", kind: "arrival" },
 
-  { id: "ferry", name_he: "מעבורת", name_en: "Ferry", icon: "Ship", color: CATEGORY_COLORS["sea-transport"], category: "sea-transport" },
-  { id: "yacht", name_he: "יאכטה", name_en: "Yacht", icon: "Sailboat", color: CATEGORY_COLORS["sea-transport"], category: "sea-transport" },
-  { id: "ship", name_he: "אוניה", name_en: "Ship", icon: "ShipWheel", color: CATEGORY_COLORS["sea-transport"], category: "sea-transport" },
-  { id: "cruise", name_he: "שייט", name_en: "Cruise", icon: "Anchor", color: CATEGORY_COLORS["sea-transport"], category: "sea-transport" },
-  { id: "canoe", name_he: "קאנו", name_en: "Canoe", icon: "Kayak", color: CATEGORY_COLORS["sea-transport"], category: "sea-transport" },
+  { id: "ferry", name_he: "מעבורת", name_en: "Ferry", icon: "Ship", color: CATEGORY_COLORS["sea-transport"], category: "sea-transport", kind: "arrival" },
+  { id: "yacht", name_he: "יאכטה", name_en: "Yacht", icon: "Sailboat", color: CATEGORY_COLORS["sea-transport"], category: "sea-transport", kind: "arrival" },
+  { id: "ship", name_he: "אוניה", name_en: "Ship", icon: "ShipWheel", color: CATEGORY_COLORS["sea-transport"], category: "sea-transport", kind: "arrival" },
+  { id: "cruise", name_he: "שייט", name_en: "Cruise", icon: "Anchor", color: CATEGORY_COLORS["sea-transport"], category: "sea-transport", kind: "arrival" },
+  { id: "canoe", name_he: "קאנו", name_en: "Canoe", icon: "Kayak", color: CATEGORY_COLORS["sea-transport"], category: "sea-transport", kind: "arrival" },
 
-  { id: "flight", name_he: "טיסה בינלאומית", name_en: "International flight", icon: "Plane", color: CATEGORY_COLORS["air-transport"], category: "air-transport" },
-  { id: "domestic-flight", name_he: "טיסת פנים", name_en: "Domestic flight", icon: "PlaneTakeoff", color: CATEGORY_COLORS["air-transport"], category: "air-transport" },
-  { id: "helicopter", name_he: "מסוק", name_en: "Helicopter", icon: "Helicopter", color: CATEGORY_COLORS["air-transport"], category: "air-transport" },
+  { id: "flight", name_he: "טיסה בינלאומית", name_en: "International flight", icon: "Plane", color: CATEGORY_COLORS["air-transport"], category: "air-transport", kind: "arrival" },
+  { id: "domestic-flight", name_he: "טיסת פנים", name_en: "Domestic flight", icon: "PlaneTakeoff", color: CATEGORY_COLORS["air-transport"], category: "air-transport", kind: "arrival" },
+  { id: "helicopter", name_he: "מסוק", name_en: "Helicopter", icon: "Helicopter", color: CATEGORY_COLORS["air-transport"], category: "air-transport", kind: "arrival" },
 
-  { id: "hotel", name_he: "מלון", name_en: "Hotel", icon: "BedDouble", color: CATEGORY_COLORS.accommodation, category: "accommodation" },
-  { id: "hostel", name_he: "אכסנייה", name_en: "Hostel", icon: "Building2", color: CATEGORY_COLORS.accommodation, category: "accommodation" },
-  { id: "apartment", name_he: "דירה", name_en: "Apartment", icon: "Home", color: CATEGORY_COLORS.accommodation, category: "accommodation" },
+  { id: "hotel", name_he: "מלון", name_en: "Hotel", icon: "BedDouble", color: CATEGORY_COLORS.accommodation, category: "accommodation", kind: "desc" },
+  { id: "hostel", name_he: "אכסנייה", name_en: "Hostel", icon: "Building2", color: CATEGORY_COLORS.accommodation, category: "accommodation", kind: "desc" },
+  { id: "apartment", name_he: "דירה", name_en: "Apartment", icon: "Home", color: CATEGORY_COLORS.accommodation, category: "accommodation", kind: "desc" },
 
-  { id: "self-tour", name_he: "טיול עצמאי", name_en: "Self-guided tour", icon: "Footprints", color: CATEGORY_COLORS.activities, category: "activities" },
-  { id: "guided-tour", name_he: "טיול מודרך", name_en: "Guided tour", icon: "Users", color: CATEGORY_COLORS.activities, category: "activities" },
-  { id: "day-tour", name_he: "טיול יומי", name_en: "Day tour", icon: "Sun", color: CATEGORY_COLORS.activities, category: "activities" },
-  { id: "attraction", name_he: "אטרקציה", name_en: "Attraction", icon: "Landmark", color: CATEGORY_COLORS.activities, category: "activities" },
-  { id: "poi", name_he: "נקודת עניין", name_en: "Point of Interest", icon: "MapPin", color: CATEGORY_COLORS.activities, category: "activities" },
-  { id: "restaurant", name_he: "מסעדה", name_en: "Restaurant", icon: "Utensils", color: CATEGORY_COLORS.activities, category: "activities" },
+  { id: "self-tour", name_he: "טיול עצמאי", name_en: "Self-guided tour", icon: "Footprints", color: CATEGORY_COLORS.activities, category: "activities", kind: "desc" },
+  { id: "guided-tour", name_he: "טיול מודרך", name_en: "Guided tour", icon: "Users", color: CATEGORY_COLORS.activities, category: "activities", kind: "desc" },
+  { id: "day-tour", name_he: "טיול יומי", name_en: "Day tour", icon: "Sun", color: CATEGORY_COLORS.activities, category: "activities", kind: "desc" },
+  { id: "attraction", name_he: "אטרקציה", name_en: "Attraction", icon: "Landmark", color: CATEGORY_COLORS.activities, category: "activities", kind: "desc" },
+  { id: "poi", name_he: "נקודת עניין", name_en: "Point of Interest", icon: "MapPin", color: CATEGORY_COLORS.activities, category: "activities", kind: "desc" },
+  { id: "restaurant", name_he: "מסעדה", name_en: "Restaurant", icon: "Utensils", color: CATEGORY_COLORS.activities, category: "activities", kind: "desc" },
 ];
 const CATEGORY_ORDER = ["public-transport", "road-transport", "sea-transport", "air-transport", "accommodation", "activities", "other"];
 const CATEGORY_LABELS = {
@@ -193,7 +193,8 @@ const T_DICT = {
     checklistShopping: "רשימת קניות", checklistPacking: "ארגון ציוד לטיסה", checklistUpload: "העלה מסמך", checklistAddItem: "הוסף פריט...",
     checklistPackingSub: "{n} מתוך {total} הושלמו", checklistShoppingSub: "{n} פריטים", checklistShoppingEmpty: "הרשימה ריקה — הוסף פריט למטה",
     deleteFrameOnly: "מחק מסגרת בלבד (התוכן יעבור למסגרת האם)", deleteFrameWithContent: "מחק מסגרת ואת כל התוכן שבתוכה",
-    type: "סוג", from: "מוצא", to: "יעד", start: "בשעה", end: "עד שעה", overnight: "חוצה חצות",
+    type: "סוג", from: "מוצא", to: "יעד", start: "בשעה", end: "עד שעה", overnight: "חוצה חצות", arrivalMethod: "אמצעי הגעה",
+    typeKindDesc: "תיאור", typeKindArrival: "אמצעי הגעה",
     requiresTicket: "דורש רכישת כרטיס כניסה", calcRoute: "חשב מסלול",
     routeErrNoOrigin: "אין מוצא זמין לחישוב (גם לא ברשומה הקודמת)", routeErrNoDest: "אין יעד ברשומה זו",
     routeErrGeocodeOrigin: "לא ניתן לאתר את המוצא", routeErrGeocodeDest: "לא ניתן לאתר את היעד",
@@ -336,7 +337,8 @@ const T_DICT = {
     checklistShopping: "Shopping List", checklistPacking: "Flight Packing", checklistUpload: "Upload document", checklistAddItem: "Add item...",
     checklistPackingSub: "{n} of {total} done", checklistShoppingSub: "{n} items", checklistShoppingEmpty: "List is empty — add an item below",
     deleteFrameOnly: "Delete frame only (content moves to parent)", deleteFrameWithContent: "Delete frame and all its content",
-    type: "Type", from: "Origin", to: "Destination", start: "At", end: "Until", overnight: "Crosses midnight",
+    type: "Type", from: "Origin", to: "Destination", start: "At", end: "Until", overnight: "Crosses midnight", arrivalMethod: "Arrival method",
+    typeKindDesc: "Description", typeKindArrival: "Arrival method",
     requiresTicket: "Requires entrance ticket", calcRoute: "Calculate route",
     routeErrNoOrigin: "No origin available for calculation (not even from the previous record)", routeErrNoDest: "This record has no destination",
     routeErrGeocodeOrigin: "Couldn't locate the origin", routeErrGeocodeDest: "Couldn't locate the destination",
@@ -522,7 +524,8 @@ function detectTextAlign(text) {
   return undefined;
 }
 function typeDisplayName(t, lang) { return t.name_he != null ? (lang === "en" ? t.name_en : t.name_he) : t.name; }
-function noOriginNeeded(typeId) { return typeId === "restaurant" || typeId === "poi" || typeId === "attraction"; }
+function isFlightType(typeId) { return typeId === "flight" || typeId === "domestic-flight"; }
+function noOriginNeeded(typeId) { return !isFlightType(typeId); }
 function isAccommodationType(typeId) { return typeId === "hotel" || typeId === "hostel" || typeId === "apartment"; }
 
 /* Simplified OSM opening_hours check — handles common "Mo-Fr 09:00-18:00" style rules only.
@@ -1043,7 +1046,7 @@ function initialRows() {
 
 function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, ctx }) {
   const { T, lang, types, visibleColumns, updateRow, deleteRow, openCard, addRow,
-    dragId, setDragId, onDropRow, typeMenuOpen, setTypeMenuOpen, newTypeDraft, setNewTypeDraft, addCustomType, openHotelInfo } = ctx;
+    dragId, setDragId, onDropRow, typeMenuOpen, setTypeMenuOpen, arrivalMenuOpen, setArrivalMenuOpen, newTypeDraft, setNewTypeDraft, addCustomType, openHotelInfo } = ctx;
   const tm = typeMeta(row.typeId, types, T, lang);
   const Icon = ICONS[tm.icon] || Tag;
   const dur = computeDuration(row.startTime, row.endTime, row.overnight);
@@ -1155,6 +1158,8 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
     if (open) { setTypeSearch(""); setShowAddTypeForm(false); setTypeMenuOpen(row.id); }
     else setTypeMenuOpen(null);
   });
+  const isArrivalMenuOpen = arrivalMenuOpen === row.id;
+  const arrivalMenuFloating = useFloatingMenu(isArrivalMenuOpen, (open) => setArrivalMenuOpen(open ? row.id : null));
 
   function renderCell(col) {
     switch (col.key) {
@@ -1212,6 +1217,10 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
                 {showAddTypeForm ? (
                   <div className="mt-type-new-form">
                     <input type="text" autoFocus placeholder={T.typeName} value={newTypeDraft.name} onChange={(e) => setNewTypeDraft({ ...newTypeDraft, name: e.target.value })} />
+                    <div className="mt-wizard-choices" style={{ marginBottom: 6 }}>
+                      <button className={"mt-wizard-choice" + (newTypeDraft.kind === "desc" ? " selected" : "")} onClick={() => setNewTypeDraft({ ...newTypeDraft, kind: "desc" })}>{T.typeKindDesc}</button>
+                      <button className={"mt-wizard-choice" + (newTypeDraft.kind === "arrival" ? " selected" : "")} onClick={() => setNewTypeDraft({ ...newTypeDraft, kind: "arrival" })}>{T.typeKindArrival}</button>
+                    </div>
                     <div className="mt-icon-pick-row">
                       {ICON_PALETTE.map((ic) => { const PI = ICONS[ic]; return (
                         <button key={ic} className={"mt-icon-pick" + (newTypeDraft.icon === ic ? " sel" : "")} onClick={() => setNewTypeDraft({ ...newTypeDraft, icon: ic })}><PI /></button>
@@ -1224,6 +1233,35 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
                 )}
               </div>
           )}
+          {noOriginNeeded(row.typeId) && (() => {
+            const am = typeMeta(row.arrivalTypeId, types, T, lang);
+            const AmIcon = ICONS[am.icon] || Footprints;
+            return (
+              <span style={{ position: "relative" }}>
+                <button className="mt-arrival-btn" ref={arrivalMenuFloating.refs.setReference} {...arrivalMenuFloating.getReferenceProps()} title={T.arrivalMethod + ": " + am.name}>
+                  <AmIcon size={12} />
+                </button>
+                {isArrivalMenuOpen && (
+                  <div ref={arrivalMenuFloating.refs.setFloating} style={arrivalMenuFloating.floatingStyles} {...arrivalMenuFloating.getFloatingProps()} className="mt-type-menu">
+                    <div className="mt-type-cat-label">{T.arrivalMethod}</div>
+                    <div className="mt-type-list">
+                      {types.filter((t) => t.kind === "arrival").map((t) => {
+                        const TI = ICONS[t.icon] || Footprints;
+                        const selected = t.id === row.arrivalTypeId;
+                        return (
+                          <button key={t.id} className={"opt" + (selected ? " selected" : "")} onClick={() => { updateRow(row.id, { arrivalTypeId: t.id }); setArrivalMenuOpen(null); }}>
+                            <span className="mt-type-icon" style={{ background: t.color, width: 20, height: 20 }}><TI size={11} /></span>
+                            <span style={{ flex: 1 }}>{typeDisplayName(t, lang)}</span>
+                            {selected && <Check size={13} />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </span>
+            );
+          })()}
         </div>
       );
       }
@@ -1764,6 +1802,9 @@ function FlowView({ rows, types, lang, T, ctx }) {
         const tm = typeMeta(r.typeId, types, T, lang);
         const Icon = ICONS[tm.icon] || Tag;
         const label = r.toAlias || r.to || r.fromAlias || r.from || "";
+        const nextRow = rows[i + 1];
+        const nextArrivalMeta = nextRow && noOriginNeeded(nextRow.typeId) ? typeMeta(nextRow.arrivalTypeId, types, T, lang) : null;
+        const NextArrivalIcon = nextArrivalMeta ? (ICONS[nextArrivalMeta.icon] || Footprints) : null;
         return (
           <React.Fragment key={r.id}>
             <button type="button" className="mt-flow-node" onClick={() => openCard(r)} title={tm.name}>
@@ -1771,7 +1812,7 @@ function FlowView({ rows, types, lang, T, ctx }) {
               {r.startTime && <span className="mt-flow-time">{r.startTime}</span>}
               {label && <span className="mt-flow-label" dir="auto">{truncateChars(label, 12)}</span>}
             </button>
-            {i < rows.length - 1 && <span className="mt-flow-arrow"><ArrowIcon size={16} /></span>}
+            {i < rows.length - 1 && <span className="mt-flow-arrow" title={nextArrivalMeta ? nextArrivalMeta.name : undefined}>{NextArrivalIcon ? <NextArrivalIcon size={14} /> : <ArrowIcon size={16} />}</span>}
           </React.Fragment>
         );
       })}
@@ -1782,7 +1823,10 @@ function FlowView({ rows, types, lang, T, ctx }) {
 function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
   const { openCard, openHotelInfo, dragId } = ctx;
   const tm = typeMeta(r.typeId, types, T, lang); const Icon = ICONS[tm.icon] || Tag;
-  const fromLabel = r.fromAlias || r.from, toLabel = r.toAlias || r.to;
+  const fromLabel = noOriginNeeded(r.typeId) ? (prevRow ? (prevRow.toAlias || prevRow.to || "") : "") : (r.fromAlias || r.from);
+  const toLabel = r.toAlias || r.to;
+  const am = noOriginNeeded(r.typeId) ? typeMeta(r.arrivalTypeId, types, T, lang) : null;
+  const AmIcon = am ? (ICONS[am.icon] || Footprints) : null;
   const cardWarnings = getRowWarning(r, T);
   const { attributes: dragAttrs, listeners: dragListeners, setNodeRef: setDragNodeRef } = useDraggable({ id: r.id, data: { type: "row" } });
   const { setNodeRef: setDropNodeRef, isOver: isRowOver } = useDroppable({ id: r.id, data: { type: "row" } });
@@ -1801,7 +1845,7 @@ function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
       {(fromLabel || toLabel) && (
         <div className="mt-card-route">
           <span dir="auto" title={fromLabel || ""}>{truncateChars(fromLabel, 18) || "—"}</span>
-          {fromLabel && toLabel && <span className="mt-card-arrow">←</span>}
+          {fromLabel && toLabel && <span className="mt-card-arrow">{AmIcon ? <AmIcon size={12} /> : "←"}</span>}
           {toLabel && <span dir="auto" title={toLabel}>{truncateChars(toLabel, 18)}</span>}
         </div>
       )}
@@ -2256,10 +2300,11 @@ export default function MyTripApp() {
   const colMenu = useFloatingMenu(colMenuOpen, setColMenuOpen);
   const [newColName, setNewColName] = useState("");
   const [typeMenuOpen, setTypeMenuOpen] = useState(null);
-  const [newTypeDraft, setNewTypeDraft] = useState({ name: "", icon: "Tag" });
+  const [arrivalMenuOpen, setArrivalMenuOpen] = useState(null);
+  const [newTypeDraft, setNewTypeDraft] = useState({ name: "", icon: "Tag", kind: "desc" });
   const [addTypeOpen, setAddTypeOpen] = useState(false);
   const addTypeMenu = useFloatingMenu(addTypeOpen, setAddTypeOpen);
-  const [addTypeDraft, setAddTypeDraft] = useState({ name: "", icon: "Tag" });
+  const [addTypeDraft, setAddTypeDraft] = useState({ name: "", icon: "Tag", kind: "desc" });
   const [cardRowId, setCardRowId] = useState(null);
   const [cardDraft, setCardDraft] = useState(null);
   const [flightLookupMsg, setFlightLookupMsg] = useState("");
@@ -2746,9 +2791,10 @@ export default function MyTripApp() {
 
   function buildShareHTML() {
     function esc(s) { return (s || "").toString().replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
-    function rowHtml(r, depth) {
+    function rowHtml(r, depth, prevRow) {
       const tm = typeMeta(r.typeId, types, T, lang);
-      const from = r.fromAlias || r.from || "", to = r.toAlias || r.to || "";
+      const from = noOriginNeeded(r.typeId) ? (prevRow ? (prevRow.toAlias || prevRow.to || "") : "") : (r.fromAlias || r.from || "");
+      const to = r.toAlias || r.to || "";
       return `<div style="padding:7px 0;padding-inline-start:${depth * 16}px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;gap:10px;">
         <div><strong>${esc(tm.name)}</strong> — ${esc(from)}${from && to ? " → " : ""}${esc(to)}${r.notes ? `<br><span style="color:#888;font-size:12px;">${esc(r.notes)}</span>` : ""}</div>
         <div style="color:#666;font-size:12px;white-space:nowrap;">${r.startTime || ""}${r.endTime ? " – " + r.endTime : ""}${Number(r.costAmount) > 0 ? ` · ${esc(r.costCurrency)}${r.costAmount}` : ""}</div>
@@ -2756,7 +2802,7 @@ export default function MyTripApp() {
     }
     function dayHtml(fid) {
       return dayGroupsAt(fid).map((g) => {
-        const rowsHtml = g.rows.map((r) => rowHtml(r, 0) + childrenOf(r.id).map((c) => rowHtml(c, 1)).join("")).join("");
+        const rowsHtml = g.rows.map((r, i) => rowHtml(r, 0, i > 0 ? g.rows[i - 1] : null) + childrenOf(r.id).map((c) => rowHtml(c, 1, r)).join("")).join("");
         return `<div style="margin-top:14px;"><div style="font-weight:700;margin-bottom:4px;">${fmtDate(g.date, lang)} — ${heDay(g.date, lang)}</div>${rowsHtml}</div>`;
       }).join("");
     }
@@ -2782,9 +2828,10 @@ export default function MyTripApp() {
     const convertedTotal = Object.entries(totals).reduce((sum, [cur, amt]) => sum + convertAmount(amt, cur, displayCurrency), 0);
     const routeUrl = frameRouteUrl(rows, frames, fid, true);
 
-    function journalRowHtml(r, depth) {
+    function journalRowHtml(r, depth, prevRow) {
       const tm = typeMeta(r.typeId, types, T, lang);
-      const from = r.fromAlias || r.from || "", to = r.toAlias || r.to || "";
+      const from = noOriginNeeded(r.typeId) ? (prevRow ? (prevRow.toAlias || prevRow.to || "") : "") : (r.fromAlias || r.from || "");
+      const to = r.toAlias || r.to || "";
       const starsHtml = r.personalRating ? `<div style="color:#D9A23D;font-size:13px;margin-top:2px;">${"★".repeat(r.personalRating)}${"☆".repeat(5 - r.personalRating)}</div>` : "";
       const experienceHtml = r.personalExperience && r.personalExperience.trim()
         ? `<div style="margin-top:6px;line-height:1.7;white-space:pre-wrap;color:#333;">${esc(r.personalExperience)}</div>` : "";
@@ -2798,7 +2845,7 @@ export default function MyTripApp() {
     }
     function journalDayHtml(dfid) {
       return dayGroupsAt(dfid).map((g) => {
-        const rowsHtml = g.rows.map((r) => journalRowHtml(r, 0) + childrenOf(r.id).map((c) => journalRowHtml(c, 1)).join("")).join("");
+        const rowsHtml = g.rows.map((r, i) => journalRowHtml(r, 0, i > 0 ? g.rows[i - 1] : null) + childrenOf(r.id).map((c) => journalRowHtml(c, 1, r)).join("")).join("");
         return `<div style="margin-top:16px;"><div style="font-weight:700;margin-bottom:4px;">${fmtDate(g.date, lang)} — ${heDay(g.date, lang)}</div>${rowsHtml}</div>`;
       }).join("");
     }
@@ -2960,7 +3007,7 @@ export default function MyTripApp() {
   function addRow(date, parentId = null, frameId = null) {
     const nr = {
       id: uid(), parentId, frameId, date: date || toLocalISODate(new Date()),
-      typeId: "unset", from: "", to: "", startTime: "", endTime: "", overnight: false,
+      typeId: "unset", arrivalTypeId: "walking", from: "", to: "", startTime: "", endTime: "", overnight: false,
       destination: "", link: "", mapLink: "", flightNumber: "", costAmount: 0, costCurrency: "₪", fromAlias: "", toAlias: "",
       notes: "", fromVerifiedUrl: "", fromVerifiedText: "", toVerifiedUrl: "", toVerifiedText: "",
       fromLat: null, fromLon: null, toLat: null, toLon: null, routeDistanceKm: null, routeDurationMin: null, custom: {},
@@ -3119,15 +3166,15 @@ export default function MyTripApp() {
   function addCustomType(rowIdToApply) {
     if (!newTypeDraft.name.trim()) return;
     const id = "custom-" + uid();
-    setTypes((prev) => [...prev, { id, name: newTypeDraft.name, icon: newTypeDraft.icon, color: CATEGORY_COLORS.other, category: "other" }]);
-    if (rowIdToApply) updateRow(rowIdToApply, { typeId: id });
-    setNewTypeDraft({ name: "", icon: "Tag" }); setTypeMenuOpen(null);
+    setTypes((prev) => [...prev, { id, name: newTypeDraft.name, icon: newTypeDraft.icon, color: CATEGORY_COLORS.other, category: "other", kind: newTypeDraft.kind }]);
+    if (rowIdToApply) updateRow(rowIdToApply, newTypeDraft.kind === "arrival" ? { arrivalTypeId: id } : { typeId: id });
+    setNewTypeDraft({ name: "", icon: "Tag", kind: "desc" }); setTypeMenuOpen(null);
   }
   function submitAddType() {
     if (!addTypeDraft.name.trim()) return;
     const id = "custom-" + uid();
-    setTypes((prev) => [...prev, { id, name: addTypeDraft.name, icon: addTypeDraft.icon, color: CATEGORY_COLORS.other, category: "other" }]);
-    setAddTypeDraft({ name: "", icon: "Tag" }); setAddTypeOpen(false);
+    setTypes((prev) => [...prev, { id, name: addTypeDraft.name, icon: addTypeDraft.icon, color: CATEGORY_COLORS.other, category: "other", kind: addTypeDraft.kind }]);
+    setAddTypeDraft({ name: "", icon: "Tag", kind: "desc" }); setAddTypeOpen(false);
   }
 
   /* ---------- location verification (OpenStreetMap Nominatim — free, no API key) ---------- */
@@ -3332,7 +3379,7 @@ export default function MyTripApp() {
   const ctx = {
     T, lang, types, visibleColumns, effectiveMobile, viewMode, rows, frames,
     updateRow, deleteRow, openCard, addRow, dragId, setDragId, onDropRow, dragDayKey, setDragDayKey, onDropDay,
-    typeMenuOpen, setTypeMenuOpen, newTypeDraft, setNewTypeDraft, addCustomType,
+    typeMenuOpen, setTypeMenuOpen, arrivalMenuOpen, setArrivalMenuOpen, newTypeDraft, setNewTypeDraft, addCustomType,
     collapsedParents, setCollapsedParents, collapsedGroups, setCollapsedGroups,
     toggleFrameCollapse, openFrameModal, setDeleteFrameConfirmId, updateFrameDates, nextDateInContext, lastDateInContext, frameTotals,
     openAddDayModal, sortDayByTime, getColWidth, startResize, displayCurrency, convertAmount, openHotelInfo,
@@ -3536,6 +3583,8 @@ export default function MyTripApp() {
         .mt-hotel-rating-demo .mt-hint { margin-inline-start:6px; color:var(--muted); }
         .mt-type-icon svg { width:12px; height:12px; color:#fff; }
         .mt-type-btn { border:none; background:none; padding:0; display:flex; align-items:center; gap:5px; font-size:12.8px; font-weight:500; color:var(--ink); max-width:100%; }
+        .mt-arrival-btn { border:1px solid var(--border); background:var(--surface); color:var(--muted); border-radius:6px; padding:3px; display:flex; align-items:center; justify-content:center; margin-inline-start:4px; }
+        .mt-arrival-btn:hover { border-color:var(--teal); color:var(--teal); }
         .mt-type-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .mt-loc-cell { display:flex; align-items:center; gap:2px; }
         .mt-loc-cell .mt-editable { flex:1; max-width:20ch; padding-inline:3px; }
@@ -3838,7 +3887,9 @@ export default function MyTripApp() {
       </div>
 
       {settingsMenuOpen && (
-        <div ref={settingsMenu.refs.setFloating} style={settingsMenu.floatingStyles} {...settingsMenu.getFloatingProps()} className="mt-floating-menu mt-kebab-menu" >
+        <>
+          <div className="mt-floating-backdrop" onClick={() => setSettingsMenuOpen(false)} />
+          <div ref={settingsMenu.refs.setFloating} style={{ ...settingsMenu.floatingStyles, zIndex: 400 }} {...settingsMenu.getFloatingProps()} className="mt-floating-menu mt-kebab-menu" >
             <div className="mt-action-cat-label"><span>{T.catViews}</span><HelpButton topic="views" lang={lang} T={T} onOpenFull={openHelpTopic} size={13} openTopic={helpPopoverOpen} setOpenTopic={setHelpPopoverOpen} /></div>
             <button className="mt-share-opt" onClick={() => { setViewMode("desktop"); setSettingsMenuOpen(false); }}>
               <Monitor size={14} /> {T.desktop}{viewMode === "desktop" && <Check size={13} style={{ marginInlineStart: "auto" }} />}
@@ -3859,10 +3910,13 @@ export default function MyTripApp() {
               {T.disableIntro}
             </button>
         </div>
+        </>
       )}
 
       {actionsMenuOpen && (
-        <div ref={actionsMenu.refs.setFloating} style={{ ...actionsMenu.floatingStyles, maxWidth: "min(240px, 92vw)" }} {...actionsMenu.getFloatingProps()} className="mt-floating-menu mt-kebab-menu">
+        <>
+          <div className="mt-floating-backdrop" onClick={() => setActionsMenuOpen(false)} />
+          <div ref={actionsMenu.refs.setFloating} style={{ ...actionsMenu.floatingStyles, maxWidth: "min(240px, 92vw)", zIndex: 400 }} {...actionsMenu.getFloatingProps()} className="mt-floating-menu mt-kebab-menu">
             <div className="mt-action-cat-label"><span>{T.catNewFrame}</span><HelpButton topic="frames" lang={lang} T={T} onOpenFull={openHelpTopic} size={13} openTopic={helpPopoverOpen} setOpenTopic={setHelpPopoverOpen} /></div>
             <button className="mt-share-opt" onClick={() => { openFrameModal(null, null); setActionsMenuOpen(false); }}><FolderPlus size={14} /> {T.newFrame}</button>
             <button className="mt-share-opt" onClick={() => { openPreWizard(); setActionsMenuOpen(false); }}><Wand2 size={14} /> {T.tripWizard}</button>
@@ -3884,6 +3938,7 @@ export default function MyTripApp() {
             <button className="mt-share-opt" onClick={() => { setChecklistOpen(true); setActionsMenuOpen(false); }}><CheckSquare size={14} /> {T.preFlightChecklist}</button>
             <button className="mt-share-opt" onClick={() => { setFileManagerOpen(true); setActionsMenuOpen(false); }}><FileUp size={14} /> {T.fileManagerTitle}</button>
         </div>
+        </>
       )}
       {demoNotice && (
         <>
@@ -4243,6 +4298,10 @@ export default function MyTripApp() {
         <div ref={addTypeMenu.refs.setFloating} style={{ ...addTypeMenu.floatingStyles, minWidth: 200 }} {...addTypeMenu.getFloatingProps()} className="mt-floating-menu">
             <div className="mt-menu-head"><span style={{ display: "flex", alignItems: "center", gap: 5 }}><strong>{T.newType}</strong><HelpButton topic="types" lang={lang} T={T} onOpenFull={openHelpTopic} size={13} openTopic={helpPopoverOpen} setOpenTopic={setHelpPopoverOpen} /></span><button className="mt-btn ghost" style={{ padding: "2px 6px" }} onClick={() => setAddTypeOpen(false)}><X size={14} /></button></div>
             <input type="text" placeholder={T.typeName} value={addTypeDraft.name} onChange={(e) => setAddTypeDraft({ ...addTypeDraft, name: e.target.value })} style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 6, padding: "5px 7px", fontSize: 12.5, marginBottom: 8, color: "var(--ink)", background: "#fff" }} />
+            <div className="mt-wizard-choices" style={{ marginBottom: 8 }}>
+              <button className={"mt-wizard-choice" + (addTypeDraft.kind === "desc" ? " selected" : "")} onClick={() => setAddTypeDraft({ ...addTypeDraft, kind: "desc" })}>{T.typeKindDesc}</button>
+              <button className={"mt-wizard-choice" + (addTypeDraft.kind === "arrival" ? " selected" : "")} onClick={() => setAddTypeDraft({ ...addTypeDraft, kind: "arrival" })}>{T.typeKindArrival}</button>
+            </div>
             <div className="mt-icon-pick-row">
               {ICON_PALETTE.map((ic) => { const PI = ICONS[ic]; return (
                 <button key={ic} className={"mt-icon-pick" + (addTypeDraft.icon === ic ? " sel" : "")} onClick={() => setAddTypeDraft({ ...addTypeDraft, icon: ic })}><PI /></button>
@@ -4432,6 +4491,21 @@ export default function MyTripApp() {
 
               {effectiveMobile ? (
                 <div className="mt-loc-mobile">
+                  {noOriginNeeded(cardDraft.typeId) && (
+                    <div className="mt-field" style={{ marginBottom: 10 }}>
+                      <label>{T.arrivalMethod}</label>
+                      <div className="mt-wizard-choices">
+                        {types.filter((t) => t.kind === "arrival").map((t) => {
+                          const TI = ICONS[t.icon] || Footprints;
+                          return (
+                            <button key={t.id} className={"mt-wizard-choice" + (cardDraft.arrivalTypeId === t.id ? " selected" : "")} onClick={() => setCardDraft({ ...cardDraft, arrivalTypeId: t.id })}>
+                              <TI size={12} style={{ verticalAlign: "-2px", marginInlineEnd: 4 }} />{typeDisplayName(t, lang)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                   <div className="mt-loc-mobile-row">
                     <span className="mt-loc-row-label">{T.from}</span>
                     <input className="mt-loc-grid-input" dir="auto" disabled={noOriginNeeded(cardDraft.typeId)} title={noOriginNeeded(cardDraft.typeId) ? T.noOriginHint : undefined} value={cardDraft.from} placeholder={getTypeHint(cardDraft.typeId, "from", lang)} onChange={(e) => setCardDraft({ ...cardDraft, from: e.target.value })} />
@@ -4471,6 +4545,22 @@ export default function MyTripApp() {
                   </div>
                 </div>
               ) : (
+              <>
+              {noOriginNeeded(cardDraft.typeId) && (
+                <div className="mt-field" style={{ marginBottom: 10 }}>
+                  <label>{T.arrivalMethod}</label>
+                  <div className="mt-wizard-choices">
+                    {types.filter((t) => t.kind === "arrival").map((t) => {
+                      const TI = ICONS[t.icon] || Footprints;
+                      return (
+                        <button key={t.id} className={"mt-wizard-choice" + (cardDraft.arrivalTypeId === t.id ? " selected" : "")} onClick={() => setCardDraft({ ...cardDraft, arrivalTypeId: t.id })}>
+                          <TI size={12} style={{ verticalAlign: "-2px", marginInlineEnd: 4 }} />{typeDisplayName(t, lang)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               <div className="mt-loc-grid">
                 <span />
                 <span className="mt-loc-col-header" style={{ gridColumn: "2 / span 2" }}>{T.locationColHeader}</span>
@@ -4510,6 +4600,7 @@ export default function MyTripApp() {
                   <PopoverInfoIcon icon={Info} trigger="hover">{T.aliasHint}</PopoverInfoIcon>
                 </span>
               </div>
+              </>
               )}
 
               <label className="mt-checkbox-row"><input type="checkbox" checked={cardDraft.toFee === "yes"} onChange={(e) => setCardDraft({ ...cardDraft, toFee: e.target.checked ? "yes" : null })} />{T.requiresTicket}</label>
