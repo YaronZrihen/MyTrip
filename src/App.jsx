@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "18.3.2";
+const APP_VERSION = "18.3.3";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -2078,17 +2078,10 @@ function TypeFieldPicker({ typeId, types, lang, T, onChange, kindFilter, placeho
   const selected = typeMeta(typeId, types, T, lang);
   const SelIcon = ICONS[selected.icon] || Tag;
   const optionTypes = kindFilter ? types.filter((t) => t.kind === kindFilter) : types;
-  const { refs, floatingStyles } = useFloating({
-    open, onOpenChange: setOpen,
-    placement: "bottom-start",
-    strategy: "fixed",
-    middleware: [offset(6), flip(), shift({ padding: 8 })],
-    whileElementsMounted: autoUpdate,
-  });
   function close() { setOpen(false); setSearch(""); }
   return (
     <span style={{ position: "relative", display: "block" }}>
-      <button type="button" className="mt-type-field-btn" ref={refs.setReference} onClick={() => setOpen((v) => !v)}>
+      <button type="button" className="mt-type-field-btn" onClick={() => setOpen(true)}>
         {typeId && typeId !== "unset" ? (
           <>
             <span className="mt-type-icon" style={{ background: selected.color, width: 20, height: 20 }}><SelIcon size={11} /></span>
@@ -2100,13 +2093,13 @@ function TypeFieldPicker({ typeId, types, lang, T, onChange, kindFilter, placeho
         <ChevronDown size={13} style={{ marginInlineStart: "auto" }} />
       </button>
       {open && (
-        <>
-          <div className="mt-floating-backdrop" onClick={close} />
-          <div ref={refs.setFloating} dir={lang === "he" ? "rtl" : "ltr"} style={{ ...floatingStyles, zIndex: 400 }} className="mt-floating-menu mt-type-menu" onClick={(e) => e.stopPropagation()}>
+        <div className="mt-modal-backdrop" onClick={close}>
+          <div dir={lang === "he" ? "rtl" : "ltr"} className="mt-modal mt-type-modal" onClick={(e) => e.stopPropagation()}>
             <div className="mt-type-search-wrap">
               <Search size={13} />
-              <input autoFocus className="mt-type-search" placeholder={T.searchTypes} value={search} onChange={(e) => setSearch(e.target.value)} />
+              <input className="mt-type-search" placeholder={T.searchTypes} value={search} onChange={(e) => setSearch(e.target.value)} />
               {search && <button className="mt-type-search-clear" onClick={() => setSearch("")}><X size={12} /></button>}
+              <button className="mt-btn ghost" style={{ padding: "4px 6px" }} onClick={close}><X size={16} /></button>
             </div>
             <div className="mt-type-list">
               {groupTypesByCategory(optionTypes)
@@ -2130,7 +2123,7 @@ function TypeFieldPicker({ typeId, types, lang, T, onChange, kindFilter, placeho
                 ))}
             </div>
           </div>
-        </>
+        </div>
       )}
     </span>
   );
@@ -3670,7 +3663,7 @@ export default function MyTripApp() {
         .mt-type-field-btn:hover { border-color:var(--teal); }
         .mt-type-modal { max-width:340px; width:92vw; max-height:70vh; display:flex; flex-direction:column; padding:12px; }
         .mt-type-modal .mt-type-search-wrap { margin-bottom:8px; }
-        .mt-type-modal .mt-type-list { overflow-y:auto; flex:1; }
+        .mt-type-modal .mt-type-list { overflow-y:auto; flex:1; overscroll-behavior:contain; }
         .mt-arrival-btn { border:1px solid var(--border); background:var(--surface); color:var(--muted); border-radius:6px; padding:3px; display:flex; align-items:center; justify-content:center; margin-inline-start:4px; }
         .mt-arrival-btn:hover { border-color:var(--teal); color:var(--teal); }
         .mt-type-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -3738,7 +3731,7 @@ export default function MyTripApp() {
         .mt-icon-pick.sel svg { color:#fff; }
         .mt-icon-pick svg { width:12px; height:12px; color:var(--muted); }
         .mt-modal-backdrop { position:fixed; inset:0; background:rgba(20,35,32,.4); display:flex; align-items:center; justify-content:center; z-index:100; padding:20px; }
-        .mt-modal { background:var(--surface); border-radius:16px; width:100%; max-width:440px; max-height:86vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,.25); }
+        .mt-modal { background:var(--surface); border-radius:16px; width:100%; max-width:440px; max-height:86vh; overflow-y:auto; overscroll-behavior:contain; box-shadow:0 20px 60px rgba(0,0,0,.25); }
         .mt-modal.narrow { max-width:360px; }
         .mt-modal-header { display:flex; align-items:center; justify-content:space-between; padding:15px 18px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--surface); }
         .mt-modal-title { font-size:17px; font-weight:700; }
