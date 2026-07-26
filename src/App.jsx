@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "18.2.0";
+const APP_VERSION = "18.3.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -4507,23 +4507,31 @@ export default function MyTripApp() {
               </div>
               {cardFrameIssue && <div className="mt-error"><AlertTriangle /> {cardFrameIssue}</div>}
 
-              <div className="mt-field-row">
-                <div className="mt-field">
-                  <label>{T.type}</label>
-                  <select value={cardDraft.typeId} onChange={(e) => {
+              <div className="mt-field">
+                <label>{T.type}</label>
+                <select value={cardDraft.typeId} onChange={(e) => {
                     const newType = e.target.value;
                     if (noOriginNeeded(newType)) setCardDraft({ ...cardDraft, typeId: newType, from: "", fromAlias: "", fromLat: null, fromLon: null, fromVerifiedUrl: "", fromVerifiedText: "", fromPlaceId: null });
                     else setCardDraft({ ...cardDraft, typeId: newType });
                   }}>
-                    <option value="unset">{T.selectType}</option>
-                    {types.filter((t) => t.id === "walking").map((t) => <option key={t.id} value={t.id}>{typeDisplayName(t, lang)}</option>)}
-                    {groupTypesByCategory(types.filter((t) => t.id !== "walking")).map((grp) => (
-                      <optgroup key={grp.category} label={CATEGORY_LABELS[lang][grp.category] || grp.category}>
-                        {grp.items.map((t) => <option key={t.id} value={t.id}>{typeDisplayName(t, lang)}</option>)}
-                      </optgroup>
-                    ))}
-                  </select>
+                  <option value="unset">{T.selectType}</option>
+                  {types.filter((t) => t.id === "walking").map((t) => <option key={t.id} value={t.id}>{typeDisplayName(t, lang)}</option>)}
+                  {groupTypesByCategory(types.filter((t) => t.id !== "walking")).map((grp) => (
+                    <optgroup key={grp.category} label={CATEGORY_LABELS[lang][grp.category] || grp.category}>
+                      {grp.items.map((t) => <option key={t.id} value={t.id}>{typeDisplayName(t, lang)}</option>)}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+
+              {noOriginNeeded(cardDraft.typeId) && (
+                <div className="mt-field">
+                  <label>{T.arrivalMethod}</label>
+                  <ArrivalMethodDropdown arrivalTypeId={cardDraft.arrivalTypeId} types={types} lang={lang} T={T} onChange={(id) => setCardDraft({ ...cardDraft, arrivalTypeId: id })} />
                 </div>
+              )}
+
+              <div className="mt-field-row">
                 <div className="mt-field"><label>תאריך</label><DateField value={cardDraft.date} lang={lang} T={T} onChange={(e) => setCardDraft({ ...cardDraft, date: e.target.value })} /></div>
               </div>
 
@@ -4557,12 +4565,7 @@ export default function MyTripApp() {
 
               {effectiveMobile ? (
                 <div className="mt-loc-mobile">
-                  {noOriginNeeded(cardDraft.typeId) ? (
-                    <div className="mt-field" style={{ marginBottom: 10 }}>
-                      <label>{T.arrivalMethod}</label>
-                      <ArrivalMethodDropdown arrivalTypeId={cardDraft.arrivalTypeId} types={types} lang={lang} T={T} onChange={(id) => setCardDraft({ ...cardDraft, arrivalTypeId: id })} />
-                    </div>
-                  ) : (
+                  {!noOriginNeeded(cardDraft.typeId) && (
                     <>
                       <div className="mt-loc-mobile-row">
                         <span className="mt-loc-row-label">{T.from}</span>
@@ -4606,12 +4609,6 @@ export default function MyTripApp() {
                 </div>
               ) : (
               <>
-              {noOriginNeeded(cardDraft.typeId) && (
-                <div className="mt-field" style={{ marginBottom: 10 }}>
-                  <label>{T.arrivalMethod}</label>
-                  <ArrivalMethodDropdown arrivalTypeId={cardDraft.arrivalTypeId} types={types} lang={lang} T={T} onChange={(id) => setCardDraft({ ...cardDraft, arrivalTypeId: id })} />
-                </div>
-              )}
               <div className="mt-loc-grid">
                 <span />
                 <span className="mt-loc-col-header" style={{ gridColumn: "2 / span 2" }}>{T.locationColHeader}</span>
