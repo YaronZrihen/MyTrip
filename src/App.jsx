@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "18.3.0";
+const APP_VERSION = "18.3.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -2072,48 +2072,58 @@ function FileManagerRow({ file, T, showCategory }) {
   );
 }
 
-function ArrivalMethodDropdown({ arrivalTypeId, types, lang, T, onChange }) {
+function TypeFieldPicker({ typeId, types, lang, T, onChange, kindFilter, placeholder }) {
   const [open, setOpen] = useState(false);
-  const { refs, floatingStyles } = useFloating({
-    open, onOpenChange: setOpen,
-    placement: "bottom-start",
-    strategy: "fixed",
-    middleware: [offset(6), flip(), shift({ padding: 8 })],
-    whileElementsMounted: autoUpdate,
-  });
-  const am = typeMeta(arrivalTypeId, types, T, lang);
-  const AmIcon = ICONS[am.icon] || Footprints;
-  const arrivalTypes = types.filter((t) => t.kind === "arrival");
+  const [search, setSearch] = useState("");
+  const selected = typeMeta(typeId, types, T, lang);
+  const SelIcon = ICONS[selected.icon] || Tag;
+  const optionTypes = kindFilter ? types.filter((t) => t.kind === kindFilter) : types;
+  function close() { setOpen(false); setSearch(""); }
   return (
-    <span style={{ position: "relative", display: "inline-flex" }}>
-      <button type="button" className="mt-type-btn" ref={refs.setReference} onClick={() => setOpen((v) => !v)}>
-        <span className="mt-type-icon" style={{ background: am.color, width: 20, height: 20 }}><AmIcon size={11} /></span>
-        <span className="mt-type-text">{am.name}</span> <ChevronDown size={12} />
+    <span style={{ position: "relative", display: "block" }}>
+      <button type="button" className="mt-type-field-btn" onClick={() => setOpen(true)}>
+        {typeId && typeId !== "unset" ? (
+          <>
+            <span className="mt-type-icon" style={{ background: selected.color, width: 20, height: 20 }}><SelIcon size={11} /></span>
+            <span className="mt-type-text">{selected.name}</span>
+          </>
+        ) : (
+          <span className="mt-type-text" style={{ color: "var(--muted)" }}>{placeholder || T.selectType}</span>
+        )}
+        <ChevronDown size={13} style={{ marginInlineStart: "auto" }} />
       </button>
       {open && (
-        <>
-          <div className="mt-floating-backdrop" onClick={() => setOpen(false)} />
-          <div ref={refs.setFloating} dir={lang === "he" ? "rtl" : "ltr"} style={{ ...floatingStyles, zIndex: 400 }} className="mt-floating-menu mt-type-menu">
+        <div className="mt-modal-backdrop" onClick={close}>
+          <div dir={lang === "he" ? "rtl" : "ltr"} className="mt-modal mt-type-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="mt-type-search-wrap">
+              <Search size={13} />
+              <input autoFocus className="mt-type-search" placeholder={T.searchTypes} value={search} onChange={(e) => setSearch(e.target.value)} />
+              {search && <button className="mt-type-search-clear" onClick={() => setSearch("")}><X size={12} /></button>}
+              <button className="mt-btn ghost" style={{ padding: "4px 6px" }} onClick={close}><X size={16} /></button>
+            </div>
             <div className="mt-type-list">
-              {groupTypesByCategory(arrivalTypes).map((grp) => (
-                <React.Fragment key={grp.category}>
-                  <div className="mt-type-cat-label">{CATEGORY_LABELS[lang][grp.category] || grp.category}</div>
-                  {grp.items.map((t) => {
-                    const TI = ICONS[t.icon] || Footprints;
-                    const selected = t.id === arrivalTypeId;
-                    return (
-                      <button key={t.id} className={"opt" + (selected ? " selected" : "")} onClick={() => { onChange(t.id); setOpen(false); }}>
-                        <span className="mt-type-icon" style={{ background: t.color, width: 20, height: 20 }}><TI size={11} /></span>
-                        <span style={{ flex: 1 }}>{typeDisplayName(t, lang)}</span>
-                        {selected && <Check size={13} />}
-                      </button>
-                    );
-                  })}
-                </React.Fragment>
-              ))}
+              {groupTypesByCategory(optionTypes)
+                .map((grp) => ({ ...grp, items: grp.items.filter((t) => typeDisplayName(t, lang).toLowerCase().includes(search.toLowerCase())) }))
+                .filter((grp) => grp.items.length)
+                .map((grp) => (
+                  <React.Fragment key={grp.category}>
+                    <div className="mt-type-cat-label">{CATEGORY_LABELS[lang][grp.category] || grp.category}</div>
+                    {grp.items.map((t) => {
+                      const TI = ICONS[t.icon] || Tag;
+                      const isSel = t.id === typeId;
+                      return (
+                        <button key={t.id} className={"opt" + (isSel ? " selected" : "")} onClick={() => { onChange(t.id); close(); }}>
+                          <span className="mt-type-icon" style={{ background: t.color, width: 20, height: 20 }}><TI size={11} /></span>
+                          <span style={{ flex: 1 }}>{typeDisplayName(t, lang)}</span>
+                          {isSel && <Check size={13} />}
+                        </button>
+                      );
+                    })}
+                  </React.Fragment>
+                ))}
             </div>
           </div>
-        </>
+        </div>
       )}
     </span>
   );
@@ -3649,6 +3659,11 @@ export default function MyTripApp() {
         .mt-hotel-rating-demo .mt-hint { margin-inline-start:6px; color:var(--muted); }
         .mt-type-icon svg { width:12px; height:12px; color:#fff; }
         .mt-type-btn { border:none; background:none; padding:0; display:flex; align-items:center; gap:5px; font-size:12.8px; font-weight:500; color:var(--ink); max-width:100%; }
+        .mt-type-field-btn { display:flex; align-items:center; gap:7px; width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 10px; background:var(--surface); font-size:13px; font-weight:500; color:var(--ink); box-sizing:border-box; }
+        .mt-type-field-btn:hover { border-color:var(--teal); }
+        .mt-type-modal { max-width:340px; width:92vw; max-height:70vh; display:flex; flex-direction:column; padding:12px; }
+        .mt-type-modal .mt-type-search-wrap { margin-bottom:8px; }
+        .mt-type-modal .mt-type-list { overflow-y:auto; flex:1; }
         .mt-arrival-btn { border:1px solid var(--border); background:var(--surface); color:var(--muted); border-radius:6px; padding:3px; display:flex; align-items:center; justify-content:center; margin-inline-start:4px; }
         .mt-arrival-btn:hover { border-color:var(--teal); color:var(--teal); }
         .mt-type-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -4509,25 +4524,35 @@ export default function MyTripApp() {
 
               <div className="mt-field">
                 <label>{T.type}</label>
-                <select value={cardDraft.typeId} onChange={(e) => {
-                    const newType = e.target.value;
-                    if (noOriginNeeded(newType)) setCardDraft({ ...cardDraft, typeId: newType, from: "", fromAlias: "", fromLat: null, fromLon: null, fromVerifiedUrl: "", fromVerifiedText: "", fromPlaceId: null });
-                    else setCardDraft({ ...cardDraft, typeId: newType });
-                  }}>
-                  <option value="unset">{T.selectType}</option>
-                  {types.filter((t) => t.id === "walking").map((t) => <option key={t.id} value={t.id}>{typeDisplayName(t, lang)}</option>)}
-                  {groupTypesByCategory(types.filter((t) => t.id !== "walking")).map((grp) => (
-                    <optgroup key={grp.category} label={CATEGORY_LABELS[lang][grp.category] || grp.category}>
-                      {grp.items.map((t) => <option key={t.id} value={t.id}>{typeDisplayName(t, lang)}</option>)}
-                    </optgroup>
-                  ))}
-                </select>
+                <TypeFieldPicker typeId={cardDraft.typeId} types={types} lang={lang} T={T} onChange={(newType) => {
+                  if (noOriginNeeded(newType)) setCardDraft({ ...cardDraft, typeId: newType, from: "", fromAlias: "", fromLat: null, fromLon: null, fromVerifiedUrl: "", fromVerifiedText: "", fromPlaceId: null });
+                  else setCardDraft({ ...cardDraft, typeId: newType });
+                }} />
+              </div>
+
+              <div className="mt-field">
+                <label>{T.to}</label>
+                <div className="mt-loc-icons" style={{ marginBottom: 4 }}>
+                  <input className="mt-loc-grid-input" dir="auto" value={cardDraft.to} placeholder={getTypeHint(cardDraft.typeId, "to", lang)} onChange={(e) => setCardDraft({ ...cardDraft, to: e.target.value })} />
+                  <button className="mt-btn ghost mt-btn-icon" title={T.copyFromOrigin} disabled={!cardDraft.from} onClick={() => setCardDraft({ ...cardDraft, to: cardDraft.from })}><Copy size={13} /></button>
+                  <button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openLocationPicker("to")}><MapPin size={13} /></button>
+                  {toVerifiedCard && (
+                    <PopoverInfoIcon icon={CircleCheck} color="#3E8E5A">
+                      {cardDraft.toPlaceId ? <div className="mt-info-popup-widget"><GooglePlaceDetailsFull placeId={cardDraft.toPlaceId} T={T} /></div> : <div>{T.verified}</div>}
+                      <a href={cardDraft.toVerifiedUrl} target="_blank" rel="noreferrer" style={{ display: "block", padding: "6px 10px" }}>{T.openMap}</a>
+                    </PopoverInfoIcon>
+                  )}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <input dir="auto" style={{ flex: 1 }} value={cardDraft.toAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "toAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, toAlias: e.target.value })} />
+                  <PopoverInfoIcon icon={Info} trigger="hover">{T.aliasHint}</PopoverInfoIcon>
+                </div>
               </div>
 
               {noOriginNeeded(cardDraft.typeId) && (
                 <div className="mt-field">
                   <label>{T.arrivalMethod}</label>
-                  <ArrivalMethodDropdown arrivalTypeId={cardDraft.arrivalTypeId} types={types} lang={lang} T={T} onChange={(id) => setCardDraft({ ...cardDraft, arrivalTypeId: id })} />
+                  <TypeFieldPicker typeId={cardDraft.arrivalTypeId} types={types} lang={lang} T={T} kindFilter="arrival" onChange={(id) => setCardDraft({ ...cardDraft, arrivalTypeId: id })} />
                 </div>
               )}
 
@@ -4587,25 +4612,6 @@ export default function MyTripApp() {
                       </div>
                     </>
                   )}
-
-                  <div className="mt-loc-mobile-row">
-                    <span className="mt-loc-row-label">{T.to}</span>
-                    <input className="mt-loc-grid-input" dir="auto" value={cardDraft.to} placeholder={getTypeHint(cardDraft.typeId, "to", lang)} onChange={(e) => setCardDraft({ ...cardDraft, to: e.target.value })} />
-                    <span className="mt-loc-icons">
-                      <button className="mt-btn ghost mt-btn-icon" title={T.copyFromOrigin} disabled={!cardDraft.from} onClick={() => setCardDraft({ ...cardDraft, to: cardDraft.from })}><Copy size={13} /></button>
-                      <button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openLocationPicker("to")}><MapPin size={13} /></button>
-                    </span>
-                    {toVerifiedCard && (
-                    <PopoverInfoIcon icon={CircleCheck} color="#3E8E5A">
-                      {cardDraft.toPlaceId ? <div className="mt-info-popup-widget"><GooglePlaceDetailsFull placeId={cardDraft.toPlaceId} T={T} /></div> : <div>{T.verified}</div>}
-                      <a href={cardDraft.toVerifiedUrl} target="_blank" rel="noreferrer" style={{ display: "block", padding: "6px 10px" }}>{T.openMap}</a>
-                    </PopoverInfoIcon>
-                  )}
-                  </div>
-                  <div className="mt-loc-mobile-alias-row">
-                    <input dir="auto" value={cardDraft.toAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "toAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, toAlias: e.target.value })} />
-                    <PopoverInfoIcon icon={Info} trigger="hover">{T.aliasHint}</PopoverInfoIcon>
-                  </div>
                 </div>
               ) : (
               <>
@@ -4634,23 +4640,6 @@ export default function MyTripApp() {
                     </span>
                   </>
                 )}
-
-                <span className="mt-loc-row-label">{T.to}</span>
-                <span className="mt-loc-icons">
-                  <button className="mt-btn ghost mt-btn-icon" title={T.copyFromOrigin} disabled={!cardDraft.from} onClick={() => setCardDraft({ ...cardDraft, to: cardDraft.from })}><Copy size={13} /></button>
-                  <button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openLocationPicker("to")}><MapPin size={13} /></button>
-                </span>
-                <input className="mt-loc-grid-input" dir="auto" value={cardDraft.to} placeholder={getTypeHint(cardDraft.typeId, "to", lang)} onChange={(e) => setCardDraft({ ...cardDraft, to: e.target.value })} />
-                <span className="mt-loc-verified-slot">{toVerifiedCard && (
-                    <PopoverInfoIcon icon={CircleCheck} color="#3E8E5A">
-                      {cardDraft.toPlaceId ? <div className="mt-info-popup-widget"><GooglePlaceDetailsFull placeId={cardDraft.toPlaceId} T={T} /></div> : <div>{T.verified}</div>}
-                      <a href={cardDraft.toVerifiedUrl} target="_blank" rel="noreferrer" style={{ display: "block", padding: "6px 10px" }}>{T.openMap}</a>
-                    </PopoverInfoIcon>
-                  )}</span>
-                <span className="mt-loc-alias-cell">
-                  <input dir="auto" value={cardDraft.toAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "toAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, toAlias: e.target.value })} />
-                  <PopoverInfoIcon icon={Info} trigger="hover">{T.aliasHint}</PopoverInfoIcon>
-                </span>
               </div>
               </>
               )}
