@@ -11,7 +11,7 @@ import {
   Smartphone, Monitor, AlertTriangle, GripVertical, Check, FolderPlus, Sparkles,
   Route, Waypoints, Download, Upload, MapPin, Search, CircleCheck, Clock, ArrowDownUp, Copy, StickyNote, TrainFront,
   Bus, Motorbike, Bike, Scooter, Sailboat, ShipWheel, Anchor, Kayak, Helicopter, Caravan, Building2, Landmark, Home,
-  CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2, MoreVertical, Menu, Calendar as CalendarIcon, Undo2, Redo2, Info, ExternalLink, Phone, Save, FolderOpen, ImagePlus, BookOpen, RefreshCw, Workflow, ArrowLeft, ArrowRight, CheckSquare, Paperclip
+  CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2, MoreVertical, Menu, Calendar as CalendarIcon, Undo2, Redo2, Info, ExternalLink, Phone, Save, FolderOpen, ImagePlus, BookOpen, RefreshCw, Workflow, ArrowLeft, ArrowRight, CheckSquare, Paperclip, Briefcase
 } from "lucide-react";
 
 /* ---------------------------------------------------------------------- */
@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "16.0.0";
+const APP_VERSION = "16.1.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -121,6 +121,7 @@ const T_DICT = {
     deleteFrameTitle: "מחיקת מסגרת", deleteFrameHint: "איך למחוק את המסגרת?",
     preFlightChecklist: "צ'ק ליסט קדם טיסה", checklistReservations: "הזמנות", checklistDocuments: "מסמכי נסיעה", checklistOther: "נוספים",
     checklistShopping: "רשימת קניות", checklistPacking: "ארגון ציוד לטיסה", checklistUpload: "העלה מסמך", checklistAddItem: "הוסף פריט...",
+    checklistPackingSub: "{n} מתוך {total} הושלמו", checklistShoppingSub: "{n} פריטים", checklistShoppingEmpty: "הרשימה ריקה — הוסף פריט למטה",
     deleteFrameOnly: "מחק מסגרת בלבד (התוכן יעבור למסגרת האם)", deleteFrameWithContent: "מחק מסגרת ואת כל התוכן שבתוכה",
     type: "סוג", from: "מוצא", to: "יעד", start: "בשעה", end: "עד שעה", overnight: "חוצה חצות",
     requiresTicket: "דורש רכישת כרטיס כניסה", calcRoute: "חשב מסלול",
@@ -260,6 +261,7 @@ const T_DICT = {
     deleteFrameTitle: "Delete Frame", deleteFrameHint: "How would you like to delete this frame?",
     preFlightChecklist: "Pre-Flight Checklist", checklistReservations: "Reservations", checklistDocuments: "Travel Documents", checklistOther: "Additional",
     checklistShopping: "Shopping List", checklistPacking: "Flight Packing", checklistUpload: "Upload document", checklistAddItem: "Add item...",
+    checklistPackingSub: "{n} of {total} done", checklistShoppingSub: "{n} items", checklistShoppingEmpty: "List is empty — add an item below",
     deleteFrameOnly: "Delete frame only (content moves to parent)", deleteFrameWithContent: "Delete frame and all its content",
     type: "Type", from: "Origin", to: "Destination", start: "At", end: "Until", overnight: "Crosses midnight",
     requiresTicket: "Requires entrance ticket", calcRoute: "Calculate route",
@@ -1893,7 +1895,7 @@ function ChecklistRow({ item, cat, lang, T, onToggle, onUpload, onRemoveDoc, onR
           <button className="mt-checklist-doc-x" onClick={() => onRemoveDoc(cat, item.id)}><X size={11} /></button>
         </span>
       ) : (
-        <button className="mt-btn ghost mt-checklist-upload-btn" onClick={() => onUpload(cat, item.id)}><Paperclip size={12} /> {T.checklistUpload}</button>
+        <button className="mt-btn ghost mt-checklist-upload-btn" onClick={() => onUpload(cat, item.id)} title={T.checklistUpload}><Paperclip size={14} /></button>
       )}
       {onRemove && <button className="mt-btn ghost" style={{ padding: "2px 6px" }} onClick={() => onRemove(cat, item.id)}><X size={12} /></button>}
     </div>
@@ -2214,12 +2216,31 @@ export default function MyTripApp() {
     currency: [{ id: "currency", label_he: "המרת כסף", label_en: "Currency exchange", checked: false, doc: null }],
     airport: [{ id: "airport", label_he: "דרכי הגעה לשדה", label_en: "Ways to the airport", checked: false, doc: null }],
     shopping: [],
-    packing: [],
+    packing: [
+      { id: "pk1", label_he: "מטען טלפון", label_en: "Phone charger", checked: false, doc: null },
+      { id: "pk2", label_he: "מתאם חשמל", label_en: "Power adapter", checked: false, doc: null },
+      { id: "pk3", label_he: "פאוארבנק", label_en: "Power bank", checked: false, doc: null },
+      { id: "pk4", label_he: "תרופות אישיות", label_en: "Personal medications", checked: false, doc: null },
+      { id: "pk5", label_he: "משקפי שמש", label_en: "Sunglasses", checked: false, doc: null },
+      { id: "pk6", label_he: "אוזניות", label_en: "Headphones", checked: false, doc: null },
+      { id: "pk7", label_he: "כרית צוואר", label_en: "Neck pillow", checked: false, doc: null },
+      { id: "pk8", label_he: "עותק צילום דרכון", label_en: "Passport photocopy", checked: false, doc: null },
+      { id: "pk9", label_he: "מברשת ומשחת שיניים", label_en: "Toothbrush & toothpaste", checked: false, doc: null },
+      { id: "pk10", label_he: "בגדים להחלפה", label_en: "Change of clothes", checked: false, doc: null },
+    ],
   };
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [checklist, setChecklist] = useState(CHECKLIST_DEFAULTS);
   const checklistFileInputRef = useRef(null);
   const [checklistUploadTarget, setChecklistUploadTarget] = useState(null);
+  const [packingListOpen, setPackingListOpen] = useState(false);
+  const [shoppingListOpen, setShoppingListOpen] = useState(false);
+  const checklistProgressItems = [
+    ...checklist.reservations, ...checklist.documents, ...checklist.checkin, ...checklist.currency, ...checklist.airport, ...checklist.packing,
+  ];
+  const checklistProgressPct = checklistProgressItems.length
+    ? Math.round((checklistProgressItems.filter((it) => it.checked).length / checklistProgressItems.length) * 100)
+    : 0;
   const [addDayCtx, setAddDayCtx] = useState(null); // { fid, date }
   const [locPicker, setLocPicker] = useState(null); // { field, query, results, loading }
   const [dragId, setDragId] = useState(null);
@@ -3486,7 +3507,17 @@ export default function MyTripApp() {
         .mt-checklist-done { text-decoration:line-through; color:var(--muted); }
         .mt-checklist-doc-chip { display:flex; align-items:center; gap:4px; background:var(--teal-tint); color:var(--teal-dark); font-size:11px; font-weight:600; padding:4px 8px; border-radius:20px; white-space:nowrap; }
         .mt-checklist-doc-x { border:none; background:none; color:var(--teal-dark); padding:0; display:flex; }
-        .mt-checklist-upload-btn { font-size:11.5px; padding:5px 9px; white-space:nowrap; }
+        .mt-checklist-upload-btn { padding:6px; display:flex; align-items:center; justify-content:center; }
+        .mt-checklist-progress-wrap { display:flex; align-items:center; gap:10px; padding:12px 20px 4px; }
+        .mt-checklist-progress-track { flex:1; height:8px; border-radius:4px; background:var(--border); overflow:hidden; }
+        .mt-checklist-progress-fill { height:100%; background:var(--teal); border-radius:4px; transition:width .3s ease; }
+        .mt-checklist-progress-pct { font-size:12.5px; font-weight:700; color:var(--teal-dark); min-width:34px; text-align:left; }
+        .mt-checklist-nav-card { display:flex; align-items:center; gap:10px; width:100%; padding:12px; border:1px solid var(--border); border-radius:10px; background:var(--surface); margin-bottom:8px; text-align:right; color:var(--ink); }
+        .mt-checklist-nav-card:hover { background:var(--bg); border-color:var(--teal); }
+        .mt-checklist-nav-icon { width:32px; height:32px; border-radius:8px; background:var(--teal-tint); color:var(--teal-dark); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .mt-checklist-nav-text { display:flex; flex-direction:column; gap:2px; flex:1; }
+        .mt-checklist-nav-text strong { font-size:13.5px; }
+        .mt-checklist-nav-text span { font-size:11.5px; color:var(--muted); }
         .mt-checklist-add-row { display:flex; align-items:center; gap:6px; padding:8px 4px 14px; }
         .mt-checklist-add-row input { flex:1; border:1px solid var(--border); border-radius:8px; padding:7px 9px; font-size:13px; font-family:inherit; text-align:right; }
         .mt-error { display:flex; gap:6px; align-items:flex-start; background:#FBEAE8; color:var(--danger); font-size:11.5px; padding:7px 9px; border-radius:8px; }
@@ -4380,43 +4411,94 @@ export default function MyTripApp() {
         <div className="mt-modal-backdrop" onClick={() => setChecklistOpen(false)}>
           <div className="mt-modal" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
             <div className="mt-modal-header"><span className="mt-modal-title">{T.preFlightChecklist}</span><button className="mt-btn ghost" onClick={() => setChecklistOpen(false)}><X size={16} /></button></div>
+            <div className="mt-checklist-progress-wrap">
+              <div className="mt-checklist-progress-track"><div className="mt-checklist-progress-fill" style={{ width: `${checklistProgressPct}%` }} /></div>
+              <span className="mt-checklist-progress-pct">{checklistProgressPct}%</span>
+            </div>
             <div className="mt-modal-body">
               <input ref={checklistFileInputRef} type="file" style={{ display: "none" }} onChange={handleChecklistFileSelected} />
               <div className="mt-section-label">{T.checklistReservations}</div>
               {checklist.reservations.map((it) => (
                 <ChecklistRow key={it.id} item={it} cat="reservations" lang={lang} T={T}
-                  onToggle={toggleChecklistItem} onUpload={openChecklistUpload} onRemoveDoc={removeChecklistDoc} />
+                  onToggle={toggleChecklistItem} onUpload={openChecklistUpload} onRemoveDoc={removeChecklistDoc} onRemove={removeChecklistItem} />
               ))}
+              <ChecklistAddRow cat="reservations" T={T} onAdd={addChecklistSubItem} />
               <div className="mt-section-label">{T.checklistDocuments}</div>
               {checklist.documents.map((it) => (
                 <ChecklistRow key={it.id} item={it} cat="documents" lang={lang} T={T}
-                  onToggle={toggleChecklistItem} onUpload={openChecklistUpload} onRemoveDoc={removeChecklistDoc} />
+                  onToggle={toggleChecklistItem} onUpload={openChecklistUpload} onRemoveDoc={removeChecklistDoc} onRemove={removeChecklistItem} />
               ))}
+              <ChecklistAddRow cat="documents" T={T} onAdd={addChecklistSubItem} />
               <div className="mt-section-label">{T.checklistOther}</div>
               {checklist.checkin.map((it) => (
                 <ChecklistRow key={it.id} item={it} cat="checkin" lang={lang} T={T}
-                  onToggle={toggleChecklistItem} onUpload={openChecklistUpload} onRemoveDoc={removeChecklistDoc} />
+                  onToggle={toggleChecklistItem} onUpload={openChecklistUpload} onRemoveDoc={removeChecklistDoc} onRemove={removeChecklistItem} />
               ))}
               {checklist.currency.map((it) => (
                 <ChecklistRow key={it.id} item={it} cat="currency" lang={lang} T={T}
-                  onToggle={toggleChecklistItem} onUpload={openChecklistUpload} onRemoveDoc={removeChecklistDoc} />
+                  onToggle={toggleChecklistItem} onUpload={openChecklistUpload} onRemoveDoc={removeChecklistDoc} onRemove={removeChecklistItem} />
               ))}
               {checklist.airport.map((it) => (
                 <ChecklistRow key={it.id} item={it} cat="airport" lang={lang} T={T}
-                  onToggle={toggleChecklistItem} onUpload={openChecklistUpload} onRemoveDoc={removeChecklistDoc} />
-              ))}
-              <div className="mt-section-label">{T.checklistShopping}</div>
-              {checklist.shopping.map((it) => (
-                <ChecklistRow key={it.id} item={it} cat="shopping" lang={lang} T={T}
                   onToggle={toggleChecklistItem} onUpload={openChecklistUpload} onRemoveDoc={removeChecklistDoc} onRemove={removeChecklistItem} />
               ))}
-              <ChecklistAddRow cat="shopping" T={T} onAdd={addChecklistSubItem} />
-              <div className="mt-section-label">{T.checklistPacking}</div>
+              <ChecklistAddRow cat="airport" T={T} onAdd={addChecklistSubItem} />
+              <div className="divider" style={{ margin: "14px 0" }} />
+              <button className="mt-checklist-nav-card" onClick={() => { setChecklistOpen(false); setPackingListOpen(true); }}>
+                <span className="mt-checklist-nav-icon"><Briefcase size={16} /></span>
+                <span className="mt-checklist-nav-text">
+                  <strong>{T.checklistPacking}</strong>
+                  <span>{T.checklistPackingSub.replace("{n}", checklist.packing.filter((it) => it.checked).length).replace("{total}", checklist.packing.length)}</span>
+                </span>
+                <ChevronLeft size={18} />
+              </button>
+              <button className="mt-checklist-nav-card" onClick={() => { setChecklistOpen(false); setShoppingListOpen(true); }}>
+                <span className="mt-checklist-nav-icon"><ShoppingBag size={16} /></span>
+                <span className="mt-checklist-nav-text">
+                  <strong>{T.checklistShopping}</strong>
+                  <span>{T.checklistShoppingSub.replace("{n}", checklist.shopping.length)}</span>
+                </span>
+                <ChevronLeft size={18} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {packingListOpen && (
+        <div className="mt-modal-backdrop" onClick={() => setPackingListOpen(false)}>
+          <div className="mt-modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+            <div className="mt-modal-header">
+              <button className="mt-btn ghost" onClick={() => { setPackingListOpen(false); setChecklistOpen(true); }}><ChevronRight size={16} /></button>
+              <span className="mt-modal-title">{T.checklistPacking}</span>
+              <button className="mt-btn ghost" onClick={() => setPackingListOpen(false)}><X size={16} /></button>
+            </div>
+            <div className="mt-modal-body">
               {checklist.packing.map((it) => (
                 <ChecklistRow key={it.id} item={it} cat="packing" lang={lang} T={T}
                   onToggle={toggleChecklistItem} onUpload={openChecklistUpload} onRemoveDoc={removeChecklistDoc} onRemove={removeChecklistItem} />
               ))}
               <ChecklistAddRow cat="packing" T={T} onAdd={addChecklistSubItem} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {shoppingListOpen && (
+        <div className="mt-modal-backdrop" onClick={() => setShoppingListOpen(false)}>
+          <div className="mt-modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+            <div className="mt-modal-header">
+              <button className="mt-btn ghost" onClick={() => { setShoppingListOpen(false); setChecklistOpen(true); }}><ChevronRight size={16} /></button>
+              <span className="mt-modal-title">{T.checklistShopping}</span>
+              <button className="mt-btn ghost" onClick={() => setShoppingListOpen(false)}><X size={16} /></button>
+            </div>
+            <div className="mt-modal-body">
+              {checklist.shopping.length === 0 && <p className="mt-hint" style={{ margin: "0 0 10px" }}>{T.checklistShoppingEmpty}</p>}
+              {checklist.shopping.map((it) => (
+                <ChecklistRow key={it.id} item={it} cat="shopping" lang={lang} T={T}
+                  onToggle={toggleChecklistItem} onUpload={openChecklistUpload} onRemoveDoc={removeChecklistDoc} onRemove={removeChecklistItem} />
+              ))}
+              <ChecklistAddRow cat="shopping" T={T} onAdd={addChecklistSubItem} />
             </div>
           </div>
         </div>
