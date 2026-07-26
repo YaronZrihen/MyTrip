@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "17.1.5";
+const APP_VERSION = "17.2.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -2030,7 +2030,7 @@ function HelpButton({ topic, lang, T, onOpenFull, size = 15, openTopic, setOpenT
       {open && createPortal(
         <>
           <div className="mt-floating-backdrop" onClick={(e) => { e.stopPropagation(); setOpenTopic(null); }} style={{ background: "rgba(20,35,32,.4)" }} />
-          <div ref={refs.setFloating} style={{ ...floatingStyles, zIndex: 400 }} className="mt-floating-menu mt-help-popover" onClick={(e) => e.stopPropagation()}>
+          <div ref={refs.setFloating} dir={lang === "he" ? "rtl" : "ltr"} style={{ ...floatingStyles, zIndex: 400 }} className="mt-floating-menu mt-help-popover" onClick={(e) => e.stopPropagation()}>
             <div className="mt-help-popover-title"><Icon size={14} /> {lang === "he" ? topicData.title_he : topicData.title_en}</div>
             <p className="mt-help-popover-text">{lang === "he" ? topicData.short_he : topicData.short_en}</p>
             <button className="mt-help-popover-more" onClick={() => { setOpenTopic(null); onOpenFull(topic); }}>{lang === "he" ? "עוד בעזרה ←" : "More in Help →"}</button>
@@ -2576,6 +2576,9 @@ export default function MyTripApp() {
     setManagedFiles((prev) => prev.filter((f) => !(f.sourceCat === cat && f.sourceId === id)));
   }
   function openHelpTopic(topic) {
+    setActionsMenuOpen(false);
+    setColMenuOpen(false);
+    setAddTypeOpen(false);
     setHelpCenterFocusTopic(topic);
     setHelpCenterOpen(true);
     setTimeout(() => {
@@ -3684,12 +3687,12 @@ export default function MyTripApp() {
         .mt-help-btn { border:none; background:none; color:var(--muted); padding:3px; display:flex; align-items:center; justify-content:center; border-radius:50%; flex-shrink:0; }
         .mt-help-btn:hover { color:var(--teal); background:var(--teal-tint); }
         .mt-help-popover { width:260px; padding:12px; box-shadow:0 8px 24px rgba(20,40,35,.18); border-radius:10px; background:var(--surface); }
-        .mt-help-popover-title { display:flex; align-items:center; gap:6px; font-size:13px; font-weight:700; color:var(--ink); margin-bottom:6px; }
-        .mt-help-popover-text { font-size:12px; color:var(--muted); line-height:1.5; margin:0 0 8px; }
+        .mt-help-popover-title { display:flex; align-items:center; gap:6px; font-size:13px; font-weight:700; color:var(--ink); margin-bottom:6px; text-align:right; }
+        .mt-help-popover-text { font-size:12px; color:var(--muted); line-height:1.5; margin:0 0 8px; text-align:right; }
         .mt-help-popover-more { border:none; background:none; color:var(--teal-dark); font-size:12px; font-weight:700; padding:0; }
         .mt-help-section { padding:12px 0; border-bottom:1px solid var(--border); transition:background .4s ease; }
         .mt-help-section.focused { background:var(--teal-tint); border-radius:8px; padding:12px 10px; }
-        .mt-help-section-title { display:flex; align-items:center; gap:7px; font-size:14.5px; font-weight:700; color:var(--ink); margin-bottom:6px; }
+        .mt-help-section-title { display:flex; align-items:center; gap:7px; font-size:14.5px; font-weight:700; color:var(--ink); margin-bottom:6px; text-align:right; }
         .mt-file-manager-tabs { display:flex; gap:6px; padding:10px 16px 0; border-bottom:1px solid var(--border); }
         .mt-file-manager-tab { border:none; background:none; padding:8px 10px; font-size:12px; font-weight:600; color:var(--muted); border-bottom:2px solid transparent; }
         .mt-file-manager-tab.active { color:var(--teal-dark); border-bottom-color:var(--teal); }
@@ -3697,7 +3700,7 @@ export default function MyTripApp() {
         .mt-file-manager-info { display:flex; flex-direction:column; gap:2px; flex:1; overflow:hidden; }
         .mt-file-manager-info strong { font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .mt-file-manager-info span { font-size:11px; color:var(--muted); }
-        .mt-help-section-text { font-size:12.5px; color:var(--muted); line-height:1.6; margin:0; }
+        .mt-help-section-text { font-size:12.5px; color:var(--muted); line-height:1.6; margin:0; text-align:right; }
         .mt-checklist-add-row { display:flex; align-items:center; gap:6px; padding:8px 4px 14px; }
         .mt-checklist-add-row input { flex:1; border:1px solid var(--border); border-radius:8px; padding:7px 9px; font-size:13px; font-family:inherit; text-align:right; }
         .mt-error { display:flex; gap:6px; align-items:flex-start; background:#FBEAE8; color:var(--danger); font-size:11.5px; padding:7px 9px; border-radius:8px; }
