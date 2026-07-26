@@ -20,7 +20,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "16.1.1";
+const APP_VERSION = "16.2.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1889,14 +1889,14 @@ function ChecklistRow({ item, cat, lang, T, onToggle, onUpload, onRemoveDoc, onR
         <input type="checkbox" checked={!!item.checked} onChange={() => onToggle(cat, item.id)} />
         <span className={item.checked ? "mt-checklist-done" : ""}>{label}</span>
       </label>
-      {item.doc ? (
+      {cat !== "packing" && (item.doc ? (
         <span className="mt-checklist-doc-chip">
           <Paperclip size={12} /> {item.doc}
           <button className="mt-checklist-doc-x" onClick={() => onRemoveDoc(cat, item.id)}><X size={11} /></button>
         </span>
       ) : (
         <button className="mt-btn ghost mt-checklist-upload-btn" onClick={() => onUpload(cat, item.id)} title={T.checklistUpload}><Paperclip size={14} /></button>
-      )}
+      ))}
       {onRemove && <button className="mt-btn ghost" style={{ padding: "2px 6px" }} onClick={() => onRemove(cat, item.id)}><X size={12} /></button>}
     </div>
   );
@@ -2235,12 +2235,16 @@ export default function MyTripApp() {
   const [checklistUploadTarget, setChecklistUploadTarget] = useState(null);
   const [packingListOpen, setPackingListOpen] = useState(false);
   const [shoppingListOpen, setShoppingListOpen] = useState(false);
-  const checklistProgressItems = [
-    ...checklist.reservations, ...checklist.documents, ...checklist.checkin, ...checklist.currency, ...checklist.airport, ...checklist.packing,
+  const checklistOtherItems = [
+    ...checklist.reservations, ...checklist.documents, ...checklist.checkin, ...checklist.currency, ...checklist.airport,
   ];
-  const checklistProgressPct = checklistProgressItems.length
-    ? Math.round((checklistProgressItems.filter((it) => it.checked).length / checklistProgressItems.length) * 100)
+  const checklistOtherPct = checklistOtherItems.length
+    ? (checklistOtherItems.filter((it) => it.checked).length / checklistOtherItems.length) * 70
     : 0;
+  const checklistPackingPct = checklist.packing.length
+    ? (checklist.packing.filter((it) => it.checked).length / checklist.packing.length) * 30
+    : 0;
+  const checklistProgressPct = Math.round(checklistOtherPct + checklistPackingPct);
   const [addDayCtx, setAddDayCtx] = useState(null); // { fid, date }
   const [locPicker, setLocPicker] = useState(null); // { field, query, results, loading }
   const [dragId, setDragId] = useState(null);
@@ -3510,8 +3514,10 @@ export default function MyTripApp() {
         .mt-checklist-upload-btn { padding:6px; display:flex; align-items:center; justify-content:center; }
         .mt-checklist-progress-wrap { display:flex; align-items:center; gap:10px; padding:12px 20px 10px; position:sticky; top:0; z-index:5; background:var(--surface); border-bottom:1px solid var(--border); }
         .mt-checklist-progress-track { flex:1; height:8px; border-radius:4px; background:var(--border); overflow:hidden; }
-        .mt-checklist-progress-fill { height:100%; background:var(--teal); border-radius:4px; transition:width .3s ease; }
-        .mt-checklist-progress-pct { font-size:12.5px; font-weight:700; color:var(--teal-dark); min-width:34px; text-align:left; }
+        .mt-checklist-progress-fill { height:100%; background:var(--danger); border-radius:4px; transition:width .3s ease, background .3s ease; }
+        .mt-checklist-progress-fill.complete { background:var(--teal); }
+        .mt-checklist-progress-pct { font-size:12.5px; font-weight:700; color:var(--danger); min-width:34px; text-align:left; }
+        .mt-checklist-progress-pct.complete { color:var(--teal-dark); }
         .mt-checklist-nav-card { display:flex; align-items:center; gap:10px; width:100%; padding:12px; border:1px solid var(--border); border-radius:10px; background:var(--surface); margin-bottom:8px; text-align:right; color:var(--ink); }
         .mt-checklist-nav-card:hover { background:var(--bg); border-color:var(--teal); }
         .mt-checklist-nav-icon { width:32px; height:32px; border-radius:8px; background:var(--teal-tint); color:var(--teal-dark); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
@@ -4412,8 +4418,8 @@ export default function MyTripApp() {
           <div className="mt-modal" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
             <div className="mt-modal-header"><span className="mt-modal-title">{T.preFlightChecklist}</span><button className="mt-btn ghost" onClick={() => setChecklistOpen(false)}><X size={16} /></button></div>
             <div className="mt-checklist-progress-wrap">
-              <div className="mt-checklist-progress-track"><div className="mt-checklist-progress-fill" style={{ width: `${checklistProgressPct}%` }} /></div>
-              <span className="mt-checklist-progress-pct">{checklistProgressPct}%</span>
+              <div className="mt-checklist-progress-track"><div className={"mt-checklist-progress-fill" + (checklistProgressPct >= 100 ? " complete" : "")} style={{ width: `${checklistProgressPct}%` }} /></div>
+              <span className={"mt-checklist-progress-pct" + (checklistProgressPct >= 100 ? " complete" : "")}>{checklistProgressPct}%</span>
             </div>
             <div className="mt-modal-body">
               <input ref={checklistFileInputRef} type="file" style={{ display: "none" }} onChange={handleChecklistFileSelected} />
