@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "18.5.1";
+const APP_VERSION = "18.5.3";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -240,7 +240,7 @@ const T_DICT = {
     tryGooglePlaces: "חפש עם Google Places (הדגמה)", demoNeedsGoogleKey: "תוצאות מדויקות ועשירות יותר (כולל עברית טובה בהרבה) אפשריות עם Google Places API — דורש מפתח API וחיוב בענן של גוגל. זו הצגה בלבד; החיפוש הפעיל כרגע משתמש ב-OpenStreetMap החינמי.",
     tryGooglePlacesReal: "חפש עם Google Places", usingGooglePlaces: "✓ מחפש עם Google Places",
     noGoogleKeyConfigured: "חיפוש מיקום דורש מפתח Google Places API מוגדר (VITE_GOOGLE_PLACES_KEY). פנה למפתח האפליקציה.",
-    uploadFile: "העלה קובץ (כרטיס טיסה, שובר הזמנה...) — הדגמה", demoNeedsStorage: "העלאת קבצים דורשת שירות אחסון (כמו Supabase Storage או S3), עדיין לא מחובר בפרוטוטייפ. זו הצגה בלבד.",
+    uploadFile: "העלה קובץ לרשומה זו — הדגמה", demoNeedsStorage: "העלאת קבצים דורשת שירות אחסון (כמו Supabase Storage או S3), עדיין לא מחובר בפרוטוטייפ. זו הצגה בלבד.",
     aiDemoNotice: "זו הדגמת ממשק בלבד. חיבור אמיתי ל-Claude דורש שרת/פונקציה בצד השרת (לא ניתן לחשוף מפתח API בצד הלקוח).",
     aiSuggestItinerary: "הצע מסלול יומי אוטומטי", aiInputPlaceholder: "שאל שאלה על הטיול...",
     aiSuggestDemoText: "דוגמה להצעה (הדגמה): יום 2 — בוקר: ביקור בקולוסיאום (09:00), צהריים: ארוחה בטרסטבר, אחה״צ: מזרקת טרווי ופנתיאון. לחיבור אמיתי נדרש שרת שמפעיל את Claude API.",
@@ -384,7 +384,7 @@ const T_DICT = {
     tryGooglePlaces: "Search with Google Places (preview)", demoNeedsGoogleKey: "Richer, more accurate results (including much better Hebrew support) are possible with the Google Places API — needs an API key and billing on Google Cloud. This is a preview only; the active search currently uses free OpenStreetMap data.",
     tryGooglePlacesReal: "Search with Google Places", usingGooglePlaces: "✓ Searching with Google Places",
     noGoogleKeyConfigured: "Location search requires a configured Google Places API key (VITE_GOOGLE_PLACES_KEY). Contact the app developer.",
-    uploadFile: "Upload a file (boarding pass, booking voucher...) — preview", demoNeedsStorage: "File uploads need a storage service (like Supabase Storage or S3), not yet connected in the prototype. This is a preview only.",
+    uploadFile: "Upload a file for this record — preview", demoNeedsStorage: "File uploads need a storage service (like Supabase Storage or S3), not yet connected in the prototype. This is a preview only.",
     aiDemoNotice: "This is a UI preview only. A real Claude connection needs a server-side function (an API key can't be exposed client-side).",
     aiSuggestItinerary: "Suggest an automatic day plan", aiInputPlaceholder: "Ask a question about the trip...",
     aiSuggestDemoText: "Example suggestion (demo): Day 2 — Morning: visit the Colosseum (9:00), Lunch in Trastevere, Afternoon: Trevi Fountain and the Pantheon. A real connection needs a server running the Claude API.",
@@ -4654,10 +4654,26 @@ export default function MyTripApp() {
                 </div>
               </div>
 
-              <label className="mt-checkbox-row"><input type="checkbox" checked={cardDraft.toFee === "yes"} onChange={(e) => setCardDraft({ ...cardDraft, toFee: e.target.checked ? "yes" : null })} />{T.requiresTicket}</label>
+              <label className="mt-checkbox-row" style={{ marginBottom: 4 }}><input type="checkbox" checked={cardDraft.toFee === "yes"} onChange={(e) => setCardDraft({ ...cardDraft, toFee: e.target.checked ? "yes" : null })} />{T.requiresTicket}</label>
+
+              <div className="mt-weather-row">
+                <span className="mt-link-icon mt-weather-icon-btn" title={T.weatherAtArrival}>
+                  {(() => {
+                    if (weatherData && weatherData.loading) return <Cloud size={17} className="mt-weather-spin" />;
+                    if (weatherData && weatherData.data) { const meta = weatherMeta(weatherData.data.code); const WI = WEATHER_ICONS[meta.icon] || Cloud; return <WI size={17} />; }
+                    return <Cloud size={17} style={{ opacity: 0.35 }} />;
+                  })()}
+                </span>
+                <span className="mt-hint">{T.weatherAtArrival}</span>
+                {weatherData && weatherData.loading && <span className="mt-hint">{T.weatherLoading}</span>}
+                {weatherData && weatherData.error && <span className="mt-hint">{T.weatherUnavailable} ({T.technicalDetail}: {String(weatherData.error)})</span>}
+                {weatherData && weatherData.data && (
+                  <span className="mt-weather-detail">{weatherMeta(weatherData.data.code)[lang]} · {Math.round(weatherData.data.min)}°–{Math.round(weatherData.data.max)}°C</span>
+                )}
+              </div>
 
               {noOriginNeeded(cardDraft.typeId) && (
-                <div className="mt-field">
+                <div className="mt-field" style={{ marginTop: 16 }}>
                   <label>{T.arrivalMethod}</label>
                   <TypeFieldPicker typeId={cardDraft.arrivalTypeId} types={types} lang={lang} T={T} kindFilter="arrival" onChange={(id) => setCardDraft({ ...cardDraft, arrivalTypeId: id })} />
                 </div>
@@ -4694,23 +4710,6 @@ export default function MyTripApp() {
                   )}
                 </div>
               )}
-
-
-              <div className="mt-weather-row">
-                <span className="mt-link-icon mt-weather-icon-btn" title={T.weatherAtArrival}>
-                  {(() => {
-                    if (weatherData && weatherData.loading) return <Cloud size={17} className="mt-weather-spin" />;
-                    if (weatherData && weatherData.data) { const meta = weatherMeta(weatherData.data.code); const WI = WEATHER_ICONS[meta.icon] || Cloud; return <WI size={17} />; }
-                    return <Cloud size={17} style={{ opacity: 0.35 }} />;
-                  })()}
-                </span>
-                <span className="mt-hint">{T.weatherAtArrival}</span>
-                {weatherData && weatherData.loading && <span className="mt-hint">{T.weatherLoading}</span>}
-                {weatherData && weatherData.error && <span className="mt-hint">{T.weatherUnavailable} ({T.technicalDetail}: {String(weatherData.error)})</span>}
-                {weatherData && weatherData.data && (
-                  <span className="mt-weather-detail">{weatherMeta(weatherData.data.code)[lang]} · {Math.round(weatherData.data.min)}°–{Math.round(weatherData.data.max)}°C</span>
-                )}
-              </div>
 
               {showFlightHint && (
                 <div className="mt-field">
