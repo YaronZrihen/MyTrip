@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "19.2.1";
+const APP_VERSION = "19.3.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -676,6 +676,36 @@ function throttledCall(fn) {
 }
 function mapsSearchUrl(lat, lon) { return `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`; }
 const __geocodeCache = new Map();
+const CACHE_MAX_ENTRIES = 300;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const LOCATION_ID_CACHE_KEY = "mytrip_cache_location_id";
+const LOCATION_ID_TTL_MS = 30 * DAY_MS;
+const LOCATION_DETAILS_CACHE_KEY = "mytrip_cache_location_details";
+const LOCATION_DETAILS_TTL_MS = 7 * DAY_MS;
+const ROUTE_CACHE_KEY = "mytrip_cache_routes";
+const ROUTE_TTL_MS = 90 * DAY_MS;
+
+function readJsonCache(key) {
+  try { return JSON.parse(localStorage.getItem(key) || "{}"); } catch (e) { return {}; }
+}
+function getCacheEntry(key, cacheKey, ttlMs) {
+  const cache = readJsonCache(key);
+  const entry = cache[cacheKey];
+  if (!entry) return null;
+  if (Date.now() - entry.t > ttlMs) return null;
+  return entry.v;
+}
+function setCacheEntry(key, cacheKey, value) {
+  const cache = readJsonCache(key);
+  cache[cacheKey] = { v: value, t: Date.now() };
+  const keys = Object.keys(cache);
+  if (keys.length > CACHE_MAX_ENTRIES) {
+    keys.sort((a, b) => cache[a].t - cache[b].t)
+      .slice(0, keys.length - CACHE_MAX_ENTRIES)
+      .forEach((k) => delete cache[k]);
+  }
+  try { localStorage.setItem(key, JSON.stringify(cache)); } catch (e) {}
+}
 const GOOGLE_PLACES_KEY = (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_GOOGLE_PLACES_KEY) || "";
 function hasGooglePlaces() { return !!GOOGLE_PLACES_KEY; }
 function extractGoogleApiError(r) {
@@ -686,6 +716,9 @@ function extractGoogleApiError(r) {
 }
 function googlePlacesAutocomplete(input, lang) {
   if (!GOOGLE_PLACES_KEY || !input || !input.trim()) return Promise.resolve([]);
+  const cacheKey = (lang === "he" ? "he" : "en") + "|" + input.trim().toLowerCase();
+  const cached = getCacheEntry(LOCATION_ID_CACHE_KEY, cacheKey, LOCATION_ID_TTL_MS);
+  if (cached) return Promise.resolve(cached);
   return fetch("https://places.googleapis.com/v1/places:autocomplete", {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Goog-Api-Key": GOOGLE_PLACES_KEY },
@@ -695,14 +728,19 @@ function googlePlacesAutocomplete(input, lang) {
     .then((data) => (data.suggestions || [])
       .map((s) => s.placePrediction)
       .filter(Boolean)
-      .map((p) => ({ placeId: p.placeId, text: (p.text && p.text.text) || "" })));
+      .map((p) => ({ placeId: p.placeId, text: (p.text && p.text.text) || "" })))
+    .then((results) => { setCacheEntry(LOCATION_ID_CACHE_KEY, cacheKey, results); return results; });
 }
 function googlePlaceDetails(placeId, lang) {
   if (!GOOGLE_PLACES_KEY || !placeId) return Promise.resolve(null);
+  const cacheKey = (lang === "he" ? "he" : "en") + "|" + placeId;
+  const cached = getCacheEntry(LOCATION_DETAILS_CACHE_KEY, cacheKey, LOCATION_DETAILS_TTL_MS);
+  if (cached) return Promise.resolve(cached);
   const fieldMask = "displayName,formattedAddress,location,rating,userRatingCount,photos,regularOpeningHours,priceLevel,internationalPhoneNumber,websiteUri";
   return fetch(`https://places.googleapis.com/v1/places/${placeId}?languageCode=${lang === "he" ? "he" : "en"}`, {
     headers: { "X-Goog-Api-Key": GOOGLE_PLACES_KEY, "X-Goog-FieldMask": fieldMask },
-  }).then((r) => { if (!r.ok) return extractGoogleApiError(r); return r.json(); });
+  }).then((r) => { if (!r.ok) return extractGoogleApiError(r); return r.json(); })
+    .then((data) => { setCacheEntry(LOCATION_DETAILS_CACHE_KEY, cacheKey, data); return data; });
 }
 const PRICE_LEVEL_MAP = { PRICE_LEVEL_FREE: "0", PRICE_LEVEL_INEXPENSIVE: "₪", PRICE_LEVEL_MODERATE: "₪₪", PRICE_LEVEL_EXPENSIVE: "₪₪₪", PRICE_LEVEL_VERY_EXPENSIVE: "₪₪₪₪" };
 function priceLevelSymbol(level) { return PRICE_LEVEL_MAP[level] || null; }
@@ -718,6 +756,9 @@ function closingTimeForDate(hours, dateStr, lang) {
 }
 function googlePlacesTextSearch(query, lang) {
   if (!GOOGLE_PLACES_KEY || !query || !query.trim()) return Promise.resolve(null);
+  const cacheKey = (lang === "he" ? "he" : "en") + "|textsearch|" + query.trim().toLowerCase();
+  const cached = getCacheEntry(LOCATION_DETAILS_CACHE_KEY, cacheKey, LOCATION_DETAILS_TTL_MS);
+  if (cached !== null) return Promise.resolve(cached);
   const fieldMask = "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.photos,places.regularOpeningHours";
   return fetch("https://places.googleapis.com/v1/places:searchText", {
     method: "POST",
@@ -725,7 +766,8 @@ function googlePlacesTextSearch(query, lang) {
     body: JSON.stringify({ textQuery: query, languageCode: lang === "he" ? "he" : "en" }),
   })
     .then((r) => { if (!r.ok) return extractGoogleApiError(r); return r.json(); })
-    .then((data) => (data.places && data.places[0]) || null);
+    .then((data) => (data.places && data.places[0]) || null)
+    .then((result) => { setCacheEntry(LOCATION_DETAILS_CACHE_KEY, cacheKey, result); return result; });
 }
 function checkGoogleOpeningHours(periods, dateStr, timeStr) {
   if (!periods || !periods.length || !dateStr || !timeStr) return null;
@@ -839,12 +881,17 @@ function deriveSmartAlias(result, isFlightRow, lang) {
 }
 function fetchDrivingRoute(a, b, profile) {
   const p = profile || "driving";
+  const cacheKey = p + "|" + a.lat.toFixed(5) + "," + a.lon.toFixed(5) + "|" + b.lat.toFixed(5) + "," + b.lon.toFixed(5);
+  const cached = getCacheEntry(ROUTE_CACHE_KEY, cacheKey, ROUTE_TTL_MS);
+  if (cached) return Promise.resolve(cached);
   return throttledCall(() => fetch(`https://router.project-osrm.org/route/v1/${p}/${a.lon},${a.lat};${b.lon},${b.lat}?overview=false`)
     .then((r) => { if (!r.ok) throw new Error("http-" + r.status); return r.json(); })
     .then((data) => {
       const route = data && data.routes && data.routes[0];
       if (!route) return null;
-      return { distanceKm: route.distance / 1000, durationMin: route.duration / 60 };
+      const result = { distanceKm: route.distance / 1000, durationMin: route.duration / 60 };
+      setCacheEntry(ROUTE_CACHE_KEY, cacheKey, result);
+      return result;
     }));
 }
 function osrmProfileForType(typeId) {
