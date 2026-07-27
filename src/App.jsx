@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "19.5.0";
+const APP_VERSION = "19.6.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -662,8 +662,12 @@ const TRAVEL_MODE_MAP = {
   train: "transit", "high-speed-train": "transit", bus: "transit",
   "self-tour": "walking", "guided-tour": "walking", "day-tour": "walking",
 };
-function rowOwnRouteUrl(row) {
-  const origin = rowStartPoint(row), dest = rowEndPoint(row);
+function rowOwnRouteUrl(row, prevRow) {
+  const ownFrom = (!noOriginNeeded(row.typeId) && row.from && row.from.trim()) ? rowStartPoint(row) : "";
+  const prevFrom = prevRow ? rowStartPoint(prevRow) : "";
+  const prevTo = prevRow ? rowEndPoint(prevRow) : "";
+  const origin = ownFrom || prevFrom || prevTo;
+  const dest = rowEndPoint(row);
   if (!origin || !dest || origin === dest) return null;
   const mode = TRAVEL_MODE_MAP[row.typeId];
   let url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}`;
@@ -1119,7 +1123,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
   const tm = typeMeta(row.typeId, types, T, lang);
   const Icon = ICONS[tm.icon] || Tag;
   const dur = computeDuration(row.startTime, row.endTime, row.overnight);
-  const routeUrl = rowOwnRouteUrl(row);
+  const routeUrl = rowOwnRouteUrl(row, prevRow);
   const fromVerified = row.fromVerifiedUrl && row.fromVerifiedText === row.from;
   const toVerified = row.toVerifiedUrl && row.toVerifiedText === row.to;
   const [typeSearch, setTypeSearch] = useState("");
@@ -1780,7 +1784,7 @@ function MobileCardMeta({ row, prevRow, ctx }) {
   const [distLoading, setDistLoading] = useState(false);
   const lastRouteCalcSig = useRef(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
-  const routeUrl = rowOwnRouteUrl(row);
+  const routeUrl = rowOwnRouteUrl(row, prevRow);
   const hasWeather = row.weatherCode != null && row.weatherForDate === row.date;
 
   useEffect(() => {
