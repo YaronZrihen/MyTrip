@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "18.9.0";
+const APP_VERSION = "19.0.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -165,6 +165,7 @@ const DEFAULT_COLUMNS = [
   { key: "icon", label_he: "סמל", label_en: "Icon", visible: true },
   { key: "type", label_he: "תיאור", label_en: "Description", visible: true },
   { key: "arrival", label_he: "אמצעי הגעה", label_en: "Arrival Method", visible: true },
+  { key: "from", label_he: "מוצא", label_en: "Origin", visible: true },
   { key: "to", label_he: "יעד", label_en: "Destination", visible: true },
   { key: "startTime", label_he: "בשעה", label_en: "At", visible: true },
   { key: "duration", label_he: "משך", label_en: "Dur.", visible: true },
@@ -1200,12 +1201,10 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
                         {selected && <Check size={13} />}
                       </button>
                     ); };
-                    const walkingType = types.find((t) => t.id === "walking");
-                    const restTypes = types.filter((t) => t.id !== "walking");
+                    const descTypes = types.filter((t) => t.kind === "desc");
                     return (
                       <>
-                        {walkingType && typeDisplayName(walkingType, lang).toLowerCase().includes(typeSearch.toLowerCase()) && renderOpt(walkingType)}
-                        {groupTypesByCategory(restTypes)
+                        {groupTypesByCategory(descTypes)
                           .map((grp) => ({ ...grp, items: grp.items.filter((t) => typeDisplayName(t, lang).toLowerCase().includes(typeSearch.toLowerCase())) }))
                           .filter((grp) => grp.items.length)
                           .map((grp) => (
@@ -1300,6 +1299,20 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
               </>
             )}
           </div>
+        );
+      }
+      case "from": {
+        if (noOriginNeeded(row.typeId)) return <span className="mt-hint" style={{ fontSize: 11 }}>—</span>;
+        return (
+          <span className={"mt-loc-cell" + (fromVerified ? " has-badge" : "")}>
+            {lang === "he" && fromVerified && <a className="mt-loc-badge" href={row.fromVerifiedUrl} target="_blank" rel="noreferrer" title={T.openMap}><MapPin size={11} /></a>}
+            {row.fromAlias ? (
+              <input className="mt-editable" dir="auto" style={{ textAlign: detectTextAlign(row.fromAlias) }} title={row.from} value={row.fromAlias} onChange={(e) => updateRow(row.id, { fromAlias: e.target.value })} />
+            ) : (
+              <input className="mt-editable" dir="auto" style={{ textAlign: detectTextAlign(row.from) }} placeholder={getTypeHint(row.typeId, "from", lang)} value={row.from} onChange={(e) => updateRow(row.id, { from: e.target.value })} />
+            )}
+            {lang !== "he" && fromVerified && <a className="mt-loc-badge" href={row.fromVerifiedUrl} target="_blank" rel="noreferrer" title={T.openMap}><MapPin size={11} /></a>}
+          </span>
         );
       }
       case "to": return (
@@ -3417,6 +3430,12 @@ export default function MyTripApp() {
     });
     return result;
   }
+  const prevRowMap = useMemo(() => {
+    const order = buildGlobalRowOrder(null);
+    const m = new Map();
+    for (let i = 1; i < order.length; i++) m.set(order[i].id, order[i - 1]);
+    return m;
+  }, [rows, frames]);
   function findPrevRowInDay(rowId) {
     return prevRowMap.get(rowId) || null;
   }
@@ -3528,13 +3547,6 @@ export default function MyTripApp() {
   }
   function toggleFrameCollapse(id) { setFrames((prev) => prev.map((f) => (f.id === id ? { ...f, collapsed: !f.collapsed } : f))); }
   function updateFrameDates(frameId, start, end) { setFrames((prev) => prev.map((f) => (f.id === frameId ? { ...f, startDate: start, endDate: end } : f))); }
-
-  const prevRowMap = useMemo(() => {
-    const order = buildGlobalRowOrder(null);
-    const m = new Map();
-    for (let i = 1; i < order.length; i++) m.set(order[i].id, order[i - 1]);
-    return m;
-  }, [rows, frames]);
 
   /* ---------- recursive render ---------- */
   const ctx = {
