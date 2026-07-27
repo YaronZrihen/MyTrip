@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "19.8.0";
+const APP_VERSION = "20.0.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -205,7 +205,7 @@ const T_DICT = {
     flightNo: "מספר טיסה", cost: "עלות", currency: "מטבע", notes: "הערות", frame: "מסגרת",
     flightNoCheck: "בדיקת מספר טיסה (לא חובה — אם מוזן, הנתונים שיימשכו יהיו הקובעים)",
     flightNoCheckReturn: "בדיקת מספר טיסה — חזור (לא חובה — אם מוזן, הנתונים שיימשכו יהיו הקובעים)",
-    flightDepTime: "שעת המראה (הלוך)", flightRetTime: "שעת המראה (חזור)",
+    flightDepTime: "שעת המראה", flightLandTime: "שעת נחיתה",
     noFrame: "ללא מסגרת (רמה עליונה)", selectType: "בחר...",
     newType: "תיאור חדש", typeName: "שם תיאור", add: "הוספה", searchTypes: "חיפוש תיאור...",
     totalPerCurrency: "סה״כ טיול", timeError: "שעת סיום לפני שעת ההתחלה — סמן \"חוצה חצות\" אם מדובר בלילה",
@@ -222,7 +222,7 @@ const T_DICT = {
     frameRangeParent: "טווח התאריכים חייב להיות בתוך טווח המסגרת המכילה",
     rowOutOfFrame: "התאריך חייב להיות בתוך טווח המסגרת שאליה הרשומה משויכת",
     routeTooltip: "פתח מסלול בגוגל מפות", dayRoute: "מסלול", addDayShort: "יום", addRowShort: "רשומה", noRoute: "אין מספיק נתוני מיקום",
-    fetchFlightData: "משוך נתונים לפי מספר טיסה", flightApiMissing: "לצורך משיכה אוטומטית יש לחבר ספק נתוני טיסות (כגון AeroDataBox) עם מפתח API ופרוקסי בצד השרת. שדה זה מוכן לחיבור עתידי.",
+    fetchFlightData: "משוך נתונים", flightApiMissing: "לצורך משיכה אוטומטית יש לחבר ספק נתוני טיסות (כגון AeroDataBox) עם מפתח API ופרוקסי בצד השרת. שדה זה מוכן לחיבור עתידי.",
     flightNoNumber: "יש להזין מספר טיסה קודם.", flightLookupLoading: "מחפש נתוני טיסה...", flightLookupError: "לא נמצאו נתונים לטיסה זו, או שהחיבור לשרת נכשל.", flightLookupSuccess: "נתוני הטיסה עודכנו.",
     flightAlreadyLookedUp: "כבר נמשכו נתונים לטיסה זו. שנה את מספר הטיסה כדי לבצע בדיקה חדשה.",
     flightTerminal: "טרמינל", flightGate: "שער",
@@ -353,7 +353,7 @@ const T_DICT = {
     flightNo: "Flight number", cost: "Cost", currency: "Currency", notes: "Notes", frame: "Frame",
     flightNoCheck: "Flight number check (optional — if entered, the fetched data will take precedence)",
     flightNoCheckReturn: "Flight number check — return (optional — if entered, the fetched data will take precedence)",
-    flightDepTime: "Departure time (outbound)", flightRetTime: "Departure time (return)",
+    flightDepTime: "Departure time", flightLandTime: "Landing time",
     noFrame: "No frame (top level)", selectType: "Select...",
     newType: "New description", typeName: "Description name", add: "Add", searchTypes: "Search description...",
     totalPerCurrency: "Trip total", timeError: "End time is before start time — check \"crosses midnight\" for overnight legs",
@@ -370,7 +370,7 @@ const T_DICT = {
     frameRangeParent: "The date range must fit inside the containing frame's range",
     rowOutOfFrame: "The date must fall inside the frame this record belongs to",
     routeTooltip: "Open route in Google Maps", dayRoute: "Route", addDayShort: "Day", addRowShort: "Record", noRoute: "Not enough location data",
-    fetchFlightData: "Fetch data by flight number", flightApiMissing: "Live lookup needs a flight-data provider (e.g. AeroDataBox) with an API key and a server-side proxy. This field is ready to be wired up later.",
+    fetchFlightData: "Fetch data", flightApiMissing: "Live lookup needs a flight-data provider (e.g. AeroDataBox) with an API key and a server-side proxy. This field is ready to be wired up later.",
     flightNoNumber: "Enter a flight number first.", flightLookupLoading: "Looking up flight data...", flightLookupError: "No data found for this flight, or the server connection failed.", flightLookupSuccess: "Flight data updated.",
     flightAlreadyLookedUp: "Data was already fetched for this flight. Change the flight number to look up again.",
     flightTerminal: "Terminal", flightGate: "Gate",
@@ -2580,14 +2580,15 @@ export default function MyTripApp() {
     // step 2
     hasFlights: "yes",
     flights: [
-      { flightNumber: "", from: "תל אביב", fromAlias: "", to: "בנגקוק", toAlias: "", depDate: "2026-08-01", depTime: "", retDate: "2026-08-31", retTime: "", retFlightNumber: "", isRoundTrip: true },
+      { flightNumber: "", from: "תל אביב", fromAlias: "", to: "בנגקוק", toAlias: "", depDate: "2026-08-01", depTime: "", landTime: "" },
+      { flightNumber: "", from: "בנגקוק", fromAlias: "", to: "תל אביב", toAlias: "", depDate: "2026-08-31", depTime: "", landTime: "" },
     ],
     // step 3 (domestic)
     hasDomestic: "yes",
     domesticFlights: [
-      { flightNumber: "", from: "בנגקוק", fromAlias: "", to: "קוסמוי", toAlias: "", depDate: "2026-08-09", depTime: "", retDate: "", retTime: "", retFlightNumber: "", isRoundTrip: false },
-      { flightNumber: "", from: "קוסמוי", fromAlias: "", to: "פוקט", toAlias: "", depDate: "2026-08-16", depTime: "", retDate: "", retTime: "", retFlightNumber: "", isRoundTrip: false },
-      { flightNumber: "", from: "פוקט", fromAlias: "", to: "בנגקוק", toAlias: "", depDate: "2026-08-23", depTime: "", retDate: "", retTime: "", retFlightNumber: "", isRoundTrip: false },
+      { flightNumber: "", from: "בנגקוק", fromAlias: "", to: "קוסמוי", toAlias: "", depDate: "2026-08-09", depTime: "", landTime: "" },
+      { flightNumber: "", from: "קוסמוי", fromAlias: "", to: "פוקט", toAlias: "", depDate: "2026-08-16", depTime: "", landTime: "" },
+      { flightNumber: "", from: "פוקט", fromAlias: "", to: "בנגקוק", toAlias: "", depDate: "2026-08-23", depTime: "", landTime: "" },
     ],
     // step 4
     hasHotels: "yes",
@@ -2879,13 +2880,13 @@ export default function MyTripApp() {
     showDemoNotice(T.preWizardAiDemoNotice);
   }
   function addPreWizardFlight() {
-    setPreWizardData((d) => ({ ...d, flights: [...d.flights, { flightNumber: "", from: "", fromAlias: "", to: "", toAlias: "", depDate: "", depTime: "", retDate: "", retTime: "", retFlightNumber: "", isRoundTrip: true }] }));
+    setPreWizardData((d) => ({ ...d, flights: [...d.flights, { flightNumber: "", from: "", fromAlias: "", to: "", toAlias: "", depDate: "", depTime: "", landTime: "" }] }));
   }
   function removePreWizardFlight(idx) {
     setPreWizardData((d) => ({ ...d, flights: d.flights.length > 1 ? d.flights.filter((_, i) => i !== idx) : d.flights }));
   }
   function addPreWizardDomesticFlight() {
-    setPreWizardData((d) => ({ ...d, domesticFlights: [...d.domesticFlights, { flightNumber: "", from: "", fromAlias: "", to: "", toAlias: "", depDate: "", depTime: "", retDate: "", retTime: "", retFlightNumber: "", isRoundTrip: false }] }));
+    setPreWizardData((d) => ({ ...d, domesticFlights: [...d.domesticFlights, { flightNumber: "", from: "", fromAlias: "", to: "", toAlias: "", depDate: "", depTime: "", landTime: "" }] }));
   }
   function removePreWizardDomesticFlight(idx) {
     setPreWizardData((d) => ({ ...d, domesticFlights: d.domesticFlights.length > 1 ? d.domesticFlights.filter((_, i) => i !== idx) : d.domesticFlights }));
@@ -2906,12 +2907,14 @@ export default function MyTripApp() {
     if (!preWizardCreatedIds) return null;
     const mainFrame = frames.find((f) => preWizardCreatedIds.frameIds.includes(f.id) && !f.parentFrameId);
     if (!mainFrame) return null;
-    const liveFlights = rows.filter((r) => r.frameId === mainFrame.id && r.typeId === "flight").map((r) => ({
-      flightNumber: r.flightNumber || "", from: r.from || "", fromAlias: r.fromAlias || "", to: r.to || "", toAlias: r.toAlias || "", depDate: r.date || "", retDate: "",
-    }));
-    const liveDomestic = rows.filter((r) => r.frameId === mainFrame.id && r.typeId === "domestic-flight").map((r) => ({
-      flightNumber: r.flightNumber || "", from: r.from || "", fromAlias: r.fromAlias || "", to: r.to || "", toAlias: r.toAlias || "", depDate: r.date || "", isRoundTrip: false,
-    }));
+    function mapFlightRows(typeId) {
+      return rows.filter((r) => r.frameId === mainFrame.id && r.typeId === typeId).map((r) => ({
+        flightNumber: r.flightNumber || "", from: r.from || "", fromAlias: r.fromAlias || "", to: r.to || "", toAlias: r.toAlias || "",
+        depDate: r.date || "", depTime: r.startTime || "", landTime: r.endTime || "",
+      }));
+    }
+    const liveFlights = mapFlightRows("flight");
+    const liveDomestic = mapFlightRows("domestic-flight");
     const hotelSubFrames = frames.filter((f) => f.parentFrameId === mainFrame.id && f.frameType === "hotel");
     const liveHotels = hotelSubFrames.map((hf) => {
       const checkinRow = rows.find((r) => r.frameId === hf.id && r.typeId === "checkin");
@@ -2945,32 +2948,25 @@ export default function MyTripApp() {
       return { ...d, [field]: arr };
     });
   }
-  function fetchWizardFlightData(field, idx, leg) {
+  function fetchWizardFlightData(field, idx) {
     const item = preWizardData[field][idx];
-    const numKey = leg === "ret" ? "retFlightNumber" : "flightNumber";
-    const num = item[numKey] && item[numKey].trim();
-    const msgKey = leg === "ret" ? "retFlightLookupMsg" : "flightLookupMsg";
-    if (!num) { updatePreWizardArrayItem(field, idx, { [msgKey]: T.flightNoNumber }); return; }
-    updatePreWizardArrayItem(field, idx, { [msgKey]: T.flightLookupLoading });
-    const params = new URLSearchParams({ flight: num, date: (leg === "ret" ? item.retDate : item.depDate) || "" });
+    const num = item.flightNumber && item.flightNumber.trim();
+    if (!num) { updatePreWizardArrayItem(field, idx, { flightLookupMsg: T.flightNoNumber }); return; }
+    updatePreWizardArrayItem(field, idx, { flightLookupMsg: T.flightLookupLoading });
+    const params = new URLSearchParams({ flight: num, date: item.depDate || "" });
     fetch(`/api/flight-lookup?${params.toString()}`)
       .then((r) => r.json().then((data) => ({ ok: r.ok, data })))
       .then(({ ok, data }) => {
-        if (!ok || !data || data.error) { updatePreWizardArrayItem(field, idx, { [msgKey]: (data && data.error) || T.flightLookupError }); return; }
-        const patch = { [msgKey]: T.flightLookupSuccess };
-        if (leg === "ret") {
-          if (data.departureAirport) patch.to = patch.to || item.to; // return leg departs from destination; keep as-is unless mismatched
-          if (data.departureDate) patch.retDate = data.departureDate;
-          if (data.departureTime) patch.retTime = data.departureTime;
-        } else {
-          if (data.departureAirport) patch.from = data.departureAirport;
-          if (data.arrivalAirport) patch.to = data.arrivalAirport;
-          if (data.departureDate) patch.depDate = data.departureDate;
-          if (data.departureTime) patch.depTime = data.departureTime;
-        }
+        if (!ok || !data || data.error) { updatePreWizardArrayItem(field, idx, { flightLookupMsg: (data && data.error) || T.flightLookupError }); return; }
+        const patch = { flightLookupMsg: T.flightLookupSuccess };
+        if (data.departureAirport) patch.from = data.departureAirport;
+        if (data.arrivalAirport) patch.to = data.arrivalAirport;
+        if (data.departureDate) patch.depDate = data.departureDate;
+        if (data.departureTime) patch.depTime = data.departureTime;
+        if (data.arrivalTime) patch.landTime = data.arrivalTime;
         updatePreWizardArrayItem(field, idx, patch);
       })
-      .catch(() => updatePreWizardArrayItem(field, idx, { [msgKey]: T.flightLookupError }));
+      .catch(() => updatePreWizardArrayItem(field, idx, { flightLookupMsg: T.flightLookupError }));
   }
   function confirmPreWizard() {
     const d = preWizardData;
@@ -3004,23 +3000,13 @@ export default function MyTripApp() {
     const createdRowIds = [];
     flights.forEach((f) => {
       const id1 = addRow(f.depDate, null, mainFrame.id);
-      updateRow(id1, { typeId: "flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, startTime: f.depTime || "" });
+      updateRow(id1, { typeId: "flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, startTime: f.depTime || "", endTime: f.landTime || "" });
       createdRowIds.push(id1);
-      if (f.isRoundTrip !== false && f.retDate) {
-        const id2 = addRow(f.retDate, null, mainFrame.id);
-        updateRow(id2, { typeId: "flight", from: f.to, fromAlias: f.toAlias, to: f.from, toAlias: f.fromAlias, flightNumber: f.retFlightNumber || f.flightNumber, startTime: f.retTime || "" });
-        createdRowIds.push(id2);
-      }
     });
     domesticFlights.forEach((f) => {
       const id1 = addRow(f.depDate, null, mainFrame.id);
-      updateRow(id1, { typeId: "domestic-flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, startTime: f.depTime || "" });
+      updateRow(id1, { typeId: "domestic-flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, startTime: f.depTime || "", endTime: f.landTime || "" });
       createdRowIds.push(id1);
-      if (f.isRoundTrip && f.retDate) {
-        const id2 = addRow(f.retDate, null, mainFrame.id);
-        updateRow(id2, { typeId: "domestic-flight", from: f.to, fromAlias: f.toAlias, to: f.from, toAlias: f.fromAlias, flightNumber: f.retFlightNumber || f.flightNumber, startTime: f.retTime || "" });
-        createdRowIds.push(id2);
-      }
     });
 
     hotelFrames.forEach((hf) => {
@@ -4473,7 +4459,7 @@ export default function MyTripApp() {
                             <label>{T.flightNoCheck}</label>
                             <div className="mt-field-inline">
                               <input value={f.flightNumber || ""} onChange={(e) => updatePreWizardArrayItem("flights", i, { flightNumber: e.target.value })} />
-                              <button className="mt-btn ghost" onClick={() => fetchWizardFlightData("flights", i, "dep")}><Download size={13} /> {T.fetchFlightData}</button>
+                              <button className="mt-btn ghost" onClick={() => fetchWizardFlightData("flights", i)}><Download size={13} /> {T.fetchFlightData}</button>
                             </div>
                           </div>
                           {f.flightLookupMsg && <div className="mt-hint" style={{ marginBottom: 8 }}>{f.flightLookupMsg}</div>}
@@ -4481,36 +4467,14 @@ export default function MyTripApp() {
                           <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={f.fromAlias} onChange={(e) => updatePreWizardArrayItem("flights", i, { fromAlias: e.target.value })} /></div>
                           <div className="mt-wizard-qa"><label>{T.to}</label><input value={f.to} onChange={(e) => updatePreWizardArrayItem("flights", i, { to: e.target.value })} /></div>
                           <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={f.toAlias} onChange={(e) => updatePreWizardArrayItem("flights", i, { toAlias: e.target.value })} /></div>
-                          <label className="mt-checkbox-row"><input type="checkbox" checked={f.isRoundTrip !== false} onChange={(e) => updatePreWizardArrayItem("flights", i, { isRoundTrip: e.target.checked })} />{T.preWizardRoundTrip}</label>
-                          {f.isRoundTrip !== false ? (
-                            <>
-                              <div className="mt-wizard-qa">
-                                <label>{T.preWizardFlightDates}</label>
-                                <DateRangeField startDate={f.depDate} endDate={f.retDate} lang={lang} T={T} initialViewMonth={preWizardRefDate}
-                                  onChange={(s, e) => { updatePreWizardArrayItem("flights", i, { depDate: s, retDate: e }); if (s) setPreWizardRefDate(s); }} />
-                              </div>
-                              <div className="mt-field-row">
-                                <div className="mt-field"><label>{T.flightDepTime}</label><TimeField value={f.depTime} onChange={(e) => updatePreWizardArrayItem("flights", i, { depTime: e.target.value })} T={T} /></div>
-                                <div className="mt-field"><label>{T.flightRetTime}</label><TimeField value={f.retTime} onChange={(e) => updatePreWizardArrayItem("flights", i, { retTime: e.target.value })} T={T} /></div>
-                              </div>
-                              <div className="mt-field">
-                                <label>{T.flightNoCheckReturn}</label>
-                                <div className="mt-field-inline">
-                                  <input value={f.retFlightNumber || ""} onChange={(e) => updatePreWizardArrayItem("flights", i, { retFlightNumber: e.target.value })} />
-                                  <button className="mt-btn ghost" onClick={() => fetchWizardFlightData("flights", i, "ret")}><Download size={13} /> {T.fetchFlightData}</button>
-                                </div>
-                              </div>
-                              {f.retFlightLookupMsg && <div className="mt-hint" style={{ marginBottom: 8 }}>{f.retFlightLookupMsg}</div>}
-                            </>
-                          ) : (
-                            <>
-                              <div className="mt-wizard-qa">
-                                <label>{T.date}</label>
-                                <DateField value={f.depDate} lang={lang} T={T} initialViewMonth={preWizardRefDate} onChange={(e) => { updatePreWizardArrayItem("flights", i, { depDate: e.target.value, retDate: "" }); if (e.target.value) setPreWizardRefDate(e.target.value); }} />
-                              </div>
-                              <div className="mt-field"><label>{T.flightDepTime}</label><TimeField value={f.depTime} onChange={(e) => updatePreWizardArrayItem("flights", i, { depTime: e.target.value })} T={T} /></div>
-                            </>
-                          )}
+                          <div className="mt-wizard-qa">
+                            <label>{T.date}</label>
+                            <DateField value={f.depDate} lang={lang} T={T} initialViewMonth={preWizardRefDate} onChange={(e) => { updatePreWizardArrayItem("flights", i, { depDate: e.target.value }); if (e.target.value) setPreWizardRefDate(e.target.value); }} />
+                          </div>
+                          <div className="mt-field-row">
+                            <div className="mt-field"><label>{T.flightDepTime}</label><TimeField value={f.depTime} onChange={(e) => updatePreWizardArrayItem("flights", i, { depTime: e.target.value })} T={T} /></div>
+                            <div className="mt-field"><label>{T.flightLandTime}</label><TimeField value={f.landTime} onChange={(e) => updatePreWizardArrayItem("flights", i, { landTime: e.target.value })} T={T} /></div>
+                          </div>
                         </div>
                       ))}
                       <button className="mt-btn ghost" style={{ width: "100%" }} onClick={addPreWizardFlight}><Plus size={13} /> {T.preWizardAddFlight}</button>
@@ -4547,36 +4511,14 @@ export default function MyTripApp() {
                           <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={f.fromAlias} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { fromAlias: e.target.value })} /></div>
                           <div className="mt-wizard-qa"><label>{T.to}</label><input value={f.to} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { to: e.target.value })} /></div>
                           <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={f.toAlias} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { toAlias: e.target.value })} /></div>
-                          <label className="mt-checkbox-row"><input type="checkbox" checked={!!f.isRoundTrip} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { isRoundTrip: e.target.checked })} />{T.preWizardRoundTrip}</label>
-                          {f.isRoundTrip ? (
-                            <>
-                              <div className="mt-wizard-qa">
-                                <label>{T.preWizardFlightDates}</label>
-                                <DateRangeField startDate={f.depDate} endDate={f.retDate} lang={lang} T={T} initialViewMonth={preWizardRefDate}
-                                  onChange={(s, e) => { updatePreWizardArrayItem("domesticFlights", i, { depDate: s, retDate: e }); if (s) setPreWizardRefDate(s); }} />
-                              </div>
-                              <div className="mt-field-row">
-                                <div className="mt-field"><label>{T.flightDepTime}</label><TimeField value={f.depTime} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { depTime: e.target.value })} T={T} /></div>
-                                <div className="mt-field"><label>{T.flightRetTime}</label><TimeField value={f.retTime} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { retTime: e.target.value })} T={T} /></div>
-                              </div>
-                              <div className="mt-field">
-                                <label>{T.flightNoCheckReturn}</label>
-                                <div className="mt-field-inline">
-                                  <input value={f.retFlightNumber || ""} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { retFlightNumber: e.target.value })} />
-                                  <button className="mt-btn ghost" onClick={() => fetchWizardFlightData("domesticFlights", i, "ret")}><Download size={13} /> {T.fetchFlightData}</button>
-                                </div>
-                              </div>
-                              {f.retFlightLookupMsg && <div className="mt-hint" style={{ marginBottom: 8 }}>{f.retFlightLookupMsg}</div>}
-                            </>
-                          ) : (
-                            <>
-                              <div className="mt-wizard-qa">
-                                <label>{T.date}</label>
-                                <DateField value={f.depDate} lang={lang} T={T} initialViewMonth={preWizardRefDate} onChange={(e) => { updatePreWizardArrayItem("domesticFlights", i, { depDate: e.target.value, retDate: "" }); if (e.target.value) setPreWizardRefDate(e.target.value); }} />
-                              </div>
-                              <div className="mt-field"><label>{T.flightDepTime}</label><TimeField value={f.depTime} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { depTime: e.target.value })} T={T} /></div>
-                            </>
-                          )}
+                          <div className="mt-wizard-qa">
+                            <label>{T.date}</label>
+                            <DateField value={f.depDate} lang={lang} T={T} initialViewMonth={preWizardRefDate} onChange={(e) => { updatePreWizardArrayItem("domesticFlights", i, { depDate: e.target.value }); if (e.target.value) setPreWizardRefDate(e.target.value); }} />
+                          </div>
+                          <div className="mt-field-row">
+                            <div className="mt-field"><label>{T.flightDepTime}</label><TimeField value={f.depTime} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { depTime: e.target.value })} T={T} /></div>
+                            <div className="mt-field"><label>{T.flightLandTime}</label><TimeField value={f.landTime} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { landTime: e.target.value })} T={T} /></div>
+                          </div>
                         </div>
                       ))}
                       <button className="mt-btn ghost" style={{ width: "100%" }} onClick={addPreWizardDomesticFlight}><Plus size={13} /> {T.preWizardAddFlight}</button>
