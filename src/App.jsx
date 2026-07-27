@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "19.6.0";
+const APP_VERSION = "19.6.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -664,9 +664,8 @@ const TRAVEL_MODE_MAP = {
 };
 function rowOwnRouteUrl(row, prevRow) {
   const ownFrom = (!noOriginNeeded(row.typeId) && row.from && row.from.trim()) ? rowStartPoint(row) : "";
-  const prevFrom = prevRow ? rowStartPoint(prevRow) : "";
   const prevTo = prevRow ? rowEndPoint(prevRow) : "";
-  const origin = ownFrom || prevFrom || prevTo;
+  const origin = ownFrom || prevTo;
   const dest = rowEndPoint(row);
   if (!origin || !dest || origin === dest) return null;
   const mode = TRAVEL_MODE_MAP[row.typeId];
@@ -1137,16 +1136,14 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
   function forceRecalcRoute() { lastRouteCalcSig.current = null; setRouteCalcError(null); fetchRouteDistance(); }
   function fetchRouteDistance() {
     const ownFrom = (!noOriginNeeded(row.typeId) && row.from && row.from.trim()) ? rowStartPoint(row) : "";
-    const prevFrom = prevRow ? rowStartPoint(prevRow) : "";
     const prevTo = prevRow ? rowEndPoint(prevRow) : "";
     let origin, originSource;
     if (ownFrom) { origin = ownFrom; originSource = "own"; }
-    else if (prevFrom) { origin = prevFrom; originSource = "prevFrom"; }
     else { origin = prevTo; originSource = "prevTo"; }
     const dest = rowEndPoint(row);
     if (!origin || !dest) { setRouteCalcError(!origin ? T.routeErrNoOrigin : T.routeErrNoDest); return; }
-    const originLat = originSource === "own" ? row.fromLat : originSource === "prevFrom" ? (prevRow && prevRow.fromLat) : (prevRow && prevRow.toLat);
-    const originLon = originSource === "own" ? row.fromLon : originSource === "prevFrom" ? (prevRow && prevRow.fromLon) : (prevRow && prevRow.toLon);
+    const originLat = originSource === "own" ? row.fromLat : (prevRow && prevRow.toLat);
+    const originLon = originSource === "own" ? row.fromLon : (prevRow && prevRow.toLon);
     const hasCoords = (originLat != null && originLon != null) ? "c" : "t";
     const sig = origin + "|" + dest + "|" + (row.startTime || "") + "|" + row.typeId + "|" + hasCoords;
     if (lastRouteCalcSig.current === sig || distLoading) return;
@@ -1805,16 +1802,14 @@ function MobileCardMeta({ row, prevRow, ctx }) {
 
   useEffect(() => {
     const ownFrom = (!noOriginNeeded(row.typeId) && row.from && row.from.trim()) ? rowStartPoint(row) : "";
-    const prevFrom = prevRow ? rowStartPoint(prevRow) : "";
     const prevTo = prevRow ? rowEndPoint(prevRow) : "";
     let origin, originSource;
     if (ownFrom) { origin = ownFrom; originSource = "own"; }
-    else if (prevFrom) { origin = prevFrom; originSource = "prevFrom"; }
     else { origin = prevTo; originSource = "prevTo"; }
     const dest = rowEndPoint(row);
     if (!origin || !dest) return;
-    const originLat = originSource === "own" ? row.fromLat : originSource === "prevFrom" ? (prevRow && prevRow.fromLat) : (prevRow && prevRow.toLat);
-    const originLon = originSource === "own" ? row.fromLon : originSource === "prevFrom" ? (prevRow && prevRow.fromLon) : (prevRow && prevRow.toLon);
+    const originLat = originSource === "own" ? row.fromLat : (prevRow && prevRow.toLat);
+    const originLon = originSource === "own" ? row.fromLon : (prevRow && prevRow.toLon);
     const hasCoords = (originLat != null && originLon != null) ? "c" : "t";
     const sig = origin + "|" + dest + "|" + (row.startTime || "") + "|" + row.typeId + "|" + hasCoords;
     if (lastRouteCalcSig.current === sig || distLoading) return;
