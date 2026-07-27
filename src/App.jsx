@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "19.2.0";
+const APP_VERSION = "19.2.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -2876,7 +2876,7 @@ export default function MyTripApp() {
     ].filter(Boolean).sort();
     const startDate = allDates[0] || toLocalISODate(new Date());
     const endDate = allDates[allDates.length - 1] || startDate;
-    const mainFrame = { id: uid(), name: d.tripName || d.destination || (lang === "he" ? "טיול חדש" : "New trip"), startDate, endDate, parentFrameId: null, collapsed: false, frameType: "trip" };
+    const mainFrame = { id: uid(), name: d.tripName || d.destination || (lang === "he" ? "טיול חדש" : "New trip"), startDate, endDate, parentFrameId: null, collapsed: false, frameType: "flight" };
     const newFrames = [mainFrame];
 
     const hotelFrames = hotels.map((h) => ({
@@ -2884,21 +2884,15 @@ export default function MyTripApp() {
     }));
     newFrames.push(...hotelFrames);
 
-    const flightFrames = flights.map((f) => ({
-      id: uid(), name: f.to || d.destination || T.intlFlightsFrameName, startDate: f.depDate, endDate: f.retDate || f.depDate, parentFrameId: mainFrame.id, collapsed: false, frameType: "flight", flightRef: f,
-    }));
-    newFrames.push(...flightFrames);
-
     setFrames((prev) => [...prev, ...newFrames]);
 
     const createdRowIds = [];
-    flightFrames.forEach((ff) => {
-      const f = ff.flightRef;
-      const id1 = addRow(f.depDate, null, ff.id);
+    flights.forEach((f) => {
+      const id1 = addRow(f.depDate, null, mainFrame.id);
       updateRow(id1, { typeId: "flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber });
       createdRowIds.push(id1);
       if (f.retDate) {
-        const id2 = addRow(f.retDate, null, ff.id);
+        const id2 = addRow(f.retDate, null, mainFrame.id);
         updateRow(id2, { typeId: "flight", from: f.to, fromAlias: f.toAlias, to: f.from, toAlias: f.fromAlias });
         createdRowIds.push(id2);
       }
