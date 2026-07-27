@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "20.3.0";
+const APP_VERSION = "20.4.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -668,13 +668,16 @@ const TRAVEL_MODE_MAP = {
   train: "transit", "high-speed-train": "transit", bus: "transit",
   "self-tour": "walking", "guided-tour": "walking", "day-tour": "walking",
 };
+function effectiveTransportType(row) {
+  return noOriginNeeded(row.typeId) ? (row.arrivalTypeId || "walking") : row.typeId;
+}
 function rowOwnRouteUrl(row, prevRow) {
   const ownFrom = (!noOriginNeeded(row.typeId) && row.from && row.from.trim()) ? rowStartPoint(row) : "";
   const prevTo = prevRow ? rowEndPoint(prevRow) : "";
   const origin = ownFrom || prevTo;
   const dest = rowEndPoint(row);
   if (!origin || !dest || origin === dest) return null;
-  const mode = TRAVEL_MODE_MAP[row.typeId];
+  const mode = TRAVEL_MODE_MAP[effectiveTransportType(row)];
   let url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}`;
   if (mode) url += `&travelmode=${mode}`;
   return url;
@@ -1160,18 +1163,24 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
     Promise.all([originP, destP]).then(([a, b]) => {
       setDistLoading(false);
       if (!a || !b) { lastRouteCalcSig.current = null; setRouteCalcError(!a ? `${T.routeErrGeocodeOrigin}: "${origin}"` : `${T.routeErrGeocodeDest}: "${dest}"`); return; }
-      return fetchRouteInfo(a, b, row.typeId).then((info) => {
+      return fetchRouteInfo(a, b, effectiveTransportType(row)).then((info) => {
         if (!info) { lastRouteCalcSig.current = null; setRouteCalcError(T.routeErrNoRoute); return; }
         setRouteCalcError(null);
         const patch = { routeDistanceKm: info.distanceKm, routeDurationMin: info.durationMin, toLat: b.lat, toLon: b.lon };
         if (originSource === "own") { patch.fromLat = a.lat; patch.fromLon = a.lon; }
-        if (row.startTime && (!row.endTime || row.endTimeAuto) && !noOriginNeeded(row.typeId)) {
+        if (row.startTime && (!row.endTime || row.endTimeAuto)) {
           const [h, m] = row.startTime.split(":").map(Number);
           const totalMin = (h * 60 + m + Math.round(info.durationMin) + 1440) % 1440;
           patch.endTime = `${String(Math.floor(totalMin / 60)).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
           patch.endTimeAuto = true;
         }
         updateRow(row.id, patch);
+        if (patch.endTime) {
+          const nextRow = ctx.nextRowMap.get(row.id);
+          if (nextRow && nextRow.date === row.date && nextRow.startTimeAuto !== false) {
+            updateRow(nextRow.id, { startTime: patch.endTime, startTimeAuto: true });
+          }
+        }
       });
     }).catch(() => { lastRouteCalcSig.current = null; setDistLoading(false); setRouteCalcError(T.routeErrNetwork); });
   }
@@ -1401,7 +1410,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
           {lang !== "he" && toVerified && <a className="mt-loc-badge" href={row.toVerifiedUrl} target="_blank" rel="noreferrer" title={T.openMap}><MapPin size={11} /></a>}
         </span>
       );
-      case "startTime": return <TimeField value={row.startTime} onChange={(e) => updateRow(row.id, { startTime: e.target.value })} T={T} className="mt-editable mt-time" />;
+      case "startTime": return <TimeField value={row.startTime} onChange={(e) => updateRow(row.id, { startTime: e.target.value, startTimeAuto: false })} T={T} className="mt-editable mt-time" />;
       case "duration": return <span title={dur === null ? "" : dur} style={{ color: dur === null ? "var(--danger)" : "var(--muted)", fontSize: 12 }}>{dur === null ? "!" : dur}</span>;
       case "endTime": return <TimeField value={row.endTime} onChange={(e) => updateRow(row.id, { endTime: e.target.value, endTimeAuto: false })} T={T} className={"mt-editable mt-time" + (row.endTimeAuto ? " mt-computed-field" : "")} title={row.endTimeAuto ? T.computedEndTimeHint : undefined} />;
       case "route": return (
@@ -1826,17 +1835,23 @@ function MobileCardMeta({ row, prevRow, ctx }) {
     Promise.all([originP, destP]).then(([a, b]) => {
       setDistLoading(false);
       if (!a || !b) { lastRouteCalcSig.current = null; return; }
-      return fetchRouteInfo(a, b, row.typeId).then((info) => {
+      return fetchRouteInfo(a, b, effectiveTransportType(row)).then((info) => {
         if (!info) { lastRouteCalcSig.current = null; return; }
         const patch = { routeDistanceKm: info.distanceKm, routeDurationMin: info.durationMin, toLat: b.lat, toLon: b.lon };
         if (originSource === "own") { patch.fromLat = a.lat; patch.fromLon = a.lon; }
-        if (row.startTime && (!row.endTime || row.endTimeAuto) && !noOriginNeeded(row.typeId)) {
+        if (row.startTime && (!row.endTime || row.endTimeAuto)) {
           const [h, m] = row.startTime.split(":").map(Number);
           const totalMin = (h * 60 + m + Math.round(info.durationMin) + 1440) % 1440;
           patch.endTime = `${String(Math.floor(totalMin / 60)).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
           patch.endTimeAuto = true;
         }
         updateRow(row.id, patch);
+        if (patch.endTime) {
+          const nextRow = ctx.nextRowMap.get(row.id);
+          if (nextRow && nextRow.date === row.date && nextRow.startTimeAuto !== false) {
+            updateRow(nextRow.id, { startTime: patch.endTime, startTimeAuto: true });
+          }
+        }
       });
     }).catch(() => { lastRouteCalcSig.current = null; setDistLoading(false); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -3301,7 +3316,7 @@ export default function MyTripApp() {
   function addRow(date, parentId = null, frameId = null) {
     const nr = {
       id: uid(), parentId, frameId, date: date || toLocalISODate(new Date()),
-      typeId: "unset", arrivalTypeId: "walking", from: "", to: "", startTime: "", endTime: "", overnight: false,
+      typeId: "unset", arrivalTypeId: "walking", from: "", to: "", startTime: "", startTimeAuto: false, endTime: "", overnight: false,
       destination: "", link: "", mapLink: "", flightNumber: "", costAmount: 0, costCurrency: "₪", fromAlias: "", toAlias: "",
       notes: "", fromVerifiedUrl: "", fromVerifiedText: "", toVerifiedUrl: "", toVerifiedText: "",
       fromLat: null, fromLon: null, toLat: null, toLon: null, routeDistanceKm: null, routeDurationMin: null, custom: {},
@@ -3616,6 +3631,12 @@ export default function MyTripApp() {
     for (let i = 1; i < order.length; i++) m.set(order[i].id, order[i - 1]);
     return m;
   }, [rows, frames]);
+  const nextRowMap = useMemo(() => {
+    const order = buildGlobalRowOrder(null);
+    const m = new Map();
+    for (let i = 0; i < order.length - 1; i++) m.set(order[i].id, order[i + 1]);
+    return m;
+  }, [rows, frames]);
   function findPrevRowInDay(rowId) {
     return prevRowMap.get(rowId) || null;
   }
@@ -3730,7 +3751,7 @@ export default function MyTripApp() {
 
   /* ---------- recursive render ---------- */
   const ctx = {
-    T, lang, types, visibleColumns, effectiveMobile, viewMode, rows, frames, prevRowMap,
+    T, lang, types, visibleColumns, effectiveMobile, viewMode, rows, frames, prevRowMap, nextRowMap,
     updateRow, deleteRow, openCard, addRow, dragId, setDragId, onDropRow, dragDayKey, setDragDayKey, onDropDay,
     typeMenuOpen, setTypeMenuOpen, arrivalMenuOpen, setArrivalMenuOpen, newTypeDraft, setNewTypeDraft, addCustomType,
     collapsedParents, setCollapsedParents, collapsedGroups, setCollapsedGroups,
@@ -4936,7 +4957,7 @@ export default function MyTripApp() {
               </div>
 
               <div className="mt-field-row">
-                <div className="mt-field"><label>{T.start}</label><TimeField value={cardDraft.startTime} onChange={(e) => setCardDraft({ ...cardDraft, startTime: e.target.value })} T={T} /></div>
+                <div className="mt-field"><label>{T.start}</label><TimeField value={cardDraft.startTime} onChange={(e) => setCardDraft({ ...cardDraft, startTime: e.target.value, startTimeAuto: false })} T={T} /></div>
                 <div className="mt-field"><label>{T.end}</label><TimeField value={cardDraft.endTime} onChange={(e) => setCardDraft({ ...cardDraft, endTime: e.target.value, endTimeAuto: false })} T={T} className={cardDraft.endTimeAuto ? "mt-computed-field" : ""} title={cardDraft.endTimeAuto ? T.computedEndTimeHint : undefined} /></div>
               </div>
               <label className="mt-checkbox-row"><input type="checkbox" checked={!!cardDraft.overnight} onChange={(e) => setCardDraft({ ...cardDraft, overnight: e.target.checked })} />{T.overnight}</label>
