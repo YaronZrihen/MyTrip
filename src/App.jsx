@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "18.7.0";
+const APP_VERSION = "18.9.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1920,7 +1920,7 @@ function DayGroup({ g, fid, depth, ctx }) {
       ) : effectiveMobile ? (
         <div className="mt-cards">
           {allRowsHere.map((r, ri) => (
-            <MobileRowCard key={r.id} r={r} prevRow={ri > 0 ? allRowsHere[ri - 1] : null} types={types} lang={lang} T={T} ctx={ctx} />
+            <MobileRowCard key={r.id} r={r} prevRow={ctx.prevRowMap.get(r.id) || null} types={types} lang={lang} T={T} ctx={ctx} />
           ))}
           <div className="mt-group-footer-actions">
             <button className="mt-group-add" onClick={() => addRow(g.date, null, fid)}><Plus size={13} /> {T.addRowShort}</button>
@@ -1960,7 +1960,7 @@ function DayGroup({ g, fid, depth, ctx }) {
               {g.rows.map((r, idx) => (
                 <React.Fragment key={r.id}>
                   <RowLine row={r} depth={0} hasChildren={childrenOf(r.id).length > 0}
-                    collapsed={!!collapsedParents[r.id]} prevRow={idx > 0 ? g.rows[idx - 1] : null}
+                    collapsed={!!collapsedParents[r.id]} prevRow={ctx.prevRowMap.get(r.id) || null}
                     toggleCollapse={() => setCollapsedParents((p) => ({ ...p, [r.id]: !p[r.id] }))} ctx={ctx} />
                   {!collapsedParents[r.id] && childrenOf(r.id).map((child) => (
                     <RowLine key={child.id} row={child} depth={1} hasChildren={false} collapsed={false} toggleCollapse={() => {}} prevRow={null} ctx={ctx} />
@@ -2109,16 +2109,21 @@ function TimeField({ value, onChange, T, className, title }) {
               <button className="mt-btn ghost" style={{ padding: "4px 6px" }} onClick={() => setOpen(false)}><X size={16} /></button>
             </div>
             <div className="mt-time-cols">
+              <div className="mt-time-highlight-band" />
               <div className="mt-time-col" ref={hourListRef}>
+                <div className="mt-time-pad" />
                 {HOURS.map((hv) => (
                   <button key={hv} className={"mt-time-opt" + (hv === hh ? " selected" : "")} onClick={() => pick(hv, mm)}>{hv}</button>
                 ))}
+                <div className="mt-time-pad" />
               </div>
               <div className="mt-time-sep">:</div>
               <div className="mt-time-col" ref={minListRef}>
+                <div className="mt-time-pad" />
                 {MINUTES.map((mv) => (
                   <button key={mv} className={"mt-time-opt" + (mv === mm ? " selected" : "")} onClick={() => pick(hh, mv)}>{mv}</button>
                 ))}
+                <div className="mt-time-pad" />
               </div>
             </div>
             <button className="mt-btn primary" style={{ width: "100%" }} onClick={() => setOpen(false)}><Check size={13} /> {T.done}</button>
@@ -2193,7 +2198,7 @@ function HelpButton({ topic, lang, T, onOpenFull, size = 15, openTopic, setOpenT
     open, onOpenChange: setOpen,
     placement: "bottom-end",
     strategy: "fixed",
-    middleware: [offset(6), flip(), shift({ padding: 8 })],
+    middleware: [offset(6), flip(), shift({ padding: 10 })],
     whileElementsMounted: autoUpdate,
   });
   const topicData = HELP_TOPICS[topic];
@@ -3394,13 +3399,26 @@ export default function MyTripApp() {
     }
   }
   function closeCard() { setCardRowId(null); setCardDraft(null); setFlightLookupMsg(""); setLocPicker(null); }
+  function buildGlobalRowOrder(fid) {
+    const cf = childFrames(fid);
+    const dg = dayGroupsAt(fid);
+    const nodes = [
+      ...cf.map((f) => ({ type: "frame", sort: f.startDate || "", frame: f })),
+      ...dg.map((g) => ({ type: "day", sort: g.date, group: g })),
+    ].sort((a, b) => {
+      if (a.sort !== b.sort) return a.sort.localeCompare(b.sort);
+      if (a.type !== b.type) return a.type === "day" ? -1 : 1;
+      return 0;
+    });
+    let result = [];
+    nodes.forEach((n) => {
+      if (n.type === "day") result = result.concat(n.group.rows);
+      else result = result.concat(buildGlobalRowOrder(n.frame.id));
+    });
+    return result;
+  }
   function findPrevRowInDay(rowId) {
-    const row = rows.find((r) => r.id === rowId);
-    if (!row || row.parentId) return null;
-    const siblings = rows.filter((r) => !r.parentId && r.date === row.date && (r.frameId || null) === (row.frameId || null));
-    const idx = siblings.findIndex((r) => r.id === row.id);
-    if (idx <= 0) return null;
-    return siblings[idx - 1];
+    return prevRowMap.get(rowId) || null;
   }
   const prevRowForCard = cardDraft ? findPrevRowInDay(cardRowId) : null;
   function copyPrevDestinationToFrom() {
@@ -3511,9 +3529,16 @@ export default function MyTripApp() {
   function toggleFrameCollapse(id) { setFrames((prev) => prev.map((f) => (f.id === id ? { ...f, collapsed: !f.collapsed } : f))); }
   function updateFrameDates(frameId, start, end) { setFrames((prev) => prev.map((f) => (f.id === frameId ? { ...f, startDate: start, endDate: end } : f))); }
 
+  const prevRowMap = useMemo(() => {
+    const order = buildGlobalRowOrder(null);
+    const m = new Map();
+    for (let i = 1; i < order.length; i++) m.set(order[i].id, order[i - 1]);
+    return m;
+  }, [rows, frames]);
+
   /* ---------- recursive render ---------- */
   const ctx = {
-    T, lang, types, visibleColumns, effectiveMobile, viewMode, rows, frames,
+    T, lang, types, visibleColumns, effectiveMobile, viewMode, rows, frames, prevRowMap,
     updateRow, deleteRow, openCard, addRow, dragId, setDragId, onDropRow, dragDayKey, setDragDayKey, onDropDay,
     typeMenuOpen, setTypeMenuOpen, arrivalMenuOpen, setArrivalMenuOpen, newTypeDraft, setNewTypeDraft, addCustomType,
     collapsedParents, setCollapsedParents, collapsedGroups, setCollapsedGroups,
@@ -3722,14 +3747,15 @@ export default function MyTripApp() {
         .mt-type-field-btn { display:flex; align-items:center; gap:7px; width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 10px; background:var(--surface); font-size:13px; font-weight:500; color:var(--ink); box-sizing:border-box; }
         .mt-type-field-btn:hover { border-color:var(--teal); }
         .mt-type-modal { max-width:340px; width:92vw; max-height:70vh; display:flex; flex-direction:column; padding:12px; }
-        .mt-time-modal { max-width:260px; width:88vw; padding:14px; }
-        .mt-time-modal-header { display:flex; align-items:center; justify-content:space-between; font-weight:700; font-size:13.5px; margin-bottom:10px; }
-        .mt-time-cols { display:flex; align-items:center; justify-content:center; gap:6px; height:220px; margin-bottom:12px; }
-        .mt-time-col { display:flex; flex-direction:column; overflow-y:auto; overscroll-behavior:contain; height:100%; width:64px; scroll-snap-type:y proximity; border-radius:8px; background:var(--bg); }
-        .mt-time-sep { font-size:20px; font-weight:700; color:var(--muted); }
-        .mt-time-opt { border:none; background:none; padding:8px 0; font-size:16px; font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; scroll-snap-align:center; border-radius:6px; }
-        .mt-time-opt:hover { background:var(--teal-tint); }
-        .mt-time-opt.selected { background:var(--teal); color:#fff; }
+        .mt-time-modal { max-width:240px; width:84vw; padding:16px; }
+        .mt-time-modal-header { display:flex; align-items:center; justify-content:space-between; font-weight:600; font-size:12.5px; color:var(--muted); margin-bottom:12px; }
+        .mt-time-cols { position:relative; display:flex; align-items:center; justify-content:center; gap:2px; height:200px; margin-bottom:14px; }
+        .mt-time-highlight-band { position:absolute; top:50%; transform:translateY(-50%); left:8px; right:8px; height:38px; border-top:1px solid var(--border); border-bottom:1px solid var(--border); pointer-events:none; z-index:1; }
+        .mt-time-col { position:relative; display:flex; flex-direction:column; overflow-y:auto; overscroll-behavior:contain; height:100%; width:56px; scroll-snap-type:y mandatory; }
+        .mt-time-pad { height:81px; flex-shrink:0; }
+        .mt-time-sep { font-size:17px; font-weight:300; color:var(--border); }
+        .mt-time-opt { border:none; background:none; height:38px; flex-shrink:0; font-size:15px; font-weight:400; color:var(--muted); font-variant-numeric:tabular-nums; scroll-snap-align:center; transition:color .15s ease, font-weight .15s ease, font-size .15s ease; }
+        .mt-time-opt.selected { color:var(--ink); font-weight:700; font-size:18px; }
         .mt-type-modal .mt-type-search-wrap { margin-bottom:8px; }
         .mt-type-modal .mt-type-list { overflow-y:auto; flex:1; overscroll-behavior:contain; }
         .mt-arrival-btn { border:1px solid var(--border); background:var(--surface); color:var(--muted); border-radius:6px; padding:3px; display:flex; align-items:center; justify-content:center; margin-inline-start:4px; }
@@ -3884,7 +3910,7 @@ export default function MyTripApp() {
         .mt-checklist-nav-text span { font-size:11.5px; color:var(--muted); }
         .mt-help-btn { border:none; background:none; color:var(--muted); padding:3px; display:flex; align-items:center; justify-content:center; border-radius:50%; flex-shrink:0; }
         .mt-help-btn:hover { color:var(--teal); background:var(--teal-tint); }
-        .mt-help-popover { width:260px; padding:12px; box-shadow:0 8px 24px rgba(20,40,35,.18); border-radius:10px; background:var(--surface); }
+        .mt-help-popover { width:260px; max-width:calc(100vw - 16px); padding:12px; box-shadow:0 8px 24px rgba(20,40,35,.18); border-radius:10px; background:var(--surface); box-sizing:border-box; }
         .mt-help-popover-title { display:flex; align-items:center; gap:6px; font-size:13px; font-weight:700; color:var(--ink); margin-bottom:6px; text-align:right; }
         .mt-help-popover-text { font-size:12px; color:var(--muted); line-height:1.5; margin:0 0 8px; text-align:right; }
         .mt-help-popover-more { border:none; background:none; color:var(--teal-dark); font-size:12px; font-weight:700; padding:0; }
