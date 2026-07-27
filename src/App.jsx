@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "20.0.0";
+const APP_VERSION = "20.1.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -2880,13 +2880,13 @@ export default function MyTripApp() {
     showDemoNotice(T.preWizardAiDemoNotice);
   }
   function addPreWizardFlight() {
-    setPreWizardData((d) => ({ ...d, flights: [...d.flights, { flightNumber: "", from: "", fromAlias: "", to: "", toAlias: "", depDate: "", depTime: "", landTime: "" }] }));
+    setPreWizardData((d) => ({ ...d, flights: [...d.flights, { flightNumber: "", from: "", fromAlias: "", to: "", toAlias: "", depDate: "", depTime: "", landTime: "", overnight: false, fromLat: null, fromLon: null, fromPlaceId: null, fromVerifiedUrl: "", toLat: null, toLon: null, toPlaceId: null, toVerifiedUrl: "" }] }));
   }
   function removePreWizardFlight(idx) {
     setPreWizardData((d) => ({ ...d, flights: d.flights.length > 1 ? d.flights.filter((_, i) => i !== idx) : d.flights }));
   }
   function addPreWizardDomesticFlight() {
-    setPreWizardData((d) => ({ ...d, domesticFlights: [...d.domesticFlights, { flightNumber: "", from: "", fromAlias: "", to: "", toAlias: "", depDate: "", depTime: "", landTime: "" }] }));
+    setPreWizardData((d) => ({ ...d, domesticFlights: [...d.domesticFlights, { flightNumber: "", from: "", fromAlias: "", to: "", toAlias: "", depDate: "", depTime: "", landTime: "", overnight: false, fromLat: null, fromLon: null, fromPlaceId: null, fromVerifiedUrl: "", toLat: null, toLon: null, toPlaceId: null, toVerifiedUrl: "" }] }));
   }
   function removePreWizardDomesticFlight(idx) {
     setPreWizardData((d) => ({ ...d, domesticFlights: d.domesticFlights.length > 1 ? d.domesticFlights.filter((_, i) => i !== idx) : d.domesticFlights }));
@@ -2910,7 +2910,7 @@ export default function MyTripApp() {
     function mapFlightRows(typeId) {
       return rows.filter((r) => r.frameId === mainFrame.id && r.typeId === typeId).map((r) => ({
         flightNumber: r.flightNumber || "", from: r.from || "", fromAlias: r.fromAlias || "", to: r.to || "", toAlias: r.toAlias || "",
-        depDate: r.date || "", depTime: r.startTime || "", landTime: r.endTime || "",
+        depDate: r.date || "", depTime: r.startTime || "", landTime: r.endTime || "", overnight: !!r.overnight,
       }));
     }
     const liveFlights = mapFlightRows("flight");
@@ -2945,6 +2945,24 @@ export default function MyTripApp() {
     setPreWizardData((d) => {
       const arr = d[field].slice();
       arr[idx] = { ...arr[idx], ...patch };
+      return { ...d, [field]: arr };
+    });
+  }
+  function movePreWizardArrayItem(field, idx, dir) {
+    setPreWizardData((d) => {
+      const arr = d[field].slice();
+      const newIdx = idx + dir;
+      if (newIdx < 0 || newIdx >= arr.length) return d;
+      [arr[idx], arr[newIdx]] = [arr[newIdx], arr[idx]];
+      return { ...d, [field]: arr };
+    });
+  }
+  function movePreWizardArrayItem(field, idx, dir) {
+    setPreWizardData((d) => {
+      const arr = d[field].slice();
+      const newIdx = idx + dir;
+      if (newIdx < 0 || newIdx >= arr.length) return d;
+      [arr[idx], arr[newIdx]] = [arr[newIdx], arr[idx]];
       return { ...d, [field]: arr };
     });
   }
@@ -3000,12 +3018,12 @@ export default function MyTripApp() {
     const createdRowIds = [];
     flights.forEach((f) => {
       const id1 = addRow(f.depDate, null, mainFrame.id);
-      updateRow(id1, { typeId: "flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, startTime: f.depTime || "", endTime: f.landTime || "" });
+      updateRow(id1, { typeId: "flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, startTime: f.depTime || "", endTime: f.landTime || "", overnight: !!f.overnight, fromLat: f.fromLat, fromLon: f.fromLon, fromPlaceId: f.fromPlaceId, fromVerifiedUrl: f.fromVerifiedUrl, toLat: f.toLat, toLon: f.toLon, toPlaceId: f.toPlaceId, toVerifiedUrl: f.toVerifiedUrl });
       createdRowIds.push(id1);
     });
     domesticFlights.forEach((f) => {
       const id1 = addRow(f.depDate, null, mainFrame.id);
-      updateRow(id1, { typeId: "domestic-flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, startTime: f.depTime || "", endTime: f.landTime || "" });
+      updateRow(id1, { typeId: "domestic-flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, startTime: f.depTime || "", endTime: f.landTime || "", overnight: !!f.overnight, fromLat: f.fromLat, fromLon: f.fromLon, fromPlaceId: f.fromPlaceId, fromVerifiedUrl: f.fromVerifiedUrl, toLat: f.toLat, toLon: f.toLon, toPlaceId: f.toPlaceId, toVerifiedUrl: f.toVerifiedUrl });
       createdRowIds.push(id1);
     });
 
@@ -3452,8 +3470,31 @@ export default function MyTripApp() {
   /* ---------- location verification (OpenStreetMap Nominatim — free, no API key) ---------- */
   function openLocationPicker(field) {
     const initialQuery = cardDraft ? (cardDraft[field] || "") : "";
-    setLocPicker({ field, mode: "search", query: initialQuery, results: [], loading: false, error: null, mapMarker: null, mapCenter: DEFAULT_MAP_CENTER });
+    setLocPicker({ field, wizardTarget: null, mode: "search", query: initialQuery, results: [], loading: false, error: null, mapMarker: null, mapCenter: DEFAULT_MAP_CENTER });
     if (initialQuery.trim()) runLocationSearch(initialQuery);
+  }
+  function openWizardLocationPicker(arrayField, idx, field) {
+    const item = preWizardData[arrayField][idx];
+    const initialQuery = (item && item[field]) || "";
+    setLocPicker({ field, wizardTarget: { arrayField, idx }, mode: "search", query: initialQuery, results: [], loading: false, error: null, mapMarker: null, mapCenter: DEFAULT_MAP_CENTER });
+    if (initialQuery.trim()) runLocationSearch(initialQuery);
+  }
+  function applyLocationPatch(field, basePatch, smartAlias) {
+    const aliasField = field === "from" ? "fromAlias" : field === "to" ? "toAlias" : null;
+    const { wizardTarget } = locPicker;
+    if (wizardTarget) {
+      const current = preWizardData[wizardTarget.arrayField][wizardTarget.idx];
+      const patch = { ...basePatch };
+      if (aliasField && !current[aliasField] && smartAlias) patch[aliasField] = smartAlias;
+      updatePreWizardArrayItem(wizardTarget.arrayField, wizardTarget.idx, patch);
+    } else {
+      setCardDraft((d) => {
+        const patch = { ...basePatch };
+        if (aliasField && !d[aliasField] && smartAlias) patch[aliasField] = smartAlias;
+        return { ...d, ...patch };
+      });
+    }
+    setLocPicker(null);
   }
   function runLocationSearch(queryOverride) {
     if (!locPicker) return;
@@ -3482,15 +3523,11 @@ export default function MyTripApp() {
       if (!details || !details.location) { setLocPicker((p) => (p ? { ...p, loading: false, error: "no-details" } : p)); return; }
       const label = details.formattedAddress || (details.displayName && details.displayName.text) || prediction.text;
       const mapUrl = `https://www.google.com/maps/search/?api=1&query=${details.location.latitude},${details.location.longitude}&query_place_id=${prediction.placeId}`;
-      const isFlightRow = cardDraft && (cardDraft.typeId === "flight" || cardDraft.typeId === "domestic-flight");
       const smartAlias = (details.displayName && details.displayName.text) || label.split(",")[0];
-      if (field === "from") {
-        setCardDraft((d) => ({ ...d, from: label, fromVerifiedUrl: mapUrl, fromVerifiedText: label, fromLat: details.location.latitude, fromLon: details.location.longitude, fromPlaceId: prediction.placeId, ...((!d.fromAlias && smartAlias) ? { fromAlias: smartAlias } : {}) }));
-      } else if (field === "to") {
-        setCardDraft((d) => ({ ...d, to: label, toVerifiedUrl: mapUrl, toVerifiedText: label, toLat: details.location.latitude, toLon: details.location.longitude, toPlaceId: prediction.placeId, ...((!d.toAlias && smartAlias) ? { toAlias: smartAlias } : {}) }));
-      } else if (field === "fromAlias") setCardDraft((d) => ({ ...d, fromAlias: smartAlias }));
-      else if (field === "toAlias") setCardDraft((d) => ({ ...d, toAlias: smartAlias }));
-      setLocPicker(null);
+      if (field === "from") applyLocationPatch("from", { from: label, fromVerifiedUrl: mapUrl, fromVerifiedText: label, fromLat: details.location.latitude, fromLon: details.location.longitude, fromPlaceId: prediction.placeId }, smartAlias);
+      else if (field === "to") applyLocationPatch("to", { to: label, toVerifiedUrl: mapUrl, toVerifiedText: label, toLat: details.location.latitude, toLon: details.location.longitude, toPlaceId: prediction.placeId }, smartAlias);
+      else if (field === "fromAlias") applyLocationPatch("fromAlias", { fromAlias: smartAlias });
+      else if (field === "toAlias") applyLocationPatch("toAlias", { toAlias: smartAlias });
     }).catch(() => setLocPicker((p) => (p ? { ...p, loading: false, error: "network" } : p)));
   }
   function pickNominatimResult(result) {
@@ -3499,13 +3536,10 @@ export default function MyTripApp() {
     const label = result.text;
     const mapUrl = `https://www.google.com/maps/search/?api=1&query=${result.lat},${result.lon}`;
     const smartAlias = label.split(",")[0];
-    if (field === "from") {
-      setCardDraft((d) => ({ ...d, from: label, fromVerifiedUrl: mapUrl, fromVerifiedText: label, fromLat: result.lat, fromLon: result.lon, fromPlaceId: null, ...((!d.fromAlias && smartAlias) ? { fromAlias: smartAlias } : {}) }));
-    } else if (field === "to") {
-      setCardDraft((d) => ({ ...d, to: label, toVerifiedUrl: mapUrl, toVerifiedText: label, toLat: result.lat, toLon: result.lon, toPlaceId: null, ...((!d.toAlias && smartAlias) ? { toAlias: smartAlias } : {}) }));
-    } else if (field === "fromAlias") setCardDraft((d) => ({ ...d, fromAlias: smartAlias }));
-    else if (field === "toAlias") setCardDraft((d) => ({ ...d, toAlias: smartAlias }));
-    setLocPicker(null);
+    if (field === "from") applyLocationPatch("from", { from: label, fromVerifiedUrl: mapUrl, fromVerifiedText: label, fromLat: result.lat, fromLon: result.lon, fromPlaceId: null }, smartAlias);
+    else if (field === "to") applyLocationPatch("to", { to: label, toVerifiedUrl: mapUrl, toVerifiedText: label, toLat: result.lat, toLon: result.lon, toPlaceId: null }, smartAlias);
+    else if (field === "fromAlias") applyLocationPatch("fromAlias", { fromAlias: smartAlias });
+    else if (field === "toAlias") applyLocationPatch("toAlias", { toAlias: smartAlias });
   }
   function setLocPickerMode(mode) { setLocPicker((p) => ({ ...p, mode })); }
   function handleMapPick(lat, lng) {
@@ -3523,18 +3557,16 @@ export default function MyTripApp() {
   function pickLocation(result) {
     const label = result.display_name.split(",").slice(0, 2).join(",").trim();
     const mapUrl = `https://www.google.com/maps/search/?api=1&query=${result.lat},${result.lon}`;
-    const isFlightRow = cardDraft && (cardDraft.typeId === "flight" || cardDraft.typeId === "domestic-flight");
+    const wizardTarget = locPicker.wizardTarget;
+    const isFlightRow = wizardTarget ? (wizardTarget.arrayField === "flights" || wizardTarget.arrayField === "domesticFlights") : (cardDraft && (cardDraft.typeId === "flight" || cardDraft.typeId === "domestic-flight"));
     const addr = result.address || {};
     const cityName = addr.city || addr.town || addr.village || addr.suburb || addr.county || addr.state || label.split(",")[0];
     const iata = result.extratags && (result.extratags.iata || result.extratags["iata"]);
     const smartAlias = isFlightRow && iata ? `${cityName} (${iata.toUpperCase()})` : cityName;
-    if (locPicker.field === "from") {
-      setCardDraft((d) => ({ ...d, from: label, fromVerifiedUrl: mapUrl, fromVerifiedText: label, fromLat: Number(result.lat), fromLon: Number(result.lon), ...((!d.fromAlias && smartAlias) ? { fromAlias: smartAlias } : {}) }));
-    } else if (locPicker.field === "to") {
-      setCardDraft((d) => ({ ...d, to: label, toVerifiedUrl: mapUrl, toVerifiedText: label, toLat: Number(result.lat), toLon: Number(result.lon), ...((!d.toAlias && smartAlias) ? { toAlias: smartAlias } : {}) }));
-    } else if (locPicker.field === "fromAlias") setCardDraft((d) => ({ ...d, fromAlias: label }));
-    else if (locPicker.field === "toAlias") setCardDraft((d) => ({ ...d, toAlias: label }));
-    setLocPicker(null);
+    if (locPicker.field === "from") applyLocationPatch("from", { from: label, fromVerifiedUrl: mapUrl, fromVerifiedText: label, fromLat: Number(result.lat), fromLon: Number(result.lon) }, smartAlias);
+    else if (locPicker.field === "to") applyLocationPatch("to", { to: label, toVerifiedUrl: mapUrl, toVerifiedText: label, toLat: Number(result.lat), toLon: Number(result.lon) }, smartAlias);
+    else if (locPicker.field === "fromAlias") applyLocationPatch("fromAlias", { fromAlias: label });
+    else if (locPicker.field === "toAlias") applyLocationPatch("toAlias", { toAlias: label });
   }
 
   /* ---------- record card ---------- */
@@ -4041,7 +4073,9 @@ export default function MyTripApp() {
         .mt-frame-summary-grid span { display:flex; align-items:center; gap:4px; }
         .mt-field-row { display:flex; gap:9px; }
         .mt-field-row > div { flex:1; }
-        .mt-field-inline { display:flex; gap:3px; align-items:flex-end; }
+        .mt-field-inline { display:flex; gap:6px; align-items:stretch; }
+        .mt-field-inline input { flex:1 1 0; min-width:0; max-width:120px; }
+        .mt-field-inline button { flex:0 0 auto; white-space:nowrap; }
         .mt-field-inline > div:first-child { flex:1; }
         .mt-checkbox-row { display:flex; align-items:center; gap:7px; font-size:12.5px; }
         .mt-checklist-row { display:flex; align-items:center; gap:8px; padding:8px 4px; border-bottom:1px solid var(--border); }
@@ -4453,7 +4487,11 @@ export default function MyTripApp() {
                         <div key={i} className="mt-wizard-subgroup">
                           <div className="mt-section-label" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                             <span>{T.preWizardFlightN.replace("{n}", i + 1)}</span>
-                            {preWizardData.flights.length > 1 && <button className="mt-btn ghost" style={{ padding: "2px 6px", marginTop: "-8px" }} onClick={() => removePreWizardFlight(i)}><X size={12} /></button>}
+                            <span style={{ display: "flex", gap: 2 }}>
+                              <button className="mt-btn ghost" style={{ padding: "2px 6px", marginTop: "-8px" }} disabled={i === 0} onClick={() => movePreWizardArrayItem("flights", i, -1)}><ChevronUp size={12} /></button>
+                              <button className="mt-btn ghost" style={{ padding: "2px 6px", marginTop: "-8px" }} disabled={i === preWizardData.flights.length - 1} onClick={() => movePreWizardArrayItem("flights", i, 1)}><ChevronDown size={12} /></button>
+                              {preWizardData.flights.length > 1 && <button className="mt-btn ghost" style={{ padding: "2px 6px", marginTop: "-8px" }} onClick={() => removePreWizardFlight(i)}><X size={12} /></button>}
+                            </span>
                           </div>
                           <div className="mt-field">
                             <label>{T.flightNoCheck}</label>
@@ -4463,9 +4501,9 @@ export default function MyTripApp() {
                             </div>
                           </div>
                           {f.flightLookupMsg && <div className="mt-hint" style={{ marginBottom: 8 }}>{f.flightLookupMsg}</div>}
-                          <div className="mt-wizard-qa"><label>{T.from}</label><input value={f.from} onChange={(e) => updatePreWizardArrayItem("flights", i, { from: e.target.value })} /></div>
+                          <div className="mt-wizard-qa"><label>{T.from}</label><div className="mt-field-inline" style={{ flex: 2 }}><input value={f.from} onChange={(e) => updatePreWizardArrayItem("flights", i, { from: e.target.value })} /><button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openWizardLocationPicker("flights", i, "from")}><MapPin size={13} /></button></div></div>
                           <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={f.fromAlias} onChange={(e) => updatePreWizardArrayItem("flights", i, { fromAlias: e.target.value })} /></div>
-                          <div className="mt-wizard-qa"><label>{T.to}</label><input value={f.to} onChange={(e) => updatePreWizardArrayItem("flights", i, { to: e.target.value })} /></div>
+                          <div className="mt-wizard-qa"><label>{T.to}</label><div className="mt-field-inline" style={{ flex: 2 }}><input value={f.to} onChange={(e) => updatePreWizardArrayItem("flights", i, { to: e.target.value })} /><button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openWizardLocationPicker("flights", i, "to")}><MapPin size={13} /></button></div></div>
                           <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={f.toAlias} onChange={(e) => updatePreWizardArrayItem("flights", i, { toAlias: e.target.value })} /></div>
                           <div className="mt-wizard-qa">
                             <label>{T.date}</label>
@@ -4475,6 +4513,7 @@ export default function MyTripApp() {
                             <div className="mt-field"><label>{T.flightDepTime}</label><TimeField value={f.depTime} onChange={(e) => updatePreWizardArrayItem("flights", i, { depTime: e.target.value })} T={T} /></div>
                             <div className="mt-field"><label>{T.flightLandTime}</label><TimeField value={f.landTime} onChange={(e) => updatePreWizardArrayItem("flights", i, { landTime: e.target.value })} T={T} /></div>
                           </div>
+                          <label className="mt-checkbox-row"><input type="checkbox" checked={!!f.overnight} onChange={(e) => updatePreWizardArrayItem("flights", i, { overnight: e.target.checked })} />{T.overnight}</label>
                         </div>
                       ))}
                       <button className="mt-btn ghost" style={{ width: "100%" }} onClick={addPreWizardFlight}><Plus size={13} /> {T.preWizardAddFlight}</button>
@@ -4497,7 +4536,11 @@ export default function MyTripApp() {
                         <div key={i} className="mt-wizard-subgroup">
                           <div className="mt-section-label" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                             <span>{T.preWizardFlightN.replace("{n}", i + 1)}</span>
-                            {preWizardData.domesticFlights.length > 1 && <button className="mt-btn ghost" style={{ padding: "2px 6px", marginTop: "-8px" }} onClick={() => removePreWizardDomesticFlight(i)}><X size={12} /></button>}
+                            <span style={{ display: "flex", gap: 2 }}>
+                              <button className="mt-btn ghost" style={{ padding: "2px 6px", marginTop: "-8px" }} disabled={i === 0} onClick={() => movePreWizardArrayItem("domesticFlights", i, -1)}><ChevronUp size={12} /></button>
+                              <button className="mt-btn ghost" style={{ padding: "2px 6px", marginTop: "-8px" }} disabled={i === preWizardData.domesticFlights.length - 1} onClick={() => movePreWizardArrayItem("domesticFlights", i, 1)}><ChevronDown size={12} /></button>
+                              {preWizardData.domesticFlights.length > 1 && <button className="mt-btn ghost" style={{ padding: "2px 6px", marginTop: "-8px" }} onClick={() => removePreWizardDomesticFlight(i)}><X size={12} /></button>}
+                            </span>
                           </div>
                           <div className="mt-field">
                             <label>{T.flightNoCheck}</label>
@@ -4507,9 +4550,9 @@ export default function MyTripApp() {
                             </div>
                           </div>
                           {f.flightLookupMsg && <div className="mt-hint" style={{ marginBottom: 8 }}>{f.flightLookupMsg}</div>}
-                          <div className="mt-wizard-qa"><label>{T.from}</label><input value={f.from} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { from: e.target.value })} /></div>
+                          <div className="mt-wizard-qa"><label>{T.from}</label><div className="mt-field-inline" style={{ flex: 2 }}><input value={f.from} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { from: e.target.value })} /><button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openWizardLocationPicker("domesticFlights", i, "from")}><MapPin size={13} /></button></div></div>
                           <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={f.fromAlias} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { fromAlias: e.target.value })} /></div>
-                          <div className="mt-wizard-qa"><label>{T.to}</label><input value={f.to} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { to: e.target.value })} /></div>
+                          <div className="mt-wizard-qa"><label>{T.to}</label><div className="mt-field-inline" style={{ flex: 2 }}><input value={f.to} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { to: e.target.value })} /><button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openWizardLocationPicker("domesticFlights", i, "to")}><MapPin size={13} /></button></div></div>
                           <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={f.toAlias} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { toAlias: e.target.value })} /></div>
                           <div className="mt-wizard-qa">
                             <label>{T.date}</label>
@@ -4519,6 +4562,7 @@ export default function MyTripApp() {
                             <div className="mt-field"><label>{T.flightDepTime}</label><TimeField value={f.depTime} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { depTime: e.target.value })} T={T} /></div>
                             <div className="mt-field"><label>{T.flightLandTime}</label><TimeField value={f.landTime} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { landTime: e.target.value })} T={T} /></div>
                           </div>
+                          <label className="mt-checkbox-row"><input type="checkbox" checked={!!f.overnight} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { overnight: e.target.checked })} />{T.overnight}</label>
                         </div>
                       ))}
                       <button className="mt-btn ghost" style={{ width: "100%" }} onClick={addPreWizardDomesticFlight}><Plus size={13} /> {T.preWizardAddFlight}</button>
@@ -4541,7 +4585,11 @@ export default function MyTripApp() {
                         <div key={i} className="mt-wizard-subgroup">
                           <div className="mt-section-label" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                             <span>{T.preWizardHotelN.replace("{n}", i + 1)}</span>
-                            {preWizardData.hotels.length > 1 && <button className="mt-btn ghost" style={{ padding: "2px 6px", marginTop: "-8px" }} onClick={() => removePreWizardHotel(i)}><X size={12} /></button>}
+                            <span style={{ display: "flex", gap: 2 }}>
+                              <button className="mt-btn ghost" style={{ padding: "2px 6px", marginTop: "-8px" }} disabled={i === 0} onClick={() => movePreWizardArrayItem("hotels", i, -1)}><ChevronUp size={12} /></button>
+                              <button className="mt-btn ghost" style={{ padding: "2px 6px", marginTop: "-8px" }} disabled={i === preWizardData.hotels.length - 1} onClick={() => movePreWizardArrayItem("hotels", i, 1)}><ChevronDown size={12} /></button>
+                              {preWizardData.hotels.length > 1 && <button className="mt-btn ghost" style={{ padding: "2px 6px", marginTop: "-8px" }} onClick={() => removePreWizardHotel(i)}><X size={12} /></button>}
+                            </span>
                           </div>
                           <div className="mt-wizard-qa"><label>{T.hotelName}</label><input value={h.name} onChange={(e) => updatePreWizardArrayItem("hotels", i, { name: e.target.value })} /></div>
                           <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={h.alias} onChange={(e) => updatePreWizardArrayItem("hotels", i, { alias: e.target.value })} /></div>
