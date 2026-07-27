@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "20.1.0";
+const APP_VERSION = "20.3.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -2892,7 +2892,7 @@ export default function MyTripApp() {
     setPreWizardData((d) => ({ ...d, domesticFlights: d.domesticFlights.length > 1 ? d.domesticFlights.filter((_, i) => i !== idx) : d.domesticFlights }));
   }
   function addPreWizardHotel() {
-    setPreWizardData((d) => ({ ...d, hotels: [...d.hotels, { name: "", alias: "", checkIn: "", checkOut: "" }] }));
+    setPreWizardData((d) => ({ ...d, hotels: [...d.hotels, { name: "", alias: "", checkIn: "", checkOut: "", nameLat: null, nameLon: null, namePlaceId: null, nameVerifiedUrl: "" }] }));
   }
   function removePreWizardHotel(idx) {
     setPreWizardData((d) => ({ ...d, hotels: d.hotels.length > 1 ? d.hotels.filter((_, i) => i !== idx) : d.hotels }));
@@ -2918,7 +2918,11 @@ export default function MyTripApp() {
     const hotelSubFrames = frames.filter((f) => f.parentFrameId === mainFrame.id && f.frameType === "hotel");
     const liveHotels = hotelSubFrames.map((hf) => {
       const checkinRow = rows.find((r) => r.frameId === hf.id && r.typeId === "checkin");
-      return { name: hf.name || "", alias: (checkinRow && checkinRow.toAlias) || "", checkIn: hf.startDate || "", checkOut: hf.endDate || "" };
+      return {
+        name: hf.name || "", alias: (checkinRow && checkinRow.toAlias) || "", checkIn: hf.startDate || "", checkOut: hf.endDate || "",
+        nameLat: (checkinRow && checkinRow.toLat) || null, nameLon: (checkinRow && checkinRow.toLon) || null,
+        namePlaceId: (checkinRow && checkinRow.toPlaceId) || null, nameVerifiedUrl: (checkinRow && checkinRow.toVerifiedUrl) || "",
+      };
     });
     return {
       tripName: mainFrame.name || "", planStartDate: mainFrame.startDate || "", planEndDate: mainFrame.endDate || "",
@@ -3030,9 +3034,9 @@ export default function MyTripApp() {
     hotelFrames.forEach((hf) => {
       const h = hf.hotelRef;
       const id1 = addRow(h.checkIn, null, hf.id);
-      updateRow(id1, { typeId: "checkin", startTime: "15:00", to: h.name, toAlias: h.alias });
+      updateRow(id1, { typeId: "checkin", startTime: "15:00", to: h.name, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
       const id2 = addRow(h.checkOut, null, hf.id);
-      updateRow(id2, { typeId: "checkout", endTime: "11:00", to: h.name, toAlias: h.alias });
+      updateRow(id2, { typeId: "checkout", endTime: "11:00", to: h.name, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
       createdRowIds.push(id1, id2);
     });
 
@@ -3480,7 +3484,7 @@ export default function MyTripApp() {
     if (initialQuery.trim()) runLocationSearch(initialQuery);
   }
   function applyLocationPatch(field, basePatch, smartAlias) {
-    const aliasField = field === "from" ? "fromAlias" : field === "to" ? "toAlias" : null;
+    const aliasField = field === "from" ? "fromAlias" : field === "to" ? "toAlias" : field === "name" ? "alias" : null;
     const { wizardTarget } = locPicker;
     if (wizardTarget) {
       const current = preWizardData[wizardTarget.arrayField][wizardTarget.idx];
@@ -3521,11 +3525,12 @@ export default function MyTripApp() {
     setLocPicker((p) => (p ? { ...p, loading: true } : p));
     googlePlaceDetails(prediction.placeId, lang).then((details) => {
       if (!details || !details.location) { setLocPicker((p) => (p ? { ...p, loading: false, error: "no-details" } : p)); return; }
-      const label = details.formattedAddress || (details.displayName && details.displayName.text) || prediction.text;
+      const label = (details.displayName && details.displayName.text) || details.formattedAddress || prediction.text;
       const mapUrl = `https://www.google.com/maps/search/?api=1&query=${details.location.latitude},${details.location.longitude}&query_place_id=${prediction.placeId}`;
       const smartAlias = (details.displayName && details.displayName.text) || label.split(",")[0];
       if (field === "from") applyLocationPatch("from", { from: label, fromVerifiedUrl: mapUrl, fromVerifiedText: label, fromLat: details.location.latitude, fromLon: details.location.longitude, fromPlaceId: prediction.placeId }, smartAlias);
       else if (field === "to") applyLocationPatch("to", { to: label, toVerifiedUrl: mapUrl, toVerifiedText: label, toLat: details.location.latitude, toLon: details.location.longitude, toPlaceId: prediction.placeId }, smartAlias);
+      else if (field === "name") applyLocationPatch("name", { name: label, nameVerifiedUrl: mapUrl, nameVerifiedText: label, nameLat: details.location.latitude, nameLon: details.location.longitude, namePlaceId: prediction.placeId }, smartAlias);
       else if (field === "fromAlias") applyLocationPatch("fromAlias", { fromAlias: smartAlias });
       else if (field === "toAlias") applyLocationPatch("toAlias", { toAlias: smartAlias });
     }).catch(() => setLocPicker((p) => (p ? { ...p, loading: false, error: "network" } : p)));
@@ -3538,6 +3543,7 @@ export default function MyTripApp() {
     const smartAlias = label.split(",")[0];
     if (field === "from") applyLocationPatch("from", { from: label, fromVerifiedUrl: mapUrl, fromVerifiedText: label, fromLat: result.lat, fromLon: result.lon, fromPlaceId: null }, smartAlias);
     else if (field === "to") applyLocationPatch("to", { to: label, toVerifiedUrl: mapUrl, toVerifiedText: label, toLat: result.lat, toLon: result.lon, toPlaceId: null }, smartAlias);
+    else if (field === "name") applyLocationPatch("name", { name: label, nameVerifiedUrl: mapUrl, nameVerifiedText: label, nameLat: result.lat, nameLon: result.lon, namePlaceId: null }, smartAlias);
     else if (field === "fromAlias") applyLocationPatch("fromAlias", { fromAlias: smartAlias });
     else if (field === "toAlias") applyLocationPatch("toAlias", { toAlias: smartAlias });
   }
@@ -3565,6 +3571,7 @@ export default function MyTripApp() {
     const smartAlias = isFlightRow && iata ? `${cityName} (${iata.toUpperCase()})` : cityName;
     if (locPicker.field === "from") applyLocationPatch("from", { from: label, fromVerifiedUrl: mapUrl, fromVerifiedText: label, fromLat: Number(result.lat), fromLon: Number(result.lon) }, smartAlias);
     else if (locPicker.field === "to") applyLocationPatch("to", { to: label, toVerifiedUrl: mapUrl, toVerifiedText: label, toLat: Number(result.lat), toLon: Number(result.lon) }, smartAlias);
+    else if (locPicker.field === "name") applyLocationPatch("name", { name: label, nameVerifiedUrl: mapUrl, nameVerifiedText: label, nameLat: Number(result.lat), nameLon: Number(result.lon) }, smartAlias);
     else if (locPicker.field === "fromAlias") applyLocationPatch("fromAlias", { fromAlias: label });
     else if (locPicker.field === "toAlias") applyLocationPatch("toAlias", { toAlias: label });
   }
@@ -4591,7 +4598,7 @@ export default function MyTripApp() {
                               {preWizardData.hotels.length > 1 && <button className="mt-btn ghost" style={{ padding: "2px 6px", marginTop: "-8px" }} onClick={() => removePreWizardHotel(i)}><X size={12} /></button>}
                             </span>
                           </div>
-                          <div className="mt-wizard-qa"><label>{T.hotelName}</label><input value={h.name} onChange={(e) => updatePreWizardArrayItem("hotels", i, { name: e.target.value })} /></div>
+                          <div className="mt-wizard-qa"><label>{T.hotelName}</label><div className="mt-field-inline" style={{ flex: 2 }}><input value={h.name} onChange={(e) => updatePreWizardArrayItem("hotels", i, { name: e.target.value })} /><button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openWizardLocationPicker("hotels", i, "name")}><MapPin size={13} /></button></div></div>
                           <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={h.alias} onChange={(e) => updatePreWizardArrayItem("hotels", i, { alias: e.target.value })} /></div>
                           <div className="mt-wizard-qa">
                             <label>{T.checkInOut}</label>
