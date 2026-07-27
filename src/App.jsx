@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "19.0.1";
+const APP_VERSION = "19.1.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -598,6 +598,15 @@ function typeMeta(typeId, types, T, lang) {
   return { ...t, name };
 }
 function childFramesPure(frames, pid) { return frames.filter((f) => f.parentFrameId === pid).sort((a, b) => (a.startDate || "").localeCompare(b.startDate || "")); }
+function effectiveFrameTypeOf(frame, rows) {
+  if (!frame) return null;
+  if (frame.frameType === "basic") return null;
+  if (frame.frameType) return frame.frameType;
+  if (!frame.parentFrameId) return "trip";
+  if (rows.some((r) => r.frameId === frame.id && (r.typeId === "checkin" || r.typeId === "checkout"))) return "hotel";
+  if (rows.some((r) => r.frameId === frame.id && (r.typeId === "flight" || r.typeId === "domestic-flight"))) return "flight";
+  return null;
+}
 function rowsAtPure(rows, fid) { return rows.filter((r) => !r.parentId && (r.frameId || null) === (fid || null)); }
 function dayGroupsAtPure(rows, fid) {
   const list = rowsAtPure(rows, fid); const map = new Map();
@@ -1046,9 +1055,10 @@ function initialRows() {
 /*  Hoisted display components                                        */
 /* ================================================================= */
 
-function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, ctx }) {
-  const { T, lang, types, visibleColumns, updateRow, deleteRow, openCard, addRow,
+function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, columns, ctx }) {
+  const { T, lang, types, visibleColumns: ctxVisibleColumns, updateRow, deleteRow, openCard, addRow,
     dragId, setDragId, onDropRow, typeMenuOpen, setTypeMenuOpen, arrivalMenuOpen, setArrivalMenuOpen, newTypeDraft, setNewTypeDraft, addCustomType, openHotelInfo } = ctx;
+  const visibleColumns = columns || ctxVisibleColumns;
   const tm = typeMeta(row.typeId, types, T, lang);
   const Icon = ICONS[tm.icon] || Tag;
   const dur = computeDuration(row.startTime, row.endTime, row.overnight);
@@ -1898,7 +1908,14 @@ function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
 
 function DayGroup({ g, fid, depth, ctx }) {
   const { T, lang, effectiveMobile, viewMode, collapsedGroups, setCollapsedGroups, collapsedParents, setCollapsedParents,
-    addRow, openCard, types, visibleColumns, openAddDayModal, rows, sortDayByTime, getColWidth, startResize, dragDayKey, setDragDayKey, dragId, openHotelInfo } = ctx;
+    addRow, openCard, types, visibleColumns, openAddDayModal, rows, frames, sortDayByTime, getColWidth, startResize, dragDayKey, setDragDayKey, dragId, openHotelInfo } = ctx;
+  const parentFrame = frames.find((f) => f.id === fid) || null;
+  const parentFrameType = effectiveFrameTypeOf(parentFrame, rows);
+  const effectiveColumns = visibleColumns.filter((c) => {
+    if (parentFrameType === "flight" && c.key === "arrival") return false;
+    if (parentFrameType === "hotel" && c.key === "from") return false;
+    return true;
+  });
   const gk = (fid || "root") + "__" + g.date;
   const isToday = g.date === toLocalISODate(new Date());
   const { attributes: dayDragAttrs, listeners: dayDragListeners, setNodeRef: setDayDragNodeRef } = useDraggable({ id: "day:" + gk, data: { type: "day", gk } });
@@ -1950,13 +1967,13 @@ function DayGroup({ g, fid, depth, ctx }) {
           <table className="mt-table">
             <colgroup>
               <col style={{ width: getColWidth("handle") }} />
-              {visibleColumns.map((c) => <col key={c.key} style={{ width: getColWidth(c.key) }} />)}
+              {effectiveColumns.map((c) => <col key={c.key} style={{ width: getColWidth(c.key) }} />)}
               <col style={{ width: getColWidth("actions") }} />
             </colgroup>
             <thead>
               <tr>
                 <th className="handle"></th>
-                {visibleColumns.map((c) => {
+                {effectiveColumns.map((c) => {
                   const ICON_HEADER = { link: Link2, notes: StickyNote, weather: Cloud };
                   const HIcon = ICON_HEADER[c.key];
                   return (
@@ -1973,10 +1990,10 @@ function DayGroup({ g, fid, depth, ctx }) {
               {g.rows.map((r, idx) => (
                 <React.Fragment key={r.id}>
                   <RowLine row={r} depth={0} hasChildren={childrenOf(r.id).length > 0}
-                    collapsed={!!collapsedParents[r.id]} prevRow={ctx.prevRowMap.get(r.id) || null}
+                    collapsed={!!collapsedParents[r.id]} prevRow={ctx.prevRowMap.get(r.id) || null} columns={effectiveColumns}
                     toggleCollapse={() => setCollapsedParents((p) => ({ ...p, [r.id]: !p[r.id] }))} ctx={ctx} />
                   {!collapsedParents[r.id] && childrenOf(r.id).map((child) => (
-                    <RowLine key={child.id} row={child} depth={1} hasChildren={false} collapsed={false} toggleCollapse={() => {}} prevRow={null} ctx={ctx} />
+                    <RowLine key={child.id} row={child} depth={1} hasChildren={false} collapsed={false} toggleCollapse={() => {}} prevRow={null} columns={effectiveColumns} ctx={ctx} />
                   ))}
                 </React.Fragment>
               ))}
@@ -2258,7 +2275,7 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
   const menuFloating = useFloatingMenu(isMenuOpen, (open) => setFrameMenuOpenId(open ? frame.id : null));
   const { setNodeRef: setFrameDropRef, isOver: isFrameOver } = useDroppable({ id: "frame:" + frame.id, data: { type: "frame", fid: frame.id } });
   const dayCount = frame.startDate && frame.endDate ? Math.round((new Date(frame.endDate + "T00:00:00") - new Date(frame.startDate + "T00:00:00")) / 86400000) + 1 : 0;
-  const effectiveFrameType = frame.frameType === "basic" ? null : (frame.frameType || (!frame.parentFrameId ? "trip" : (rows.some((r) => r.frameId === frame.id && (r.typeId === "checkin" || r.typeId === "checkout")) ? "hotel" : null)));
+  const effectiveFrameType = effectiveFrameTypeOf(frame, rows);
   const hotelRowWithPlace = effectiveFrameType === "hotel" ? rows.find((r) => r.frameId === frame.id && (r.typeId === "checkin" || r.typeId === "checkout") && (r.fromPlaceId || r.toPlaceId)) : null;
   return (
     <div className="mt-frame-block" style={{ "--frame-color": color }}>
