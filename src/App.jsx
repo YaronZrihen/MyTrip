@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "18.5.3";
+const APP_VERSION = "18.7.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -133,7 +133,8 @@ const DEFAULT_TYPES = [
   { id: "domestic-flight", name_he: "טיסת פנים", name_en: "Domestic flight", icon: "PlaneTakeoff", color: CATEGORY_COLORS["air-transport"], category: "air-transport", kind: "arrival" },
   { id: "helicopter", name_he: "מסוק", name_en: "Helicopter", icon: "Helicopter", color: CATEGORY_COLORS["air-transport"], category: "air-transport", kind: "arrival" },
 
-  { id: "hotel", name_he: "מלון", name_en: "Hotel", icon: "BedDouble", color: CATEGORY_COLORS.accommodation, category: "accommodation", kind: "desc" },
+  { id: "checkin", name_he: "צ'ק-אין", name_en: "Check-in", icon: "BedDouble", color: CATEGORY_COLORS.accommodation, category: "accommodation", kind: "desc" },
+  { id: "checkout", name_he: "צ'ק-אאוט", name_en: "Check-out", icon: "BedDouble", color: CATEGORY_COLORS.accommodation, category: "accommodation", kind: "desc" },
   { id: "hostel", name_he: "אכסנייה", name_en: "Hostel", icon: "Building2", color: CATEGORY_COLORS.accommodation, category: "accommodation", kind: "desc" },
   { id: "apartment", name_he: "דירה", name_en: "Apartment", icon: "Home", color: CATEGORY_COLORS.accommodation, category: "accommodation", kind: "desc" },
 
@@ -526,7 +527,7 @@ function detectTextAlign(text) {
 function typeDisplayName(t, lang) { return t.name_he != null ? (lang === "en" ? t.name_en : t.name_he) : t.name; }
 function isFlightType(typeId) { return typeId === "flight" || typeId === "domestic-flight"; }
 function noOriginNeeded(typeId) { return !isFlightType(typeId); }
-function isAccommodationType(typeId) { return typeId === "hotel" || typeId === "hostel" || typeId === "apartment"; }
+function isAccommodationType(typeId) { return typeId === "checkin" || typeId === "checkout" || typeId === "hostel" || typeId === "apartment"; }
 
 /* Simplified OSM opening_hours check — handles common "Mo-Fr 09:00-18:00" style rules only.
    Returns null (unknown/can't tell) for anything more complex (holidays, exceptions, etc.) — we never
@@ -937,7 +938,7 @@ function frameSummaryStats(rows, frames, fid) {
   const totalKm = relevant.reduce((s, r) => s + (Number(r.routeDistanceKm) || 0), 0);
   const totalKmNoFlights = relevant.filter((r) => !FLIGHT_TYPES.includes(r.typeId)).reduce((s, r) => s + (Number(r.routeDistanceKm) || 0), 0);
   const countByType = (ids) => relevant.filter((r) => ids.includes(r.typeId)).length;
-  const hotelRows = relevant.filter((r) => ["hotel", "hostel", "apartment"].includes(r.typeId));
+  const hotelRows = relevant.filter((r) => ["checkin", "checkout", "hostel", "apartment"].includes(r.typeId));
   const distinctHotels = new Set(hotelRows.map((r) => (r.to || r.from || "").trim()).filter(Boolean)).size;
   const totalNights = new Set(hotelRows.map((r) => r.date).filter(Boolean)).size;
   const ratings = relevant.filter((r) => r.personalRating).map((r) => r.personalRating);
@@ -1030,7 +1031,7 @@ function initialRows() {
   const base = [
     { date: day1, typeId: "flight", from: "Ben Gurion Airport", to: "Aeroporto di Roma - Fiumicino Leonardo da Vinci", fromAlias: "תל אביב (TLV)", toAlias: "רומא (FCO)", startTime: "07:40", endTime: "10:35", link: "https://www.google.com/flights", costAmount: 1450, costCurrency: "₪", flightNumber: "LY386" },
     { date: day1, typeId: "taxi", from: "Aeroporto di Roma - Fiumicino Leonardo da Vinci", to: "Hilton Garden Inn Rome Airport", startTime: "11:15", endTime: "12:00", costAmount: 45, costCurrency: "€" },
-    { date: day1, typeId: "hotel", from: "Hilton Garden Inn Rome Airport", to: "Hilton Garden Inn Rome Airport", startTime: "12:00", endTime: "15:00", notes: "מנוחה במלון", link: "https://www.booking.com", costAmount: 620, costCurrency: "€" },
+    { date: day1, typeId: "checkin", from: "Hilton Garden Inn Rome Airport", to: "Hilton Garden Inn Rome Airport", startTime: "12:00", endTime: "15:00", notes: "מנוחה במלון", link: "https://www.booking.com", costAmount: 620, costCurrency: "€" },
     { date: day1, typeId: "train", from: "Hilton Garden Inn Rome Airport", to: "Fontana di Trevi", startTime: "15:30", endTime: "16:10", costAmount: 8, costCurrency: "€" },
     { date: day1, typeId: "day-tour", from: "Fontana di Trevi", to: "Fontana di Trevi", startTime: "16:15", endTime: "19:00", costAmount: 0, costCurrency: "€" },
     { date: day2, typeId: "guided-tour", from: "", to: "", startTime: "09:00", endTime: "13:00", link: "https://maps.google.com", costAmount: 280, costCurrency: "€" },
@@ -1178,7 +1179,9 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
             <span className={"mt-type-text " + warningClass(warnings)}>{tm.name}</span> <ChevronDown size={12} />
           </button>
           {isTypeMenuOpen && (
-            <div ref={typeMenuFloating.refs.setFloating} style={typeMenuFloating.floatingStyles} {...typeMenuFloating.getFloatingProps()} className="mt-type-menu">
+            <>
+              <div className="mt-floating-backdrop" onClick={() => setTypeMenuOpen(null)} />
+              <div ref={typeMenuFloating.refs.setFloating} style={{ ...typeMenuFloating.floatingStyles, zIndex: 400 }} {...typeMenuFloating.getFloatingProps()} className="mt-type-menu">
                 <div className="mt-type-search-wrap">
                   <Search size={13} />
                   <input autoFocus className="mt-type-search" placeholder={T.searchTypes} value={typeSearch} onChange={(e) => setTypeSearch(e.target.value)} />
@@ -1234,6 +1237,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
                   <button className="mt-type-add-toggle" onClick={() => setShowAddTypeForm(true)}><Plus size={13} /> {T.newType}</button>
                 )}
               </div>
+            </>
           )}
         </div>
       );
@@ -1249,7 +1253,9 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
               <span className="mt-type-text">{am.name}</span> <ChevronDown size={12} />
             </button>
             {isArrivalMenuOpen && (
-              <div ref={arrivalMenuFloating.refs.setFloating} style={arrivalMenuFloating.floatingStyles} {...arrivalMenuFloating.getFloatingProps()} className="mt-type-menu">
+              <>
+                <div className="mt-floating-backdrop" onClick={() => setArrivalMenuOpen(null)} />
+                <div ref={arrivalMenuFloating.refs.setFloating} style={{ ...arrivalMenuFloating.floatingStyles, zIndex: 400 }} {...arrivalMenuFloating.getFloatingProps()} className="mt-type-menu">
                 <div className="mt-type-search-wrap">
                   <Search size={13} />
                   <input autoFocus className="mt-type-search" placeholder={T.searchTypes} value={arrivalSearch} onChange={(e) => setArrivalSearch(e.target.value)} />
@@ -1290,7 +1296,8 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
                 ) : (
                   <button className="mt-type-add-toggle" onClick={() => { setNewTypeDraft({ ...newTypeDraft, kind: "arrival" }); setShowAddArrivalForm(true); }}><Plus size={13} /> {T.newType}</button>
                 )}
-              </div>
+                </div>
+              </>
             )}
           </div>
         );
@@ -2233,8 +2240,8 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
   const menuFloating = useFloatingMenu(isMenuOpen, (open) => setFrameMenuOpenId(open ? frame.id : null));
   const { setNodeRef: setFrameDropRef, isOver: isFrameOver } = useDroppable({ id: "frame:" + frame.id, data: { type: "frame", fid: frame.id } });
   const dayCount = frame.startDate && frame.endDate ? Math.round((new Date(frame.endDate + "T00:00:00") - new Date(frame.startDate + "T00:00:00")) / 86400000) + 1 : 0;
-  const effectiveFrameType = frame.frameType === "basic" ? null : (frame.frameType || (!frame.parentFrameId ? "trip" : (rows.some((r) => r.frameId === frame.id && r.typeId === "hotel") ? "hotel" : null)));
-  const hotelRowWithPlace = effectiveFrameType === "hotel" ? rows.find((r) => r.frameId === frame.id && r.typeId === "hotel" && (r.fromPlaceId || r.toPlaceId)) : null;
+  const effectiveFrameType = frame.frameType === "basic" ? null : (frame.frameType || (!frame.parentFrameId ? "trip" : (rows.some((r) => r.frameId === frame.id && (r.typeId === "checkin" || r.typeId === "checkout")) ? "hotel" : null)));
+  const hotelRowWithPlace = effectiveFrameType === "hotel" ? rows.find((r) => r.frameId === frame.id && (r.typeId === "checkin" || r.typeId === "checkout") && (r.fromPlaceId || r.toPlaceId)) : null;
   return (
     <div className="mt-frame-block" style={{ "--frame-color": color }}>
       <div ref={setFrameDropRef} className={"mt-frame-header" + (dragDayKey ? " droppable" : "") + (isFrameOver ? " mt-drop-hover" : "") + (effectiveFrameType ? " mt-frame-header-special" : "")} onClick={() => toggleFrameCollapse(frame.id)}>
@@ -2291,7 +2298,9 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
         )}
       </div>
       {isMenuOpen && (
-        <div ref={menuFloating.refs.setFloating} style={menuFloating.floatingStyles} {...menuFloating.getFloatingProps()} className="mt-floating-menu mt-kebab-menu">
+        <>
+          <div className="mt-floating-backdrop" onClick={() => setFrameMenuOpenId(null)} />
+          <div ref={menuFloating.refs.setFloating} style={{ ...menuFloating.floatingStyles, zIndex: 400 }} {...menuFloating.getFloatingProps()} className="mt-floating-menu mt-kebab-menu">
             <button className="mt-share-opt" onClick={() => { openAddDayModal(frame.id); setFrameMenuOpenId(null); }}><Plus size={14} /> {T.addDay}</button>
             <button className="mt-share-opt" onClick={() => { openFrameModal(null, frame.id); setFrameMenuOpenId(null); }}><FolderPlus size={14} /> {T.addSubFrame}</button>
             <button className="mt-share-opt" onClick={() => { openFrameModal(frame); setFrameMenuOpenId(null); }}><Pencil size={14} /> {T.editFrame}</button>
@@ -2304,7 +2313,8 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
             })()}
             <div className="divider" />
             <button className="mt-share-opt" style={{ color: "var(--danger)" }} onClick={() => { setDeleteFrameConfirmId(frame.id); setFrameMenuOpenId(null); }}><Trash2 size={14} /> {T.delete}</button>
-        </div>
+          </div>
+        </>
       )}
       {!frame.collapsed && (
         <div className="mt-frame-body">
@@ -2866,9 +2876,9 @@ export default function MyTripApp() {
     hotelFrames.forEach((hf) => {
       const h = hf.hotelRef;
       const id1 = addRow(h.checkIn, null, hf.id);
-      updateRow(id1, { typeId: "hotel", startTime: "15:00", to: h.name, toAlias: h.alias });
+      updateRow(id1, { typeId: "checkin", startTime: "15:00", to: h.name, toAlias: h.alias });
       const id2 = addRow(h.checkOut, null, hf.id);
-      updateRow(id2, { typeId: "hotel", endTime: "11:00", to: h.name, toAlias: h.alias });
+      updateRow(id2, { typeId: "checkout", endTime: "11:00", to: h.name, toAlias: h.alias });
       createdRowIds.push(id1, id2);
     });
 
@@ -3219,7 +3229,7 @@ export default function MyTripApp() {
   const addDayFrame = addDayCtx && addDayCtx.fid ? frames.find((f) => f.id === addDayCtx.fid) : null;
   const addDayIssue = addDayCtx && addDayFrame && (addDayCtx.date < addDayFrame.startDate || addDayCtx.date > addDayFrame.endDate) ? T.rowOutOfFrame : null;
   function findLastHotelInfo(beforeDate) {
-    const hotelRows = rows.filter((r) => r.typeId === "hotel" && r.date && r.date < beforeDate)
+    const hotelRows = rows.filter((r) => (r.typeId === "checkin" || r.typeId === "checkout") && r.date && r.date < beforeDate)
       .sort((a, b) => (a.date + (a.startTime || "")).localeCompare(b.date + (b.startTime || "")));
     if (!hotelRows.length) return null;
     const last = hotelRows[hotelRows.length - 1];
@@ -3239,7 +3249,7 @@ export default function MyTripApp() {
     if (addDayCtx.addHotel) {
       const id1 = addRow(addDayCtx.date, null, addDayCtx.fid);
       updateRow(id1, {
-        typeId: "hotel", startTime: "08:00",
+        typeId: "checkout", startTime: "08:00",
         from: hotelRaw, fromAlias: hotelAlias, fromLat: hotelLat, fromLon: hotelLon,
         fromVerifiedUrl: prevHotel ? prevHotel.verifiedUrl : "", fromVerifiedText: prevHotel ? prevHotel.verifiedText : "",
         fromPlaceId: prevHotel ? prevHotel.placeId : null,
@@ -3269,7 +3279,7 @@ export default function MyTripApp() {
     if (addDayCtx.addHotel) {
       const id2 = addRow(addDayCtx.date, null, addDayCtx.fid);
       updateRow(id2, {
-        typeId: "hotel", endTime: "22:00",
+        typeId: "checkin", endTime: "22:00",
         to: hotelRaw, toAlias: hotelAlias, toLat: hotelLat, toLon: hotelLon,
         toVerifiedUrl: prevHotel ? prevHotel.verifiedUrl : "", toVerifiedText: prevHotel ? prevHotel.verifiedText : "",
         toPlaceId: prevHotel ? prevHotel.placeId : null,
@@ -4416,7 +4426,9 @@ export default function MyTripApp() {
       )}
 
       {colMenuOpen && (
-        <div ref={colMenu.refs.setFloating} style={colMenu.floatingStyles} {...colMenu.getFloatingProps()} className="mt-floating-menu mt-columns-menu">
+        <>
+          <div className="mt-floating-backdrop" onClick={() => setColMenuOpen(false)} />
+          <div ref={colMenu.refs.setFloating} style={{ ...colMenu.floatingStyles, zIndex: 400 }} {...colMenu.getFloatingProps()} className="mt-floating-menu mt-columns-menu">
             <div className="mt-menu-head"><strong>{T.columns}</strong><button className="mt-btn ghost" style={{ padding: "2px 6px" }} onClick={() => setColMenuOpen(false)}><X size={14} /></button></div>
             {columns.map((c) => (
               <label key={c.key}>
@@ -4430,11 +4442,14 @@ export default function MyTripApp() {
             <button className="mt-btn primary" style={{ width: "100%" }} onClick={addCustomColumn}><Plus size={13} /> {T.addColumn}</button>
             <div className="divider" />
             <button className="mt-btn ghost" style={{ width: "100%" }} onClick={resetColumnWidths}><ArrowDownUp size={13} /> {T.resetColumnWidths}</button>
-        </div>
+          </div>
+        </>
       )}
 
       {addTypeOpen && (
-        <div ref={addTypeMenu.refs.setFloating} style={{ ...addTypeMenu.floatingStyles, minWidth: 200 }} {...addTypeMenu.getFloatingProps()} className="mt-floating-menu">
+        <>
+          <div className="mt-floating-backdrop" onClick={() => setAddTypeOpen(false)} />
+          <div ref={addTypeMenu.refs.setFloating} style={{ ...addTypeMenu.floatingStyles, minWidth: 200, zIndex: 400 }} {...addTypeMenu.getFloatingProps()} className="mt-floating-menu">
             <div className="mt-menu-head"><span style={{ display: "flex", alignItems: "center", gap: 5 }}><strong>{T.newType}</strong><HelpButton topic="types" lang={lang} T={T} onOpenFull={openHelpTopic} size={13} openTopic={helpPopoverOpen} setOpenTopic={setHelpPopoverOpen} /></span><button className="mt-btn ghost" style={{ padding: "2px 6px" }} onClick={() => setAddTypeOpen(false)}><X size={14} /></button></div>
             <input type="text" placeholder={T.typeName} value={addTypeDraft.name} onChange={(e) => setAddTypeDraft({ ...addTypeDraft, name: e.target.value })} style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 6, padding: "5px 7px", fontSize: 12.5, marginBottom: 8, color: "var(--ink)", background: "#fff" }} />
             <div className="mt-wizard-choices" style={{ marginBottom: 8 }}>
@@ -4447,7 +4462,8 @@ export default function MyTripApp() {
               ); })}
             </div>
             <button className="mt-btn primary" style={{ width: "100%" }} onClick={submitAddType}><Plus size={13} /> {T.add}</button>
-        </div>
+          </div>
+        </>
       )}
 
       <DndContext sensors={dndSensors} onDragStart={handleDndStart} onDragEnd={handleDndEnd} onDragCancel={handleDndCancel}>
@@ -4588,51 +4604,36 @@ export default function MyTripApp() {
                 }} />
               </div>
 
+              {showFlightHint && (
+                <div className="mt-field">
+                  <label>{T.flightNo}</label>
+                  <div className="mt-field-inline">
+                    <input value={cardDraft.flightNumber || ""} onChange={(e) => setCardDraft({ ...cardDraft, flightNumber: e.target.value })} />
+                    <button className="mt-btn ghost" onClick={fetchFlightData}><Download size={13} /> {T.fetchFlightData}</button>
+                  </div>
+                  {flightLookupMsg && <div className="mt-hint" style={{ marginTop: 4 }}>{flightLookupMsg}</div>}
+                </div>
+              )}
+
               {!noOriginNeeded(cardDraft.typeId) && (
-                effectiveMobile ? (
-                  <div className="mt-loc-mobile">
-                    <div className="mt-loc-mobile-row">
-                      <span className="mt-loc-row-label">{T.from}</span>
-                      <input className="mt-loc-grid-input" dir="auto" value={cardDraft.from} placeholder={getTypeHint(cardDraft.typeId, "from", lang)} onChange={(e) => setCardDraft({ ...cardDraft, from: e.target.value })} />
-                      <span className="mt-loc-icons">
-                        <button className="mt-btn ghost mt-btn-icon" title={T.copyPrevDest} disabled={!prevRowForCard || !prevRowForCard.to} onClick={copyPrevDestinationToFrom}><Copy size={13} /></button>
-                        <button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openLocationPicker("from")}><MapPin size={13} /></button>
-                      </span>
-                      {fromVerifiedCard && (
+                <div className="mt-field">
+                  <label>{T.from}</label>
+                  <div className="mt-loc-icons" style={{ marginBottom: 4 }}>
+                    <input className="mt-loc-grid-input" dir="auto" value={cardDraft.from} placeholder={getTypeHint(cardDraft.typeId, "from", lang)} onChange={(e) => setCardDraft({ ...cardDraft, from: e.target.value })} />
+                    <button className="mt-btn ghost mt-btn-icon" title={T.copyPrevDest} disabled={!prevRowForCard || !prevRowForCard.to} onClick={copyPrevDestinationToFrom}><Copy size={13} /></button>
+                    <button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openLocationPicker("from")}><MapPin size={13} /></button>
+                    {fromVerifiedCard && (
                       <PopoverInfoIcon icon={CircleCheck} color="#3E8E5A">
                         {cardDraft.fromPlaceId ? <div className="mt-info-popup-widget"><GooglePlaceDetailsFull placeId={cardDraft.fromPlaceId} T={T} /></div> : <div>{T.verified}</div>}
                         <a href={cardDraft.fromVerifiedUrl} target="_blank" rel="noreferrer" style={{ display: "block", padding: "6px 10px" }}>{T.openMap}</a>
                       </PopoverInfoIcon>
                     )}
-                    </div>
-                    <div className="mt-loc-mobile-alias-row">
-                      <input dir="auto" value={cardDraft.fromAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "fromAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, fromAlias: e.target.value })} />
-                      <PopoverInfoIcon icon={Info} trigger="hover">{T.aliasHint}</PopoverInfoIcon>
-                    </div>
                   </div>
-                ) : (
-                  <div className="mt-loc-grid">
-                    <span />
-                    <span className="mt-loc-col-header" style={{ gridColumn: "2 / span 2" }}>{T.locationColHeader}</span>
-                    <span className="mt-loc-col-header" style={{ gridColumn: "4 / span 2" }}>{T.aliasColHeader}</span>
-                    <span className="mt-loc-row-label">{T.from}</span>
-                    <span className="mt-loc-icons">
-                      <button className="mt-btn ghost mt-btn-icon" title={T.copyPrevDest} disabled={!prevRowForCard || !prevRowForCard.to} onClick={copyPrevDestinationToFrom}><Copy size={13} /></button>
-                      <button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openLocationPicker("from")}><MapPin size={13} /></button>
-                    </span>
-                    <input className="mt-loc-grid-input" dir="auto" value={cardDraft.from} placeholder={getTypeHint(cardDraft.typeId, "from", lang)} onChange={(e) => setCardDraft({ ...cardDraft, from: e.target.value })} />
-                    <span className="mt-loc-verified-slot">{fromVerifiedCard && (
-                        <PopoverInfoIcon icon={CircleCheck} color="#3E8E5A">
-                          {cardDraft.fromPlaceId ? <div className="mt-info-popup-widget"><GooglePlaceDetailsFull placeId={cardDraft.fromPlaceId} T={T} /></div> : <div>{T.verified}</div>}
-                          <a href={cardDraft.fromVerifiedUrl} target="_blank" rel="noreferrer" style={{ display: "block", padding: "6px 10px" }}>{T.openMap}</a>
-                        </PopoverInfoIcon>
-                      )}</span>
-                    <span className="mt-loc-alias-cell">
-                      <input dir="auto" value={cardDraft.fromAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "fromAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, fromAlias: e.target.value })} />
-                      <PopoverInfoIcon icon={Info} trigger="hover">{T.aliasHint}</PopoverInfoIcon>
-                    </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <input dir="auto" style={{ flex: 1 }} value={cardDraft.fromAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "fromAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, fromAlias: e.target.value })} />
+                    <PopoverInfoIcon icon={Info} trigger="hover">{T.aliasHint}</PopoverInfoIcon>
                   </div>
-                )
+                </div>
               )}
 
               <div className="mt-field">
@@ -4695,32 +4696,25 @@ export default function MyTripApp() {
                 <div style={{ position: "relative", marginBottom: 4 }}>
                   <button type="button" className="mt-btn ghost" ref={savedHotelsMenu.refs.setReference} {...savedHotelsMenu.getReferenceProps()}><BedDouble size={13} /> {T.pickSavedHotel}</button>
                   {savedHotelsOpen && (
-                    <div ref={savedHotelsMenu.refs.setFloating} style={savedHotelsMenu.floatingStyles} {...savedHotelsMenu.getFloatingProps()} className="mt-floating-menu" >
-                      {getSavedHotels().length === 0 ? (
-                        <div className="mt-hint" style={{ padding: 8 }}>{T.noSavedHotels}</div>
-                      ) : getSavedHotels().map((h) => (
-                        <button key={h.placeId || h.name} className="mt-share-opt" onClick={() => {
-                          setCardDraft((d) => ({ ...d, to: h.name, toAlias: h.alias, toLat: h.lat, toLon: h.lon, toPlaceId: h.placeId, toVerifiedUrl: h.verifiedUrl, toVerifiedText: h.verifiedText }));
-                          setSavedHotelsOpen(false);
-                        }}>
-                          <BedDouble size={13} /> <span style={{ flex: 1, textAlign: "start" }}>{h.alias || h.name}</span>
-                        </button>
-                      ))}
-                    </div>
+                    <>
+                      <div className="mt-floating-backdrop" onClick={() => setSavedHotelsOpen(false)} />
+                      <div ref={savedHotelsMenu.refs.setFloating} style={{ ...savedHotelsMenu.floatingStyles, zIndex: 400 }} {...savedHotelsMenu.getFloatingProps()} className="mt-floating-menu" >
+                        {getSavedHotels().length === 0 ? (
+                          <div className="mt-hint" style={{ padding: 8 }}>{T.noSavedHotels}</div>
+                        ) : getSavedHotels().map((h) => (
+                          <button key={h.placeId || h.name} className="mt-share-opt" onClick={() => {
+                            setCardDraft((d) => ({ ...d, to: h.name, toAlias: h.alias, toLat: h.lat, toLon: h.lon, toPlaceId: h.placeId, toVerifiedUrl: h.verifiedUrl, toVerifiedText: h.verifiedText }));
+                            setSavedHotelsOpen(false);
+                          }}>
+                            <BedDouble size={13} /> <span style={{ flex: 1, textAlign: "start" }}>{h.alias || h.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </>
                   )}
                 </div>
               )}
 
-              {showFlightHint && (
-                <div className="mt-field">
-                  <label>{T.flightNo}</label>
-                  <div className="mt-field-inline">
-                    <input value={cardDraft.flightNumber || ""} onChange={(e) => setCardDraft({ ...cardDraft, flightNumber: e.target.value })} />
-                    <button className="mt-btn ghost" onClick={fetchFlightData}><Download size={13} /> {T.fetchFlightData}</button>
-                  </div>
-                  {flightLookupMsg && <div className="mt-hint" style={{ marginTop: 4 }}>{flightLookupMsg}</div>}
-                </div>
-              )}
               <div className="mt-field"><label>{T.link}</label><input value={cardDraft.link} placeholder="https://..." onChange={(e) => setCardDraft({ ...cardDraft, link: e.target.value })} /></div>
               <div className="mt-field-row">
                 <div className="mt-field"><label>{T.cost}</label><input type="number" value={cardDraft.costAmount} onChange={(e) => setCardDraft({ ...cardDraft, costAmount: e.target.value })} /></div>
