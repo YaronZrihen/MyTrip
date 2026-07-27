@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "19.4.0";
+const APP_VERSION = "19.5.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1141,19 +1141,20 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
     else { origin = prevTo; originSource = "prevTo"; }
     const dest = rowEndPoint(row);
     if (!origin || !dest) { setRouteCalcError(!origin ? T.routeErrNoOrigin : T.routeErrNoDest); return; }
-    const sig = origin + "|" + dest + "|" + (row.startTime || "") + "|" + row.typeId;
+    const originLat = originSource === "own" ? row.fromLat : originSource === "prevFrom" ? (prevRow && prevRow.fromLat) : (prevRow && prevRow.toLat);
+    const originLon = originSource === "own" ? row.fromLon : originSource === "prevFrom" ? (prevRow && prevRow.fromLon) : (prevRow && prevRow.toLon);
+    const hasCoords = (originLat != null && originLon != null) ? "c" : "t";
+    const sig = origin + "|" + dest + "|" + (row.startTime || "") + "|" + row.typeId + "|" + hasCoords;
     if (lastRouteCalcSig.current === sig || distLoading) return;
     lastRouteCalcSig.current = sig;
     setDistLoading(true);
-    const originLat = originSource === "own" ? row.fromLat : originSource === "prevFrom" ? (prevRow && prevRow.fromLat) : (prevRow && prevRow.toLat);
-    const originLon = originSource === "own" ? row.fromLon : originSource === "prevFrom" ? (prevRow && prevRow.fromLon) : (prevRow && prevRow.toLon);
     const originP = (originLat != null && originLon != null) ? Promise.resolve({ lat: originLat, lon: originLon }) : geocodeText(origin);
     const destP = (row.toLat != null && row.toLon != null) ? Promise.resolve({ lat: row.toLat, lon: row.toLon }) : geocodeText(dest);
     Promise.all([originP, destP]).then(([a, b]) => {
       setDistLoading(false);
-      if (!a || !b) { setRouteCalcError(!a ? `${T.routeErrGeocodeOrigin}: "${origin}"` : `${T.routeErrGeocodeDest}: "${dest}"`); return; }
+      if (!a || !b) { lastRouteCalcSig.current = null; setRouteCalcError(!a ? `${T.routeErrGeocodeOrigin}: "${origin}"` : `${T.routeErrGeocodeDest}: "${dest}"`); return; }
       return fetchRouteInfo(a, b, row.typeId).then((info) => {
-        if (!info) { setRouteCalcError(T.routeErrNoRoute); return; }
+        if (!info) { lastRouteCalcSig.current = null; setRouteCalcError(T.routeErrNoRoute); return; }
         setRouteCalcError(null);
         const patch = { routeDistanceKm: info.distanceKm, routeDurationMin: info.durationMin, toLat: b.lat, toLon: b.lon };
         if (originSource === "own") { patch.fromLat = a.lat; patch.fromLon = a.lon; }
@@ -1165,7 +1166,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
         }
         updateRow(row.id, patch);
       });
-    }).catch(() => { setDistLoading(false); setRouteCalcError(T.routeErrNetwork); });
+    }).catch(() => { lastRouteCalcSig.current = null; setDistLoading(false); setRouteCalcError(T.routeErrNetwork); });
   }
   useEffect(() => {
     fetchRouteDistance();
@@ -1808,19 +1809,20 @@ function MobileCardMeta({ row, prevRow, ctx }) {
     else { origin = prevTo; originSource = "prevTo"; }
     const dest = rowEndPoint(row);
     if (!origin || !dest) return;
-    const sig = origin + "|" + dest + "|" + (row.startTime || "") + "|" + row.typeId;
+    const originLat = originSource === "own" ? row.fromLat : originSource === "prevFrom" ? (prevRow && prevRow.fromLat) : (prevRow && prevRow.toLat);
+    const originLon = originSource === "own" ? row.fromLon : originSource === "prevFrom" ? (prevRow && prevRow.fromLon) : (prevRow && prevRow.toLon);
+    const hasCoords = (originLat != null && originLon != null) ? "c" : "t";
+    const sig = origin + "|" + dest + "|" + (row.startTime || "") + "|" + row.typeId + "|" + hasCoords;
     if (lastRouteCalcSig.current === sig || distLoading) return;
     lastRouteCalcSig.current = sig;
     setDistLoading(true);
-    const originLat = originSource === "own" ? row.fromLat : originSource === "prevFrom" ? (prevRow && prevRow.fromLat) : (prevRow && prevRow.toLat);
-    const originLon = originSource === "own" ? row.fromLon : originSource === "prevFrom" ? (prevRow && prevRow.fromLon) : (prevRow && prevRow.toLon);
     const originP = (originLat != null && originLon != null) ? Promise.resolve({ lat: originLat, lon: originLon }) : geocodeText(origin);
     const destP = (row.toLat != null && row.toLon != null) ? Promise.resolve({ lat: row.toLat, lon: row.toLon }) : geocodeText(dest);
     Promise.all([originP, destP]).then(([a, b]) => {
       setDistLoading(false);
-      if (!a || !b) return;
+      if (!a || !b) { lastRouteCalcSig.current = null; return; }
       return fetchRouteInfo(a, b, row.typeId).then((info) => {
-        if (!info) return;
+        if (!info) { lastRouteCalcSig.current = null; return; }
         const patch = { routeDistanceKm: info.distanceKm, routeDurationMin: info.durationMin, toLat: b.lat, toLon: b.lon };
         if (originSource === "own") { patch.fromLat = a.lat; patch.fromLon = a.lon; }
         if (row.startTime && (!row.endTime || row.endTimeAuto) && !noOriginNeeded(row.typeId)) {
@@ -1831,7 +1833,7 @@ function MobileCardMeta({ row, prevRow, ctx }) {
         }
         updateRow(row.id, patch);
       });
-    }).catch(() => setDistLoading(false));
+    }).catch(() => { lastRouteCalcSig.current = null; setDistLoading(false); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [row.id, row.from, row.to, row.fromAlias, row.toAlias, row.startTime, row.typeId, row.fromLat, row.fromLon, row.toLat, row.toLon, prevRow && prevRow.from, prevRow && prevRow.fromAlias, prevRow && prevRow.fromLat, prevRow && prevRow.fromLon, prevRow && prevRow.to, prevRow && prevRow.toAlias, prevRow && prevRow.toLat, prevRow && prevRow.toLon]);
 
