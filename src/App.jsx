@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "19.3.0";
+const APP_VERSION = "19.4.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -242,6 +242,7 @@ const T_DICT = {
     tryGooglePlaces: "חפש עם Google Places (הדגמה)", demoNeedsGoogleKey: "תוצאות מדויקות ועשירות יותר (כולל עברית טובה בהרבה) אפשריות עם Google Places API — דורש מפתח API וחיוב בענן של גוגל. זו הצגה בלבד; החיפוש הפעיל כרגע משתמש ב-OpenStreetMap החינמי.",
     tryGooglePlacesReal: "חפש עם Google Places", usingGooglePlaces: "✓ מחפש עם Google Places",
     noGoogleKeyConfigured: "חיפוש מיקום דורש מפתח Google Places API מוגדר (VITE_GOOGLE_PLACES_KEY). פנה למפתח האפליקציה.",
+    locFallbackNoResults: "Google Places אינו זמין כרגע. נעשה ניסיון חיפוש גיבוי (OpenStreetMap), אך לא נמצאו תוצאות. נסה ניסוח מדויק יותר.",
     uploadFile: "העלה קובץ לרשומה זו — הדגמה", demoNeedsStorage: "העלאת קבצים דורשת שירות אחסון (כמו Supabase Storage או S3), עדיין לא מחובר בפרוטוטייפ. זו הצגה בלבד.",
     aiDemoNotice: "זו הדגמת ממשק בלבד. חיבור אמיתי ל-Claude דורש שרת/פונקציה בצד השרת (לא ניתן לחשוף מפתח API בצד הלקוח).",
     aiSuggestItinerary: "הצע מסלול יומי אוטומטי", aiInputPlaceholder: "שאל שאלה על הטיול...",
@@ -386,6 +387,7 @@ const T_DICT = {
     tryGooglePlaces: "Search with Google Places (preview)", demoNeedsGoogleKey: "Richer, more accurate results (including much better Hebrew support) are possible with the Google Places API — needs an API key and billing on Google Cloud. This is a preview only; the active search currently uses free OpenStreetMap data.",
     tryGooglePlacesReal: "Search with Google Places", usingGooglePlaces: "✓ Searching with Google Places",
     noGoogleKeyConfigured: "Location search requires a configured Google Places API key (VITE_GOOGLE_PLACES_KEY). Contact the app developer.",
+    locFallbackNoResults: "Google Places is currently unavailable. A backup search (OpenStreetMap) was attempted but found no results. Try a more precise search term.",
     uploadFile: "Upload a file for this record — preview", demoNeedsStorage: "File uploads need a storage service (like Supabase Storage or S3), not yet connected in the prototype. This is a preview only.",
     aiDemoNotice: "This is a UI preview only. A real Claude connection needs a server-side function (an API key can't be exposed client-side).",
     aiSuggestItinerary: "Suggest an automatic day plan", aiInputPlaceholder: "Ask a question about the trip...",
@@ -829,6 +831,14 @@ function autoVerifyLocationField(row, field, lang) {
 function googlePlacePhotoUrl(photoName, maxWidth) {
   if (!GOOGLE_PLACES_KEY || !photoName) return null;
   return `https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=${maxWidth || 480}&key=${GOOGLE_PLACES_KEY}`;
+}
+function nominatimSearch(query, lang) {
+  if (!query || !query.trim()) return Promise.resolve([]);
+  return throttledCall(() => fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&accept-language=${lang === "he" ? "he,en" : "en"}&q=${encodeURIComponent(query)}`, { headers: { Accept: "application/json" } })
+    .then((r) => { if (!r.ok) throw new Error("http-" + r.status); return r.json(); }))
+    .then((data) => (data || []).map((d) => ({
+      source: "nominatim", lat: Number(d.lat), lon: Number(d.lon), text: d.display_name || d.name || query,
+    })));
 }
 function geocodeTextDetailed(text) {
   const key = (text || "").trim().toLowerCase();
@@ -3405,11 +3415,20 @@ export default function MyTripApp() {
     if (!locPicker) return;
     const q = (queryOverride !== undefined ? queryOverride : locPicker.query) || "";
     if (!q.trim()) return;
-    if (!hasGooglePlaces()) { setLocPicker((p) => (p ? { ...p, error: "no-google-key" } : p)); return; }
     setLocPicker((p) => ({ ...p, loading: true, error: null }));
+    if (!hasGooglePlaces()) {
+      nominatimSearch(q, lang)
+        .then((results) => setLocPicker((p) => (p ? { ...p, loading: false, error: results.length ? null : "no-results-fallback", results } : p)))
+        .catch(() => setLocPicker((p) => (p ? { ...p, loading: false, results: [], error: "network" } : p)));
+      return;
+    }
     googlePlacesAutocomplete(q, lang)
       .then((results) => setLocPicker((p) => (p ? { ...p, loading: false, error: null, results } : p)))
-      .catch((err) => setLocPicker((p) => (p ? { ...p, loading: false, results: [], error: (err && err.message) || "network" } : p)));
+      .catch(() => {
+        nominatimSearch(q, lang)
+          .then((results) => setLocPicker((p) => (p ? { ...p, loading: false, error: results.length ? null : "no-results-fallback", results } : p)))
+          .catch(() => setLocPicker((p) => (p ? { ...p, loading: false, results: [], error: "network" } : p)));
+      });
   }
   function pickGooglePlaceResult(prediction) {
     if (!locPicker) return;
@@ -3429,6 +3448,20 @@ export default function MyTripApp() {
       else if (field === "toAlias") setCardDraft((d) => ({ ...d, toAlias: smartAlias }));
       setLocPicker(null);
     }).catch(() => setLocPicker((p) => (p ? { ...p, loading: false, error: "network" } : p)));
+  }
+  function pickNominatimResult(result) {
+    if (!locPicker) return;
+    const field = locPicker.field;
+    const label = result.text;
+    const mapUrl = `https://www.google.com/maps/search/?api=1&query=${result.lat},${result.lon}`;
+    const smartAlias = label.split(",")[0];
+    if (field === "from") {
+      setCardDraft((d) => ({ ...d, from: label, fromVerifiedUrl: mapUrl, fromVerifiedText: label, fromLat: result.lat, fromLon: result.lon, fromPlaceId: null, ...((!d.fromAlias && smartAlias) ? { fromAlias: smartAlias } : {}) }));
+    } else if (field === "to") {
+      setCardDraft((d) => ({ ...d, to: label, toVerifiedUrl: mapUrl, toVerifiedText: label, toLat: result.lat, toLon: result.lon, toPlaceId: null, ...((!d.toAlias && smartAlias) ? { toAlias: smartAlias } : {}) }));
+    } else if (field === "fromAlias") setCardDraft((d) => ({ ...d, fromAlias: smartAlias }));
+    else if (field === "toAlias") setCardDraft((d) => ({ ...d, toAlias: smartAlias }));
+    setLocPicker(null);
   }
   function setLocPickerMode(mode) { setLocPicker((p) => ({ ...p, mode })); }
   function handleMapPick(lat, lng) {
@@ -4634,7 +4667,10 @@ export default function MyTripApp() {
                 {!locPicker.loading && locPicker.error === "no-google-key" && (
                   <div className="mt-error"><AlertTriangle /> <span>{T.noGoogleKeyConfigured}</span></div>
                 )}
-                {!locPicker.loading && locPicker.error && locPicker.error !== "no-google-key" && (
+                {!locPicker.loading && locPicker.error === "no-results-fallback" && (
+                  <div className="mt-error"><AlertTriangle /> <span>{T.locFallbackNoResults}</span></div>
+                )}
+                {!locPicker.loading && locPicker.error && locPicker.error !== "no-google-key" && locPicker.error !== "no-results-fallback" && (
                   <div className="mt-error">
                     <AlertTriangle />
                     <span>
@@ -4646,7 +4682,7 @@ export default function MyTripApp() {
                 {!locPicker.loading && !locPicker.error && locPicker.results.length === 0 && <div className="mt-hint">{T.locNoResults}</div>}
                 <div className="mt-loc-results">
                   {locPicker.results.map((r, i) => (
-                    <button key={i} className="mt-loc-result" onClick={() => pickGooglePlaceResult(r)}>{r.text}</button>
+                    <button key={i} className="mt-loc-result" onClick={() => (r.source === "nominatim" ? pickNominatimResult(r) : pickGooglePlaceResult(r))}>{r.text}</button>
                   ))}
                 </div>
               </div>
