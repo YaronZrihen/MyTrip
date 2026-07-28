@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "20.8.0";
+const APP_VERSION = "20.9.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -3323,11 +3323,18 @@ export default function MyTripApp() {
     return rows.filter((r) => !r.parentId && (r.frameId || null) === (row.frameId || null) && r.date === row.date);
   }
   function setStartTimeWithCascade(rowId, newStartTime) {
-    if (!newStartTime) { updateRow(rowId, { startTime: "", startTimeAuto: false }); return; }
+    const isManualSet = !!newStartTime;
+    let effectiveStart = newStartTime;
+    if (!isManualSet) {
+      const row = rows.find((r) => r.id === rowId);
+      const prevRow = row ? prevRowMap.get(rowId) : null;
+      effectiveStart = (row && prevRow && prevRow.date === row.date && prevRow.endTime) ? prevRow.endTime : "";
+      if (!effectiveStart) { updateRow(rowId, { startTime: "", startTimeAuto: true }); return; }
+    }
     const patches = new Map();
-    patches.set(rowId, { startTime: newStartTime, startTimeAuto: false });
+    patches.set(rowId, { startTime: effectiveStart, startTimeAuto: !isManualSet });
     let currentId = rowId;
-    let currentStart = newStartTime;
+    let currentStart = effectiveStart;
     let guard = 0;
     while (guard++ < 200) {
       const currentRow = rows.find((r) => r.id === currentId);
@@ -3349,14 +3356,24 @@ export default function MyTripApp() {
     setRows((prev) => prev.map((r) => (patches.has(r.id) ? { ...r, ...patches.get(r.id) } : r)));
   }
   function setEndTimeWithCascade(rowId, newEndTime) {
-    if (!newEndTime) { updateRow(rowId, { endTime: "", endTimeAuto: false }); return; }
-    const patches = new Map();
-    patches.set(rowId, { endTime: newEndTime, endTimeAuto: false });
+    const isManualSet = !!newEndTime;
     const startRow = rows.find((r) => r.id === rowId);
     if (!startRow) return;
+    let effectiveEnd = newEndTime;
+    if (!isManualSet) {
+      if (startRow.startTime && startRow.routeDurationMin != null) {
+        const [h, m] = startRow.startTime.split(":").map(Number);
+        const totalMin = (h * 60 + m + Math.round(startRow.routeDurationMin) + 1440) % 1440;
+        effectiveEnd = `${String(Math.floor(totalMin / 60)).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
+      } else {
+        updateRow(rowId, { endTime: "", endTimeAuto: true }); return;
+      }
+    }
+    const patches = new Map();
+    patches.set(rowId, { endTime: effectiveEnd, endTimeAuto: !isManualSet });
     let currentDate = startRow.date;
     let nextRow = nextRowMap.get(rowId);
-    let currentEnd = newEndTime;
+    let currentEnd = effectiveEnd;
     let guard = 0;
     while (nextRow && nextRow.date === currentDate && nextRow.startTimeAuto !== false && guard++ < 200) {
       patches.set(nextRow.id, { ...patches.get(nextRow.id), startTime: currentEnd, startTimeAuto: true });
