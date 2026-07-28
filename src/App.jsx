@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "20.4.0";
+const APP_VERSION = "20.6.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -186,7 +186,7 @@ const T_DICT = {
     exportFile: "שמור לקובץ", importFile: "ייבוא מקובץ", importSuccess: "הייבוא הצליח", importError: "הקובץ אינו תקין",
     login: "התחברות עם Google", logout: "יציאה",
     desktop: "מחשב", mobile: "סלולר", flowView: "תצוגת זרימה", lang: "English", editRecord: "כרטיס רשומה",
-    save: "שמירה", cancel: "ביטול", delete: "מחיקה", addSub: "תת רשומה", selectTime: "בחר שעה", done: "אישור",
+    save: "שמירה", cancel: "ביטול", delete: "מחיקה", addSub: "תת רשומה", selectTime: "בחר שעה", done: "אישור", clearTime: "נקה",
     deleteFrameTitle: "מחיקת מסגרת", deleteFrameHint: "איך למחוק את המסגרת?",
     preFlightChecklist: "צ'ק ליסט קדם טיסה", checklistReservations: "הזמנות", checklistDocuments: "מסמכי נסיעה", checklistOther: "נוספים",
     helpCenterTitle: "מרכז עזרה",
@@ -334,7 +334,7 @@ const T_DICT = {
     exportFile: "Save to file", importFile: "Import from file", importSuccess: "Import successful", importError: "This file isn't valid",
     login: "Sign in with Google", logout: "Sign out",
     desktop: "Desktop", mobile: "Mobile", flowView: "Flow view", lang: "עברית", editRecord: "Record card",
-    save: "Save", cancel: "Cancel", delete: "Delete", addSub: "Sub-record", selectTime: "Select time", done: "Done",
+    save: "Save", cancel: "Cancel", delete: "Delete", addSub: "Sub-record", selectTime: "Select time", done: "Done", clearTime: "Clear",
     deleteFrameTitle: "Delete Frame", deleteFrameHint: "How would you like to delete this frame?",
     preFlightChecklist: "Pre-Flight Checklist", checklistReservations: "Reservations", checklistDocuments: "Travel Documents", checklistOther: "Additional",
     helpCenterTitle: "Help Center",
@@ -1410,9 +1410,9 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
           {lang !== "he" && toVerified && <a className="mt-loc-badge" href={row.toVerifiedUrl} target="_blank" rel="noreferrer" title={T.openMap}><MapPin size={11} /></a>}
         </span>
       );
-      case "startTime": return <TimeField value={row.startTime} onChange={(e) => updateRow(row.id, { startTime: e.target.value, startTimeAuto: false })} T={T} className="mt-editable mt-time" />;
+      case "startTime": return <TimeField value={row.startTime} onChange={(e) => ctx.setStartTimeWithCascade(row.id, e.target.value)} T={T} className="mt-editable mt-time" />;
       case "duration": return <span title={dur === null ? "" : dur} style={{ color: dur === null ? "var(--danger)" : "var(--muted)", fontSize: 12 }}>{dur === null ? "!" : dur}</span>;
-      case "endTime": return <TimeField value={row.endTime} onChange={(e) => updateRow(row.id, { endTime: e.target.value, endTimeAuto: false })} T={T} className={"mt-editable mt-time" + (row.endTimeAuto ? " mt-computed-field" : "")} title={row.endTimeAuto ? T.computedEndTimeHint : undefined} />;
+      case "endTime": return <TimeField value={row.endTime} onChange={(e) => ctx.setEndTimeWithCascade(row.id, e.target.value)} T={T} className={"mt-editable mt-time" + (row.endTimeAuto ? " mt-computed-field" : "")} title={row.endTimeAuto ? T.computedEndTimeHint : undefined} />;
       case "route": return (
         <span className="mt-route-mini">
           {routeUrl && <a className="mt-link-icon" href={routeUrl} target="_blank" rel="noreferrer" title={T.routeTooltip}><Route size={14} /></a>}
@@ -2190,18 +2190,22 @@ function FileManagerRow({ file, T, showCategory }) {
 
 function TimeField({ value, onChange, T, className, title }) {
   const [open, setOpen] = useState(false);
-  const [h, m] = (value || "").split(":");
-  const hh = h || "00", mm = m || "00";
+  const [draft, setDraft] = useState("");
   const hourListRef = useRef(null);
   const minListRef = useRef(null);
-  function pick(newH, newM) { onChange({ target: { value: `${newH}:${newM}` } }); }
+  const [dh, dm] = (draft || "").split(":");
+  const hh = dh || "00", mm = dm || "00";
+  function pick(newH, newM) { setDraft(`${newH}:${newM}`); }
   function openPicker() {
+    setDraft(value || "00:00");
     setOpen(true);
     setTimeout(() => {
       if (hourListRef.current) { const el = hourListRef.current.querySelector(".selected"); if (el) el.scrollIntoView({ block: "center" }); }
       if (minListRef.current) { const el = minListRef.current.querySelector(".selected"); if (el) el.scrollIntoView({ block: "center" }); }
     }, 30);
   }
+  function commit() { onChange({ target: { value: draft } }); setOpen(false); }
+  function clear() { onChange({ target: { value: "" } }); setOpen(false); }
   const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
   const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"));
   return (
@@ -2235,7 +2239,10 @@ function TimeField({ value, onChange, T, className, title }) {
                 <div className="mt-time-pad" />
               </div>
             </div>
-            <button className="mt-btn primary" style={{ width: "100%" }} onClick={() => setOpen(false)}><Check size={13} /> {T.done}</button>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button className="mt-btn ghost" style={{ flex: 1 }} onClick={clear}>{T.clearTime}</button>
+              <button className="mt-btn primary" style={{ flex: 2 }} onClick={commit}><Check size={13} /> {T.done}</button>
+            </div>
           </div>
         </div>
       )}
@@ -3312,6 +3319,58 @@ export default function MyTripApp() {
 
   /* ---------- row mutators ---------- */
   function updateRow(id, patch) { setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r))); }
+  function setStartTimeWithCascade(rowId, newStartTime) {
+    if (!newStartTime) { updateRow(rowId, { startTime: "", startTimeAuto: false }); return; }
+    const patches = new Map();
+    patches.set(rowId, { startTime: newStartTime, startTimeAuto: false });
+    let currentId = rowId;
+    let currentStart = newStartTime;
+    let guard = 0;
+    while (guard++ < 200) {
+      const currentRow = rows.find((r) => r.id === currentId);
+      if (!currentRow || currentRow.routeDurationMin == null) break;
+      const priorPatch = patches.get(currentId) || {};
+      const effectiveEndTimeAuto = priorPatch.endTimeAuto !== undefined ? priorPatch.endTimeAuto : currentRow.endTimeAuto;
+      const effectiveEndTime = priorPatch.endTime !== undefined ? priorPatch.endTime : currentRow.endTime;
+      if (effectiveEndTime && effectiveEndTimeAuto === false) break;
+      const [h, m] = currentStart.split(":").map(Number);
+      const totalMin = (h * 60 + m + Math.round(currentRow.routeDurationMin) + 1440) % 1440;
+      const newEnd = `${String(Math.floor(totalMin / 60)).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
+      patches.set(currentId, { ...patches.get(currentId), endTime: newEnd, endTimeAuto: true });
+      const nextRow = nextRowMap.get(currentId);
+      if (!nextRow || nextRow.date !== currentRow.date || nextRow.startTimeAuto === false) break;
+      patches.set(nextRow.id, { startTime: newEnd, startTimeAuto: true });
+      currentId = nextRow.id;
+      currentStart = newEnd;
+    }
+    setRows((prev) => prev.map((r) => (patches.has(r.id) ? { ...r, ...patches.get(r.id) } : r)));
+  }
+  function setEndTimeWithCascade(rowId, newEndTime) {
+    if (!newEndTime) { updateRow(rowId, { endTime: "", endTimeAuto: false }); return; }
+    const patches = new Map();
+    patches.set(rowId, { endTime: newEndTime, endTimeAuto: false });
+    const startRow = rows.find((r) => r.id === rowId);
+    if (!startRow) return;
+    let currentDate = startRow.date;
+    let nextRow = nextRowMap.get(rowId);
+    let currentEnd = newEndTime;
+    let guard = 0;
+    while (nextRow && nextRow.date === currentDate && nextRow.startTimeAuto !== false && guard++ < 200) {
+      patches.set(nextRow.id, { ...patches.get(nextRow.id), startTime: currentEnd, startTimeAuto: true });
+      if (nextRow.routeDurationMin == null) break;
+      const priorPatch = patches.get(nextRow.id) || {};
+      const effectiveEndTimeAuto = priorPatch.endTimeAuto !== undefined ? priorPatch.endTimeAuto : nextRow.endTimeAuto;
+      const effectiveEndTime = priorPatch.endTime !== undefined ? priorPatch.endTime : nextRow.endTime;
+      if (effectiveEndTime && effectiveEndTimeAuto === false) break;
+      const [h, m] = currentEnd.split(":").map(Number);
+      const totalMin = (h * 60 + m + Math.round(nextRow.routeDurationMin) + 1440) % 1440;
+      const newEnd = `${String(Math.floor(totalMin / 60)).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
+      patches.set(nextRow.id, { ...patches.get(nextRow.id), endTime: newEnd, endTimeAuto: true });
+      currentEnd = newEnd;
+      nextRow = nextRowMap.get(nextRow.id);
+    }
+    setRows((prev) => prev.map((r) => (patches.has(r.id) ? { ...r, ...patches.get(r.id) } : r)));
+  }
   function deleteRow(id) { setRows((prev) => prev.filter((r) => r.id !== id && r.parentId !== id)); }
   function addRow(date, parentId = null, frameId = null) {
     const nr = {
@@ -3682,7 +3741,10 @@ export default function MyTripApp() {
         });
       }
     }
-    updateRow(cardRowId, cardDraft); closeCard();
+    updateRow(cardRowId, cardDraft);
+    if (cardDraft.startTimeAuto === false && cardDraft.startTime) setStartTimeWithCascade(cardRowId, cardDraft.startTime);
+    if (cardDraft.endTimeAuto === false && cardDraft.endTime) setEndTimeWithCascade(cardRowId, cardDraft.endTime);
+    closeCard();
   }
   function fetchFlightData() {
     const num = cardDraft.flightNumber && cardDraft.flightNumber.trim();
@@ -3751,7 +3813,7 @@ export default function MyTripApp() {
 
   /* ---------- recursive render ---------- */
   const ctx = {
-    T, lang, types, visibleColumns, effectiveMobile, viewMode, rows, frames, prevRowMap, nextRowMap,
+    T, lang, types, visibleColumns, effectiveMobile, viewMode, rows, frames, prevRowMap, nextRowMap, setStartTimeWithCascade, setEndTimeWithCascade,
     updateRow, deleteRow, openCard, addRow, dragId, setDragId, onDropRow, dragDayKey, setDragDayKey, onDropDay,
     typeMenuOpen, setTypeMenuOpen, arrivalMenuOpen, setArrivalMenuOpen, newTypeDraft, setNewTypeDraft, addCustomType,
     collapsedParents, setCollapsedParents, collapsedGroups, setCollapsedGroups,
