@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "20.9.0";
+const APP_VERSION = "20.9.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -3395,7 +3395,7 @@ export default function MyTripApp() {
   function addRow(date, parentId = null, frameId = null) {
     const nr = {
       id: uid(), parentId, frameId, date: date || toLocalISODate(new Date()),
-      typeId: "unset", arrivalTypeId: "walking", from: "", to: "", startTime: "", startTimeAuto: false, endTime: "", overnight: false,
+      typeId: "unset", arrivalTypeId: "walking", from: "", to: "", startTime: "", startTimeAuto: true, endTime: "", overnight: false,
       destination: "", link: "", mapLink: "", flightNumber: "", costAmount: 0, costCurrency: "₪", fromAlias: "", toAlias: "",
       notes: "", fromVerifiedUrl: "", fromVerifiedText: "", toVerifiedUrl: "", toVerifiedText: "",
       fromLat: null, fromLon: null, toLat: null, toLon: null, routeDistanceKm: null, routeDurationMin: null, custom: {},
@@ -3762,8 +3762,8 @@ export default function MyTripApp() {
       }
     }
     updateRow(cardRowId, cardDraft);
-    if (cardDraft.startTimeAuto === false && cardDraft.startTime) setStartTimeWithCascade(cardRowId, cardDraft.startTime);
-    if (cardDraft.endTimeAuto === false && cardDraft.endTime) setEndTimeWithCascade(cardRowId, cardDraft.endTime);
+    if (cardDraft.startTimeAuto === false) setStartTimeWithCascade(cardRowId, cardDraft.startTime);
+    if (cardDraft.endTimeAuto === false) setEndTimeWithCascade(cardRowId, cardDraft.endTime);
     closeCard();
   }
   function fetchFlightData() {
