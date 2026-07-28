@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "21.1.0";
+const APP_VERSION = "21.2.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1984,7 +1984,10 @@ function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
           <strong className={warningClass(cardWarnings)} style={{ fontSize: 13.5 }} title={cardWarnings.length ? warningText(cardWarnings) : undefined}>{tm.name}</strong>
         </div>
         <div className="mt-card-top-end">
-          <span className="mt-card-times" dir="ltr">{r.startTime || "—"}{r.endTime ? ` → ${r.endTime}` : ""}</span>
+          <span className="mt-card-times" dir="ltr">
+            <span style={{ ...(r.startTime && Number(r.startTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...((r.startTimeAuto !== false && r.startTime) ? { borderBottom: "2px dashed #3E7CB1" } : {}) }}>{r.startTime || "—"}</span>
+            {r.endTime ? <> → <span style={{ ...(Number(r.endTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...((r.endTimeAuto !== false && r.endTime) ? { borderBottom: "2px dashed #3E7CB1" } : {}) }}>{r.endTime}</span></> : ""}
+          </span>
           <span className="mt-card-drag-handle" onClick={(e) => e.stopPropagation()} {...dragListeners} {...dragAttrs}><GripVertical size={15} /></span>
         </div>
       </div>
@@ -2049,7 +2052,7 @@ function DayGroup({ g, fid, depth, ctx }) {
           {allRowsHere.map((r, ri) => (
             <MobileRowCard key={r.id} r={r} prevRow={ctx.prevRowMap.get(r.id) || null} types={types} lang={lang} T={T} ctx={ctx} />
           ))}
-          <div className="mt-group-footer-actions">
+          <div className="mt-group-footer-actions" style={{ display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 8, flexWrap: "nowrap" }}>
             <button className="mt-group-add" onClick={() => addRow(g.date, null, fid)}><Plus size={13} /> {T.addRowShort}</button>
             <button className="mt-group-add" onClick={() => openAddDayModal(fid, g.date)}><Plus size={13} /> {T.addDayShort}</button>
             {dayRoute ? (
@@ -2096,7 +2099,7 @@ function DayGroup({ g, fid, depth, ctx }) {
               ))}
             </tbody>
           </table>
-          <div className="mt-group-footer-actions">
+          <div className="mt-group-footer-actions" style={{ display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 8, flexWrap: "nowrap" }}>
             <button className="mt-group-add" onClick={() => addRow(g.date, null, fid)}><Plus size={13} /> {T.addRowShort}</button>
             <button className="mt-group-add" onClick={() => openAddDayModal(fid, g.date)}><Plus size={13} /> {T.addDayShort}</button>
             {dayRoute ? (
@@ -2219,8 +2222,6 @@ function TimeField({ value, onChange, T, className, title }) {
   const [dh, dm] = (draft || "").split(":");
   const hh = dh || "00", mm = dm || "00";
   const hourNum = Number(hh), minNum = Number(mm);
-  const isPM = hourNum >= 12;
-  const hour12 = hourNum % 12 === 0 ? 12 : hourNum % 12;
   function openPicker() {
     setDraft(value || "00:00");
     setMode("hour");
@@ -2228,18 +2229,11 @@ function TimeField({ value, onChange, T, className, title }) {
   }
   function commit() { onChange({ target: { value: draft } }); setOpen(false); }
   function clear() { onChange({ target: { value: "" } }); setOpen(false); }
-  function setHour12(h12, pm) {
-    let h24 = h12 % 12;
-    if (pm) h24 += 12;
+  function setHour24(h24) {
     setDraft(`${String(h24).padStart(2, "0")}:${mm}`);
     setMode("minute");
   }
   function setMinute(m) { setDraft(`${hh}:${String(m).padStart(2, "0")}`); }
-  function togglePM(pm) {
-    let h24 = hourNum % 12;
-    if (pm) h24 += 12;
-    setDraft(`${String(h24).padStart(2, "0")}:${mm}`);
-  }
   function handleFaceClick(e) {
     const rect = faceRef.current.getBoundingClientRect();
     const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
@@ -2249,22 +2243,27 @@ function TimeField({ value, onChange, T, className, title }) {
     let angle = Math.atan2(dx, -dy) * (180 / Math.PI);
     if (angle < 0) angle += 360;
     if (mode === "hour") {
-      let h = Math.round(angle / 30) % 12;
-      if (h === 0) h = 12;
-      setHour12(h, isPM);
+      let h12 = Math.round(angle / 30) % 12;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const midR = (OUTER_R + INNER_R) / 2;
+      const isInner = dist < midR;
+      setHour24(isInner ? h12 + 12 : h12);
     } else {
       let m = Math.round(angle / 6) % 60;
       setMinute(m);
     }
   }
-  const R = 78, CX = 90, CY = 90;
-  const handLen = mode === "hour" ? 46 : 62;
-  const handAngle = mode === "hour" ? (hour12 % 12) * 30 : minNum * 6;
+  const CX = 90, CY = 90, OUTER_R = 78, INNER_R = 50;
+  const handLen = mode === "hour" ? (hourNum >= 12 ? INNER_R - 8 : OUTER_R - 8) : 62;
+  const handAngle = mode === "hour" ? (hourNum % 12) * 30 : minNum * 6;
   const handRad = (handAngle - 90) * Math.PI / 180;
   const handX = CX + handLen * Math.cos(handRad), handY = CY + handLen * Math.sin(handRad);
-  const marks = mode === "hour"
-    ? Array.from({ length: 12 }, (_, i) => i + 1)
-    : Array.from({ length: 12 }, (_, i) => i * 5);
+  const hourMarks = [
+    ...Array.from({ length: 12 }, (_, i) => ({ v: i, r: OUTER_R })),
+    ...Array.from({ length: 12 }, (_, i) => ({ v: i + 12, r: INNER_R })),
+  ];
+  const minMarks = Array.from({ length: 12 }, (_, i) => ({ v: i * 5, r: OUTER_R }));
+  const marks = mode === "hour" ? hourMarks : minMarks;
   return (
     <span style={{ position: "relative", display: "block" }}>
       <button type="button" className={"mt-type-field-btn" + (className ? " " + className : "")} title={title} onClick={openPicker}>
@@ -2283,25 +2282,22 @@ function TimeField({ value, onChange, T, className, title }) {
               <span className={"mt-clock-hh" + (mode === "hour" ? " active" : "")} onClick={() => setMode("hour")}>{hh}</span>
               <span className="mt-clock-colon">:</span>
               <span className={"mt-clock-mm" + (mode === "minute" ? " active" : "")} onClick={() => setMode("minute")}>{mm}</span>
-              <span className="mt-clock-ampm">
-                <button className={"mt-clock-ampm-btn" + (!isPM ? " active" : "")} onClick={() => togglePM(false)}>{T.amLabel}</button>
-                <button className={"mt-clock-ampm-btn" + (isPM ? " active" : "")} onClick={() => togglePM(true)}>{T.pmLabel}</button>
-              </span>
             </div>
             <div className="mt-clock-face-wrap">
               <svg ref={faceRef} viewBox="0 0 180 180" className="mt-clock-face" onClick={handleFaceClick}>
-                <circle cx={CX} cy={CY} r={R} className="mt-clock-face-circle" />
+                <circle cx={CX} cy={CY} r={OUTER_R} className="mt-clock-face-circle" />
+                {mode === "hour" && <circle cx={CX} cy={CY} r={INNER_R} className="mt-clock-inner-ring" />}
                 <circle cx={CX} cy={CY} r={3} className="mt-clock-center-dot" />
                 <line x1={CX} y1={CY} x2={handX} y2={handY} className="mt-clock-hand" />
-                {marks.map((mv) => {
-                  const a = (mode === "hour" ? mv * 30 : mv * 6) - 90;
+                {marks.map(({ v, r }) => {
+                  const a = (mode === "hour" ? (v % 12) * 30 : v * 6) - 90;
                   const rad = a * Math.PI / 180;
-                  const mx = CX + (R - 16) * Math.cos(rad), my = CY + (R - 16) * Math.sin(rad);
-                  const isSelected = mode === "hour" ? mv === hour12 : mv === minNum || (mv === 0 && minNum === 0);
+                  const mx = CX + (r - 14) * Math.cos(rad), my = CY + (r - 14) * Math.sin(rad);
+                  const isSelected = mode === "hour" ? v === hourNum : v === minNum;
                   return (
-                    <g key={mv}>
+                    <g key={v}>
                       {isSelected && <circle cx={mx} cy={my} r={11} className="mt-clock-num-bg" />}
-                      <text x={mx} y={my + 5} textAnchor="middle" className={"mt-clock-num" + (isSelected ? " selected" : "")}>{mode === "minute" ? String(mv).padStart(2, "0") : mv}</text>
+                      <text x={mx} y={my + 5} textAnchor="middle" className={"mt-clock-num" + (isSelected ? " selected" : "")}>{mode === "minute" ? String(v).padStart(2, "0") : v}</text>
                     </g>
                   );
                 })}
@@ -4115,12 +4111,10 @@ export default function MyTripApp() {
         .mt-clock-hh, .mt-clock-mm { font-size:32px; font-weight:700; color:var(--muted); cursor:pointer; padding:2px 6px; border-radius:8px; font-variant-numeric:tabular-nums; }
         .mt-clock-hh.active, .mt-clock-mm.active { color:var(--ink); background:var(--teal-tint); }
         .mt-clock-colon { font-size:32px; font-weight:300; color:var(--border); }
-        .mt-clock-ampm { display:flex; flex-direction:column; gap:2px; margin-inline-start:8px; }
-        .mt-clock-ampm-btn { font-size:10px; font-weight:700; border:1px solid var(--border); background:none; color:var(--muted); border-radius:5px; padding:2px 6px; }
-        .mt-clock-ampm-btn.active { background:var(--teal); color:#fff; border-color:var(--teal); }
         .mt-clock-face-wrap { display:flex; justify-content:center; }
         .mt-clock-face { width:180px; height:180px; touch-action:none; cursor:pointer; }
         .mt-clock-face-circle { fill:var(--bg); stroke:var(--border); stroke-width:1; }
+        .mt-clock-inner-ring { fill:none; stroke:var(--border); stroke-width:1; stroke-dasharray:2,3; }
         .mt-clock-center-dot { fill:var(--teal); }
         .mt-clock-hand { stroke:var(--teal); stroke-width:2.5; stroke-linecap:round; }
         .mt-clock-num-bg { fill:var(--teal); }
