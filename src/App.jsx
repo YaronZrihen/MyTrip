@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "20.7.0";
+const APP_VERSION = "20.8.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1176,8 +1176,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
         }
         updateRow(row.id, patch);
         if (patch.endTime) {
-          const dayRows = ctx.rows.filter((r) => !r.parentId && (r.frameId || null) === (row.frameId || null) && r.date === row.date);
-          const nextRow = isChronological(dayRows) ? ctx.nextRowMap.get(row.id) : null;
+          const nextRow = ctx.nextRowMap.get(row.id);
           if (nextRow && nextRow.date === row.date && nextRow.startTimeAuto !== false) {
             updateRow(nextRow.id, { startTime: patch.endTime, startTimeAuto: true });
           }
@@ -1848,8 +1847,7 @@ function MobileCardMeta({ row, prevRow, ctx }) {
         }
         updateRow(row.id, patch);
         if (patch.endTime) {
-          const dayRows = ctx.rows.filter((r) => !r.parentId && (r.frameId || null) === (row.frameId || null) && r.date === row.date);
-          const nextRow = isChronological(dayRows) ? ctx.nextRowMap.get(row.id) : null;
+          const nextRow = ctx.nextRowMap.get(row.id);
           if (nextRow && nextRow.date === row.date && nextRow.startTimeAuto !== false) {
             updateRow(nextRow.id, { startTime: patch.endTime, startTimeAuto: true });
           }
@@ -3328,12 +3326,10 @@ export default function MyTripApp() {
     if (!newStartTime) { updateRow(rowId, { startTime: "", startTimeAuto: false }); return; }
     const patches = new Map();
     patches.set(rowId, { startTime: newStartTime, startTimeAuto: false });
-    const startRowForCheck = rows.find((r) => r.id === rowId);
-    const dayIsChronological = startRowForCheck ? isChronological(getDayGroupRows(startRowForCheck)) : true;
     let currentId = rowId;
     let currentStart = newStartTime;
     let guard = 0;
-    while (dayIsChronological && guard++ < 200) {
+    while (guard++ < 200) {
       const currentRow = rows.find((r) => r.id === currentId);
       if (!currentRow || currentRow.routeDurationMin == null) break;
       const priorPatch = patches.get(currentId) || {};
@@ -3358,9 +3354,8 @@ export default function MyTripApp() {
     patches.set(rowId, { endTime: newEndTime, endTimeAuto: false });
     const startRow = rows.find((r) => r.id === rowId);
     if (!startRow) return;
-    const dayIsChronological = isChronological(getDayGroupRows(startRow));
     let currentDate = startRow.date;
-    let nextRow = dayIsChronological ? nextRowMap.get(rowId) : null;
+    let nextRow = nextRowMap.get(rowId);
     let currentEnd = newEndTime;
     let guard = 0;
     while (nextRow && nextRow.date === currentDate && nextRow.startTimeAuto !== false && guard++ < 200) {
