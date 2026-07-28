@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "21.0.0";
+const APP_VERSION = "21.1.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -195,6 +195,7 @@ const T_DICT = {
     login: "התחברות עם Google", logout: "יציאה",
     desktop: "מחשב", mobile: "סלולר", flowView: "תצוגת זרימה", lang: "English", editRecord: "כרטיס רשומה",
     save: "שמירה", cancel: "ביטול", delete: "מחיקה", addSub: "תת רשומה", selectTime: "בחר שעה", done: "אישור", clearTime: "נקה",
+    amLabel: "לפנה״צ", pmLabel: "אחה״צ",
     deleteFrameTitle: "מחיקת מסגרת", deleteFrameHint: "איך למחוק את המסגרת?",
     preFlightChecklist: "צ'ק ליסט קדם טיסה", checklistReservations: "הזמנות", checklistDocuments: "מסמכי נסיעה", checklistOther: "נוספים",
     helpCenterTitle: "מרכז עזרה",
@@ -345,6 +346,7 @@ const T_DICT = {
     login: "Sign in with Google", logout: "Sign out",
     desktop: "Desktop", mobile: "Mobile", flowView: "Flow view", lang: "עברית", editRecord: "Record card",
     save: "Save", cancel: "Cancel", delete: "Delete", addSub: "Sub-record", selectTime: "Select time", done: "Done", clearTime: "Clear",
+    amLabel: "AM", pmLabel: "PM",
     deleteFrameTitle: "Delete Frame", deleteFrameHint: "How would you like to delete this frame?",
     preFlightChecklist: "Pre-Flight Checklist", checklistReservations: "Reservations", checklistDocuments: "Travel Documents", checklistOther: "Additional",
     helpCenterTitle: "Help Center",
@@ -1426,9 +1428,9 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
           {lang !== "he" && toVerified && <a className="mt-loc-badge" href={row.toVerifiedUrl} target="_blank" rel="noreferrer" title={T.openMap}><MapPin size={11} /></a>}
         </span>
       );
-      case "startTime": return <TimeField value={row.startTime} onChange={(e) => ctx.setStartTimeWithCascade(row.id, e.target.value)} T={T} className={"mt-editable mt-time" + (row.startTimeAuto ? " mt-computed-field" : "")} title={row.startTimeAuto ? T.computedStartTimeHint : undefined} />;
+      case "startTime": return <TimeField value={row.startTime} onChange={(e) => ctx.setStartTimeWithCascade(row.id, e.target.value)} T={T} className={"mt-editable mt-time" + ((row.startTimeAuto !== false && row.startTime) ? " mt-computed-field" : "")} title={(row.startTimeAuto !== false && row.startTime) ? T.computedStartTimeHint : undefined} />;
       case "duration": return <span title={dur === null ? "" : dur} style={{ color: dur === null ? "var(--danger)" : "var(--muted)", fontSize: 12 }}>{dur === null ? "!" : dur}</span>;
-      case "endTime": return <TimeField value={row.endTime} onChange={(e) => ctx.setEndTimeWithCascade(row.id, e.target.value)} T={T} className={"mt-editable mt-time" + (row.endTimeAuto ? " mt-computed-field" : "")} title={row.endTimeAuto ? T.computedEndTimeHint : undefined} />;
+      case "endTime": return <TimeField value={row.endTime} onChange={(e) => ctx.setEndTimeWithCascade(row.id, e.target.value)} T={T} className={"mt-editable mt-time" + ((row.endTimeAuto !== false && row.endTime) ? " mt-computed-field" : "")} title={(row.endTimeAuto !== false && row.endTime) ? T.computedEndTimeHint : undefined} />;
       case "route": return (
         <span className="mt-route-mini">
           {routeUrl && <a className="mt-link-icon" href={routeUrl} target="_blank" rel="noreferrer" title={T.routeTooltip}><Route size={14} /></a>}
@@ -2212,23 +2214,57 @@ function FileManagerRow({ file, T, showCategory }) {
 function TimeField({ value, onChange, T, className, title }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
-  const hourListRef = useRef(null);
-  const minListRef = useRef(null);
+  const [mode, setMode] = useState("hour");
+  const faceRef = useRef(null);
   const [dh, dm] = (draft || "").split(":");
   const hh = dh || "00", mm = dm || "00";
-  function pick(newH, newM) { setDraft(`${newH}:${newM}`); }
+  const hourNum = Number(hh), minNum = Number(mm);
+  const isPM = hourNum >= 12;
+  const hour12 = hourNum % 12 === 0 ? 12 : hourNum % 12;
   function openPicker() {
     setDraft(value || "00:00");
+    setMode("hour");
     setOpen(true);
-    setTimeout(() => {
-      if (hourListRef.current) { const el = hourListRef.current.querySelector(".selected"); if (el) el.scrollIntoView({ block: "center" }); }
-      if (minListRef.current) { const el = minListRef.current.querySelector(".selected"); if (el) el.scrollIntoView({ block: "center" }); }
-    }, 30);
   }
   function commit() { onChange({ target: { value: draft } }); setOpen(false); }
   function clear() { onChange({ target: { value: "" } }); setOpen(false); }
-  const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
-  const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"));
+  function setHour12(h12, pm) {
+    let h24 = h12 % 12;
+    if (pm) h24 += 12;
+    setDraft(`${String(h24).padStart(2, "0")}:${mm}`);
+    setMode("minute");
+  }
+  function setMinute(m) { setDraft(`${hh}:${String(m).padStart(2, "0")}`); }
+  function togglePM(pm) {
+    let h24 = hourNum % 12;
+    if (pm) h24 += 12;
+    setDraft(`${String(h24).padStart(2, "0")}:${mm}`);
+  }
+  function handleFaceClick(e) {
+    const rect = faceRef.current.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const dx = clientX - cx, dy = clientY - cy;
+    let angle = Math.atan2(dx, -dy) * (180 / Math.PI);
+    if (angle < 0) angle += 360;
+    if (mode === "hour") {
+      let h = Math.round(angle / 30) % 12;
+      if (h === 0) h = 12;
+      setHour12(h, isPM);
+    } else {
+      let m = Math.round(angle / 6) % 60;
+      setMinute(m);
+    }
+  }
+  const R = 78, CX = 90, CY = 90;
+  const handLen = mode === "hour" ? 46 : 62;
+  const handAngle = mode === "hour" ? (hour12 % 12) * 30 : minNum * 6;
+  const handRad = (handAngle - 90) * Math.PI / 180;
+  const handX = CX + handLen * Math.cos(handRad), handY = CY + handLen * Math.sin(handRad);
+  const marks = mode === "hour"
+    ? Array.from({ length: 12 }, (_, i) => i + 1)
+    : Array.from({ length: 12 }, (_, i) => i * 5);
   return (
     <span style={{ position: "relative", display: "block" }}>
       <button type="button" className={"mt-type-field-btn" + (className ? " " + className : "")} title={title} onClick={openPicker}>
@@ -2238,30 +2274,40 @@ function TimeField({ value, onChange, T, className, title }) {
       </button>
       {open && (
         <div className="mt-modal-backdrop" onClick={() => setOpen(false)}>
-          <div className="mt-modal mt-time-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="mt-modal mt-time-modal mt-clock-modal" onClick={(e) => e.stopPropagation()}>
             <div className="mt-time-modal-header">
               <span>{T.selectTime}</span>
               <button className="mt-btn ghost" style={{ padding: "4px 6px" }} onClick={() => setOpen(false)}><X size={16} /></button>
             </div>
-            <div className="mt-time-cols">
-              <div className="mt-time-highlight-band" />
-              <div className="mt-time-col" ref={hourListRef}>
-                <div className="mt-time-pad" />
-                {HOURS.map((hv) => (
-                  <button key={hv} className={"mt-time-opt" + (hv === hh ? " selected" : "")} onClick={() => pick(hv, mm)}>{hv}</button>
-                ))}
-                <div className="mt-time-pad" />
-              </div>
-              <div className="mt-time-sep">:</div>
-              <div className="mt-time-col" ref={minListRef}>
-                <div className="mt-time-pad" />
-                {MINUTES.map((mv) => (
-                  <button key={mv} className={"mt-time-opt" + (mv === mm ? " selected" : "")} onClick={() => pick(hh, mv)}>{mv}</button>
-                ))}
-                <div className="mt-time-pad" />
-              </div>
+            <div className="mt-clock-time-display">
+              <span className={"mt-clock-hh" + (mode === "hour" ? " active" : "")} onClick={() => setMode("hour")}>{hh}</span>
+              <span className="mt-clock-colon">:</span>
+              <span className={"mt-clock-mm" + (mode === "minute" ? " active" : "")} onClick={() => setMode("minute")}>{mm}</span>
+              <span className="mt-clock-ampm">
+                <button className={"mt-clock-ampm-btn" + (!isPM ? " active" : "")} onClick={() => togglePM(false)}>{T.amLabel}</button>
+                <button className={"mt-clock-ampm-btn" + (isPM ? " active" : "")} onClick={() => togglePM(true)}>{T.pmLabel}</button>
+              </span>
             </div>
-            <div style={{ display: "flex", gap: 6 }}>
+            <div className="mt-clock-face-wrap">
+              <svg ref={faceRef} viewBox="0 0 180 180" className="mt-clock-face" onClick={handleFaceClick}>
+                <circle cx={CX} cy={CY} r={R} className="mt-clock-face-circle" />
+                <circle cx={CX} cy={CY} r={3} className="mt-clock-center-dot" />
+                <line x1={CX} y1={CY} x2={handX} y2={handY} className="mt-clock-hand" />
+                {marks.map((mv) => {
+                  const a = (mode === "hour" ? mv * 30 : mv * 6) - 90;
+                  const rad = a * Math.PI / 180;
+                  const mx = CX + (R - 16) * Math.cos(rad), my = CY + (R - 16) * Math.sin(rad);
+                  const isSelected = mode === "hour" ? mv === hour12 : mv === minNum || (mv === 0 && minNum === 0);
+                  return (
+                    <g key={mv}>
+                      {isSelected && <circle cx={mx} cy={my} r={11} className="mt-clock-num-bg" />}
+                      <text x={mx} y={my + 5} textAnchor="middle" className={"mt-clock-num" + (isSelected ? " selected" : "")}>{mode === "minute" ? String(mv).padStart(2, "0") : mv}</text>
+                    </g>
+                  );
+                })}
+              </svg>
+            </div>
+            <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
               <button className="mt-btn ghost" style={{ flex: 1 }} onClick={clear}>{T.clearTime}</button>
               <button className="mt-btn primary" style={{ flex: 2 }} onClick={commit}><Check size={13} /> {T.done}</button>
             </div>
@@ -4009,12 +4055,12 @@ export default function MyTripApp() {
         .mt-group { margin-top:14px; }
         .mt-group-today { border:2px solid var(--teal); border-radius:12px; padding:8px; background:var(--teal-tint); }
         .mt-group-header { display:flex; align-items:center; gap:7px; padding:6px 4px; cursor:pointer; user-select:none; flex-wrap:wrap; }
-        .mt-day-badge { display:flex; flex-direction:column; align-items:center; border-radius:8px; overflow:hidden; flex-shrink:0; width:37px; margin-inline-start:auto; box-shadow:0 1px 3px rgba(0,0,0,.15); }
-        .mt-day-badge-top { background:var(--danger); width:100%; height:8px; flex-shrink:0; }
-        .mt-day-badge-body { background:var(--surface); width:100%; display:flex; flex-direction:column; align-items:center; padding:3px 0; }
-        .mt-day-badge-num { font-size:15px; font-weight:800; color:var(--ink); line-height:1; }
-        .mt-day-badge-mon { font-size:8px; font-weight:700; color:var(--muted); text-transform:uppercase; line-height:1.3; }
-        .mt-day-badge-weekday { font-size:8px; font-weight:700; color:var(--muted); line-height:1.3; }
+        .mt-day-badge { display:flex; flex-direction:column; align-items:center; border-radius:7px; overflow:hidden; flex-shrink:0; width:32px; margin-inline-start:auto; box-shadow:0 1px 3px rgba(0,0,0,.15); }
+        .mt-day-badge-top { background:var(--danger); width:100%; height:6px; flex-shrink:0; }
+        .mt-day-badge-body { background:var(--surface); width:100%; display:flex; flex-direction:column; align-items:center; padding:2px 0; }
+        .mt-day-badge-num { font-size:13px; font-weight:800; color:var(--ink); line-height:1; }
+        .mt-day-badge-mon { font-size:7px; font-weight:700; color:var(--muted); text-transform:uppercase; line-height:1.2; }
+        .mt-day-badge-weekday { font-size:7px; font-weight:700; color:var(--muted); line-height:1.2; }
         .mt-group-actions { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
         .mt-group-add { font-size:12px; color:var(--teal); display:flex; align-items:center; gap:3px; background:none; border:none; font-weight:600; text-decoration:none; }
         .mt-group-add:hover { text-decoration:underline; }
@@ -4065,6 +4111,21 @@ export default function MyTripApp() {
         .mt-type-field-btn:hover { border-color:var(--teal); }
         .mt-type-modal { max-width:340px; width:92vw; max-height:70vh; display:flex; flex-direction:column; padding:12px; }
         .mt-time-modal { max-width:240px; width:84vw; padding:18px; }
+        .mt-clock-time-display { display:flex; align-items:center; justify-content:center; gap:2px; margin-bottom:16px; }
+        .mt-clock-hh, .mt-clock-mm { font-size:32px; font-weight:700; color:var(--muted); cursor:pointer; padding:2px 6px; border-radius:8px; font-variant-numeric:tabular-nums; }
+        .mt-clock-hh.active, .mt-clock-mm.active { color:var(--ink); background:var(--teal-tint); }
+        .mt-clock-colon { font-size:32px; font-weight:300; color:var(--border); }
+        .mt-clock-ampm { display:flex; flex-direction:column; gap:2px; margin-inline-start:8px; }
+        .mt-clock-ampm-btn { font-size:10px; font-weight:700; border:1px solid var(--border); background:none; color:var(--muted); border-radius:5px; padding:2px 6px; }
+        .mt-clock-ampm-btn.active { background:var(--teal); color:#fff; border-color:var(--teal); }
+        .mt-clock-face-wrap { display:flex; justify-content:center; }
+        .mt-clock-face { width:180px; height:180px; touch-action:none; cursor:pointer; }
+        .mt-clock-face-circle { fill:var(--bg); stroke:var(--border); stroke-width:1; }
+        .mt-clock-center-dot { fill:var(--teal); }
+        .mt-clock-hand { stroke:var(--teal); stroke-width:2.5; stroke-linecap:round; }
+        .mt-clock-num-bg { fill:var(--teal); }
+        .mt-clock-num { font-size:14px; font-weight:600; fill:var(--muted); user-select:none; font-variant-numeric:tabular-nums; }
+        .mt-clock-num.selected { fill:#fff; font-weight:700; }
         .mt-time-modal-header { display:flex; align-items:center; justify-content:space-between; font-weight:600; font-size:12.5px; color:var(--muted); margin-bottom:14px; }
         .mt-time-cols { position:relative; display:flex; align-items:center; justify-content:center; gap:4px; height:190px; margin-bottom:16px; }
         .mt-time-highlight-band { position:absolute; top:50%; transform:translateY(-50%); left:4px; right:4px; height:36px; background:var(--teal-tint); border-radius:8px; pointer-events:none; z-index:1; }
@@ -4291,13 +4352,15 @@ export default function MyTripApp() {
         .mt-note { font-size:11px; color:var(--muted); margin-top:4px; }
 
         @media (max-width: 640px) {
+          .mt-group-footer-actions { flex-wrap:nowrap; gap:8px; justify-content:flex-start; }
+          .mt-group-footer-actions .mt-group-add { font-size:11px; white-space:nowrap; }
           .mt-header-row1 { padding:8px 10px 4px; }
           .mt-header-actions { padding:4px 10px; }
           .mt-toolbar { padding:4px 10px 8px; gap:5px; }
           .mt-content { padding:0 12px 32px; }
           .mt-frame-header { padding:12px 10px; gap:7px; }
           .mt-frame-actions button, .mt-row-actions button { min-width:32px; min-height:32px; justify-content:center; }
-          .mt-group-header { padding:10px 6px; }
+          .mt-group-header { padding:5px 6px; }
           .mt-group-actions { gap:14px; }
           .mt-group-add { min-height:32px; }
           .mt-card { padding:12px 14px; }
@@ -5063,8 +5126,8 @@ export default function MyTripApp() {
               </div>
 
               <div className="mt-field-row">
-                <div className="mt-field"><label>{T.start}</label><TimeField value={cardDraft.startTime} onChange={(e) => setCardDraft({ ...cardDraft, startTime: e.target.value, startTimeAuto: false })} T={T} className={cardDraft.startTimeAuto ? "mt-computed-field" : ""} title={cardDraft.startTimeAuto ? T.computedStartTimeHint : undefined} /></div>
-                <div className="mt-field"><label>{T.end}</label><TimeField value={cardDraft.endTime} onChange={(e) => setCardDraft({ ...cardDraft, endTime: e.target.value, endTimeAuto: false })} T={T} className={cardDraft.endTimeAuto ? "mt-computed-field" : ""} title={cardDraft.endTimeAuto ? T.computedEndTimeHint : undefined} /></div>
+                <div className="mt-field"><label>{T.start}</label><TimeField value={cardDraft.startTime} onChange={(e) => setCardDraft({ ...cardDraft, startTime: e.target.value, startTimeAuto: false })} T={T} className={(cardDraft.startTimeAuto !== false && cardDraft.startTime) ? "mt-computed-field" : ""} title={(cardDraft.startTimeAuto !== false && cardDraft.startTime) ? T.computedStartTimeHint : undefined} /></div>
+                <div className="mt-field"><label>{T.end}</label><TimeField value={cardDraft.endTime} onChange={(e) => setCardDraft({ ...cardDraft, endTime: e.target.value, endTimeAuto: false })} T={T} className={(cardDraft.endTimeAuto !== false && cardDraft.endTime) ? "mt-computed-field" : ""} title={(cardDraft.endTimeAuto !== false && cardDraft.endTime) ? T.computedEndTimeHint : undefined} /></div>
               </div>
               <label className="mt-checkbox-row"><input type="checkbox" checked={!!cardDraft.overnight} onChange={(e) => setCardDraft({ ...cardDraft, overnight: e.target.checked })} />{T.overnight}</label>
               {cardHasTimeError && <div className="mt-error"><AlertTriangle /> {T.timeError}</div>}
