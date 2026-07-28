@@ -12,7 +12,7 @@ import {
   Smartphone, Monitor, AlertTriangle, GripVertical, Check, FolderPlus, Sparkles,
   Route, Waypoints, Download, Upload, MapPin, Search, CircleCheck, Clock, ArrowDownUp, Copy, StickyNote, TrainFront,
   Bus, Motorbike, Bike, Scooter, Sailboat, ShipWheel, Anchor, Kayak, Helicopter, Caravan, Building2, Landmark, Home,
-  CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2, MoreVertical, Menu, Calendar as CalendarIcon, Undo2, Redo2, Info, ExternalLink, Phone, Save, FolderOpen, ImagePlus, BookOpen, RefreshCw, Workflow, ArrowLeft, ArrowRight, CheckSquare, Paperclip, Briefcase, Compass, FolderTree, LayoutGrid, HelpCircle
+  CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2, MoreVertical, Menu, Calendar as CalendarIcon, Undo2, Redo2, Info, ExternalLink, Phone, Save, FolderOpen, ImagePlus, BookOpen, RefreshCw, Workflow, ArrowLeft, ArrowRight, CheckSquare, Paperclip, Briefcase, Compass, FolderTree, LayoutGrid, HelpCircle, Wine, Beer, PartyPopper, Mic2
 } from "lucide-react";
 
 /* ---------------------------------------------------------------------- */
@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "20.9.1";
+const APP_VERSION = "21.0.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -109,6 +109,7 @@ const HELP_TOPICS = {
 const CATEGORY_COLORS = {
   "public-transport": "#3E7CB1", "road-transport": "#8B6F47", "sea-transport": "#2F7A8C",
   "air-transport": "#256D64", accommodation: "#D98E3F", activities: "#5B8C5A", other: "#7A5C9E",
+  culinary: "#C1543A", entertainment: "#A6457A",
 };
 const DEFAULT_TYPES = [
   { id: "train", name_he: "רכבת", name_en: "Train", icon: "TrainFront", color: CATEGORY_COLORS["public-transport"], category: "public-transport", kind: "arrival" },
@@ -137,18 +138,25 @@ const DEFAULT_TYPES = [
   { id: "checkout", name_he: "צ'ק-אאוט", name_en: "Check-out", icon: "BedDouble", color: CATEGORY_COLORS.accommodation, category: "accommodation", kind: "desc" },
   { id: "hostel", name_he: "אכסנייה", name_en: "Hostel", icon: "Building2", color: CATEGORY_COLORS.accommodation, category: "accommodation", kind: "desc" },
   { id: "apartment", name_he: "דירה", name_en: "Apartment", icon: "Home", color: CATEGORY_COLORS.accommodation, category: "accommodation", kind: "desc" },
+  { id: "transfer", name_he: "העברות", name_en: "Transfers", icon: "Car", color: CATEGORY_COLORS.accommodation, category: "accommodation", kind: "desc" },
 
   { id: "self-tour", name_he: "טיול עצמאי", name_en: "Self-guided tour", icon: "Footprints", color: CATEGORY_COLORS.activities, category: "activities", kind: "desc" },
   { id: "guided-tour", name_he: "טיול מודרך", name_en: "Guided tour", icon: "Users", color: CATEGORY_COLORS.activities, category: "activities", kind: "desc" },
   { id: "day-tour", name_he: "טיול יומי", name_en: "Day tour", icon: "Sun", color: CATEGORY_COLORS.activities, category: "activities", kind: "desc" },
   { id: "attraction", name_he: "אטרקציה", name_en: "Attraction", icon: "Landmark", color: CATEGORY_COLORS.activities, category: "activities", kind: "desc" },
   { id: "poi", name_he: "נקודת עניין", name_en: "Point of Interest", icon: "MapPin", color: CATEGORY_COLORS.activities, category: "activities", kind: "desc" },
-  { id: "restaurant", name_he: "מסעדה", name_en: "Restaurant", icon: "Utensils", color: CATEGORY_COLORS.activities, category: "activities", kind: "desc" },
+  { id: "restaurant", name_he: "מסעדה", name_en: "Restaurant", icon: "Utensils", color: CATEGORY_COLORS.culinary, category: "culinary", kind: "desc" },
+  { id: "bar", name_he: "בר", name_en: "Bar", icon: "Wine", color: CATEGORY_COLORS.culinary, category: "culinary", kind: "desc" },
+  { id: "pub", name_he: "פאב", name_en: "Pub", icon: "Beer", color: CATEGORY_COLORS.culinary, category: "culinary", kind: "desc" },
+  { id: "club", name_he: "מועדון", name_en: "Club", icon: "Music", color: CATEGORY_COLORS.entertainment, category: "entertainment", kind: "desc" },
+  { id: "party", name_he: "מסיבה", name_en: "Party", icon: "PartyPopper", color: CATEGORY_COLORS.entertainment, category: "entertainment", kind: "desc" },
+  { id: "show", name_he: "הופעה", name_en: "Show", icon: "Mic2", color: CATEGORY_COLORS.entertainment, category: "entertainment", kind: "desc" },
+  { id: "festival", name_he: "פסטיבל", name_en: "Festival", icon: "Music", color: CATEGORY_COLORS.entertainment, category: "entertainment", kind: "desc" },
 ];
-const CATEGORY_ORDER = ["public-transport", "road-transport", "sea-transport", "air-transport", "accommodation", "activities", "other"];
+const CATEGORY_ORDER = ["public-transport", "road-transport", "sea-transport", "air-transport", "accommodation", "activities", "culinary", "entertainment", "other"];
 const CATEGORY_LABELS = {
-  he: { "public-transport": "תחבורה ציבורית", "road-transport": "תחבורה כביש", "sea-transport": "תחבורה ימית", "air-transport": "תחבורה אווירית", accommodation: "לינה", activities: "פעילויות", other: "אחר" },
-  en: { "public-transport": "Public Transport", "road-transport": "Road Transport", "sea-transport": "Sea Transport", "air-transport": "Air Transport", accommodation: "Accommodation", activities: "Activities", other: "Other" },
+  he: { "public-transport": "תחבורה ציבורית", "road-transport": "תחבורה כביש", "sea-transport": "תחבורה ימית", "air-transport": "תחבורה אווירית", accommodation: "לינה", activities: "פעילויות", culinary: "קולינריה", entertainment: "בילויים", other: "אחר" },
+  en: { "public-transport": "Public Transport", "road-transport": "Road Transport", "sea-transport": "Sea Transport", "air-transport": "Air Transport", accommodation: "Accommodation", activities: "Activities", culinary: "Culinary", entertainment: "Entertainment", other: "Other" },
 };
 function groupTypesByCategory(types) {
   const map = {};
@@ -301,6 +309,8 @@ const T_DICT = {
     wizardAiNote: "תחומי העניין, התקציב והקצב שבחרת נשמרים במסגרת — הצעות פעילויות בפועל שמבוססות עליהם ידרשו חיבור לשרת AI בעתיד.",
     wizardBack: "הקודם", wizardNext: "הבא", wizardCreate: "צור טיול",
     computedEndTimeHint: "שדה מחושב לפי מסלול Google Maps, בהתאם לאמצעי התחבורה שנבחר בתיאור.", chronoEndWarning: "רצף השעות (כולל שעות סיום) אינו כרונולוגי.",
+    afterMidnightHint: "שעה זו היא לאחר חצות",
+    computedStartTimeHint: "שדה שנמשך אוטומטית משעת ההגעה של הרשומה הקודמת.",
     noOriginHint: "אין צורך בשדה מוצא עבור סוג רשומה זה.",
     dragDayHint: "גרור להעברת היום למסגרת אחרת", dropDayToRoot: "שחרר כאן כדי להוציא את היום מהמסגרת", showOverallRoute: "הצג מסלול טיול כולל",
     tripSummary: "סיכום הטיול", summaryFlights: "טיסות", summaryHotels: "מלונות", summaryPois: "נק׳ עניין", summaryRestaurants: "מסעדות", summaryAvgRating: "דירוג ממוצע",
@@ -449,6 +459,8 @@ const T_DICT = {
     wizardAiNote: "Your interests, budget, and pace are saved on the frame — actual activity suggestions based on them will need a future AI server connection.",
     wizardBack: "Back", wizardNext: "Next", wizardCreate: "Create trip",
     computedEndTimeHint: "Computed from the Google Maps route, based on the transportation mode selected in the description.", chronoEndWarning: "The time sequence (including end times) isn't chronological.",
+    afterMidnightHint: "This time is after midnight",
+    computedStartTimeHint: "Automatically pulled from the previous record's arrival time.",
     noOriginHint: "No origin field is needed for this record type.",
     dragDayHint: "Drag to move this day to another frame", dropDayToRoot: "Drop here to take this day out of its frame", showOverallRoute: "Show overall trip route",
     tripSummary: "Trip summary", summaryFlights: "Flights", summaryHotels: "Hotels", summaryPois: "Points of interest", summaryRestaurants: "Restaurants", summaryAvgRating: "Average rating",
@@ -1018,8 +1030,12 @@ function frameSummaryStats(rows, frames, fid) {
   const totalKmNoFlights = relevant.filter((r) => !FLIGHT_TYPES.includes(r.typeId)).reduce((s, r) => s + (Number(r.routeDistanceKm) || 0), 0);
   const countByType = (ids) => relevant.filter((r) => ids.includes(r.typeId)).length;
   const hotelRows = relevant.filter((r) => ["checkin", "checkout", "hostel", "apartment"].includes(r.typeId));
-  const distinctHotels = new Set(hotelRows.map((r) => (r.to || r.from || "").trim()).filter(Boolean)).size;
-  const totalNights = new Set(hotelRows.map((r) => r.date).filter(Boolean)).size;
+  const hotelSubFrames = frames.filter((f) => frameIds.has(f.id) && effectiveFrameTypeOf(f, rows) === "hotel");
+  const nightsOf = (f) => (f.startDate && f.endDate) ? Math.max(0, Math.round((new Date(f.endDate) - new Date(f.startDate)) / 86400000)) : 0;
+  const thisFrame = frames.find((f) => f.id === fid);
+  const isThisAHotelFrame = thisFrame && effectiveFrameTypeOf(thisFrame, rows) === "hotel";
+  const distinctHotels = isThisAHotelFrame ? (hotelRows.length ? 1 : 0) : (hotelSubFrames.length || new Set(hotelRows.map((r) => (r.to || r.from || "").trim()).filter(Boolean)).size);
+  const totalNights = isThisAHotelFrame ? nightsOf(thisFrame) : hotelSubFrames.reduce((s, f) => s + nightsOf(f), 0);
   const ratings = relevant.filter((r) => r.personalRating).map((r) => r.personalRating);
   return {
     totalKm, totalKmNoFlights,
@@ -1410,7 +1426,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
           {lang !== "he" && toVerified && <a className="mt-loc-badge" href={row.toVerifiedUrl} target="_blank" rel="noreferrer" title={T.openMap}><MapPin size={11} /></a>}
         </span>
       );
-      case "startTime": return <TimeField value={row.startTime} onChange={(e) => ctx.setStartTimeWithCascade(row.id, e.target.value)} T={T} className="mt-editable mt-time" />;
+      case "startTime": return <TimeField value={row.startTime} onChange={(e) => ctx.setStartTimeWithCascade(row.id, e.target.value)} T={T} className={"mt-editable mt-time" + (row.startTimeAuto ? " mt-computed-field" : "")} title={row.startTimeAuto ? T.computedStartTimeHint : undefined} />;
       case "duration": return <span title={dur === null ? "" : dur} style={{ color: dur === null ? "var(--danger)" : "var(--muted)", fontSize: 12 }}>{dur === null ? "!" : dur}</span>;
       case "endTime": return <TimeField value={row.endTime} onChange={(e) => ctx.setEndTimeWithCascade(row.id, e.target.value)} T={T} className={"mt-editable mt-time" + (row.endTimeAuto ? " mt-computed-field" : "")} title={row.endTimeAuto ? T.computedEndTimeHint : undefined} />;
       case "route": return (
@@ -1966,7 +1982,7 @@ function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
           <strong className={warningClass(cardWarnings)} style={{ fontSize: 13.5 }} title={cardWarnings.length ? warningText(cardWarnings) : undefined}>{tm.name}</strong>
         </div>
         <div className="mt-card-top-end">
-          <span className="mt-card-times" dir="ltr">{r.startTime || "—"}{r.endTime ? ` – ${r.endTime}` : ""}</span>
+          <span className="mt-card-times" dir="ltr">{r.startTime || "—"}{r.endTime ? ` → ${r.endTime}` : ""}</span>
           <span className="mt-card-drag-handle" onClick={(e) => e.stopPropagation()} {...dragListeners} {...dragAttrs}><GripVertical size={15} /></span>
         </div>
       </div>
@@ -2100,22 +2116,27 @@ function FrameSummaryRow({ frame, ctx }) {
   const totals = frameTotals(frame.id);
   const convertedTotal = Object.entries(totals).reduce((sum, [cur, amt]) => sum + convertAmount(amt, cur, summaryCurrency), 0);
   const stats = frameSummaryStats(rows, frames, frame.id);
+  const isHotelFrame = effectiveFrameTypeOf(frame, rows) === "hotel";
   return (
     <div className="mt-frame-summary">
       <button className="mt-frame-summary-toggle" onClick={() => setExpanded((v) => !v)}>
         <span>{T.tripSummary}</span>
         {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
       </button>
-      <div className="mt-frame-summary-line">
-        <span>{convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-        <select className="mt-frame-summary-currency" value={summaryCurrency} onChange={(e) => setSummaryCurrency(e.target.value)} onClick={(e) => e.stopPropagation()}>
-          {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-      </div>
-      <div className="mt-frame-summary-line" style={{ marginTop: 3 }}>
-        <span>{stats.totalKm.toLocaleString(undefined, { maximumFractionDigits: 0 })} {T.km} {T.summaryTotal}</span>
-        <span className="mt-hint">· {stats.totalKmNoFlights.toLocaleString(undefined, { maximumFractionDigits: 0 })} {T.km} {T.summaryKmNoFlights}</span>
-      </div>
+      {(!isHotelFrame || expanded) && (
+        <div className="mt-frame-summary-line">
+          <span>{convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+          <select className="mt-frame-summary-currency" value={summaryCurrency} onChange={(e) => setSummaryCurrency(e.target.value)} onClick={(e) => e.stopPropagation()}>
+            {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+      )}
+      {(!isHotelFrame || expanded) && (
+        <div className="mt-frame-summary-line" style={{ marginTop: 3 }}>
+          <span>{stats.totalKm.toLocaleString(undefined, { maximumFractionDigits: 0 })} {T.km} {T.summaryTotal}</span>
+          <span className="mt-hint">· {stats.totalKmNoFlights.toLocaleString(undefined, { maximumFractionDigits: 0 })} {T.km} {T.summaryKmNoFlights}</span>
+        </div>
+      )}
       {expanded && (
         <>
           <div className="mt-frame-summary-grid">
@@ -2128,7 +2149,7 @@ function FrameSummaryRow({ frame, ctx }) {
             {stats.restaurants > 0 && <span><Utensils size={13} /> {stats.restaurants} {T.summaryRestaurants}</span>}
             {stats.avgRating != null && <span><Star size={13} fill="currentColor" /> {stats.avgRating.toFixed(1)} {T.summaryAvgRating}</span>}
           </div>
-          <button className="mt-btn ghost" style={{ marginTop: 8 }} onClick={() => generateTravelJournal(frame.id)}><BookOpen size={13} /> {T.generateJournal}</button>
+          {!isHotelFrame && <button className="mt-btn ghost" style={{ marginTop: 8 }} onClick={() => generateTravelJournal(frame.id)}><BookOpen size={13} /> {T.generateJournal}</button>}
         </>
       )}
     </div>
@@ -2212,7 +2233,8 @@ function TimeField({ value, onChange, T, className, title }) {
     <span style={{ position: "relative", display: "block" }}>
       <button type="button" className={"mt-type-field-btn" + (className ? " " + className : "")} title={title} onClick={openPicker}>
         <Clock size={14} />
-        <span className="mt-type-text" dir="ltr">{value || "--:--"}</span>
+        <span className="mt-type-text" dir="ltr" style={value && Number(value.split(":")[0]) < 6 ? { color: "#C1543A", fontWeight: 700 } : undefined}>{value || "--:--"}</span>
+        {value && Number(value.split(":")[0]) < 6 && <span className="mt-hint" style={{ color: "#C1543A", fontSize: 10 }} title={T.afterMidnightHint}>🌙</span>}
       </button>
       {open && (
         <div className="mt-modal-backdrop" onClick={() => setOpen(false)}>
@@ -3987,10 +4009,10 @@ export default function MyTripApp() {
         .mt-group { margin-top:14px; }
         .mt-group-today { border:2px solid var(--teal); border-radius:12px; padding:8px; background:var(--teal-tint); }
         .mt-group-header { display:flex; align-items:center; gap:7px; padding:6px 4px; cursor:pointer; user-select:none; flex-wrap:wrap; }
-        .mt-day-badge { display:flex; flex-direction:column; align-items:center; border-radius:8px; overflow:hidden; flex-shrink:0; width:42px; margin-inline-start:auto; box-shadow:0 1px 3px rgba(0,0,0,.15); }
+        .mt-day-badge { display:flex; flex-direction:column; align-items:center; border-radius:8px; overflow:hidden; flex-shrink:0; width:37px; margin-inline-start:auto; box-shadow:0 1px 3px rgba(0,0,0,.15); }
         .mt-day-badge-top { background:var(--danger); width:100%; height:8px; flex-shrink:0; }
         .mt-day-badge-body { background:var(--surface); width:100%; display:flex; flex-direction:column; align-items:center; padding:3px 0; }
-        .mt-day-badge-num { font-size:17px; font-weight:800; color:var(--ink); line-height:1; }
+        .mt-day-badge-num { font-size:15px; font-weight:800; color:var(--ink); line-height:1; }
         .mt-day-badge-mon { font-size:8px; font-weight:700; color:var(--muted); text-transform:uppercase; line-height:1.3; }
         .mt-day-badge-weekday { font-size:8px; font-weight:700; color:var(--muted); line-height:1.3; }
         .mt-group-actions { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
@@ -3998,7 +4020,7 @@ export default function MyTripApp() {
         .mt-group-add:hover { text-decoration:underline; }
         .mt-group-add.disabled { color:var(--border); cursor:default; }
         .mt-group-add-bottom { display:flex; margin-top:6px; padding:6px 4px; }
-        .mt-group-footer-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:6px; padding:6px 4px; }
+        .mt-group-footer-actions { display:flex; align-items:center; justify-content:flex-start; gap:10px; flex-wrap:wrap; margin-top:3px; padding:4px 4px; }
         .mt-chrono-warning { display:flex; align-items:center; gap:7px; background:#FBEAE8; color:var(--danger); font-size:11.5px; padding:6px 10px; border-radius:8px; margin:0 4px 8px; }
         .mt-table-wrap { width:100%; overflow-x:auto; border-radius:10px; }
         .mt-flow-view { display:flex; align-items:flex-start; gap:4px; flex-wrap:wrap; padding:16px 8px; background:var(--surface); border-radius:10px; border:1px solid var(--border); }
@@ -4042,15 +4064,15 @@ export default function MyTripApp() {
         .mt-type-field-btn { display:flex; align-items:center; gap:7px; width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 10px; background:var(--surface); font-size:13px; font-weight:500; color:var(--ink); box-sizing:border-box; }
         .mt-type-field-btn:hover { border-color:var(--teal); }
         .mt-type-modal { max-width:340px; width:92vw; max-height:70vh; display:flex; flex-direction:column; padding:12px; }
-        .mt-time-modal { max-width:240px; width:84vw; padding:16px; }
-        .mt-time-modal-header { display:flex; align-items:center; justify-content:space-between; font-weight:600; font-size:12.5px; color:var(--muted); margin-bottom:12px; }
-        .mt-time-cols { position:relative; display:flex; align-items:center; justify-content:center; gap:2px; height:200px; margin-bottom:14px; }
-        .mt-time-highlight-band { position:absolute; top:50%; transform:translateY(-50%); left:8px; right:8px; height:38px; border-top:1px solid var(--border); border-bottom:1px solid var(--border); pointer-events:none; z-index:1; }
-        .mt-time-col { position:relative; display:flex; flex-direction:column; overflow-y:auto; overscroll-behavior:contain; height:100%; width:56px; scroll-snap-type:y mandatory; }
-        .mt-time-pad { height:81px; flex-shrink:0; }
-        .mt-time-sep { font-size:17px; font-weight:300; color:var(--border); }
-        .mt-time-opt { border:none; background:none; height:38px; flex-shrink:0; font-size:15px; font-weight:400; color:var(--muted); font-variant-numeric:tabular-nums; scroll-snap-align:center; transition:color .15s ease, font-weight .15s ease, font-size .15s ease; }
-        .mt-time-opt.selected { color:var(--ink); font-weight:700; font-size:18px; }
+        .mt-time-modal { max-width:240px; width:84vw; padding:18px; }
+        .mt-time-modal-header { display:flex; align-items:center; justify-content:space-between; font-weight:600; font-size:12.5px; color:var(--muted); margin-bottom:14px; }
+        .mt-time-cols { position:relative; display:flex; align-items:center; justify-content:center; gap:4px; height:190px; margin-bottom:16px; }
+        .mt-time-highlight-band { position:absolute; top:50%; transform:translateY(-50%); left:4px; right:4px; height:36px; background:var(--teal-tint); border-radius:8px; pointer-events:none; z-index:1; }
+        .mt-time-col { position:relative; display:flex; flex-direction:column; overflow-y:auto; overscroll-behavior:contain; height:100%; width:52px; scroll-snap-type:y mandatory; -webkit-mask-image:linear-gradient(to bottom, transparent 0%, black 22%, black 78%, transparent 100%); mask-image:linear-gradient(to bottom, transparent 0%, black 22%, black 78%, transparent 100%); }
+        .mt-time-pad { height:77px; flex-shrink:0; }
+        .mt-time-sep { font-size:16px; font-weight:300; color:var(--border); z-index:2; }
+        .mt-time-opt { border:none; background:none; height:36px; flex-shrink:0; font-size:14px; font-weight:400; color:var(--muted); font-variant-numeric:tabular-nums; scroll-snap-align:center; transition:color .15s ease, font-weight .15s ease, font-size .15s ease; z-index:2; position:relative; }
+        .mt-time-opt.selected { color:var(--ink); font-weight:700; font-size:19px; }
         .mt-type-modal .mt-type-search-wrap { margin-bottom:8px; }
         .mt-type-modal .mt-type-list { overflow-y:auto; flex:1; overscroll-behavior:contain; }
         .mt-arrival-btn { border:1px solid var(--border); background:var(--surface); color:var(--muted); border-radius:6px; padding:3px; display:flex; align-items:center; justify-content:center; margin-inline-start:4px; }
@@ -4065,7 +4087,7 @@ export default function MyTripApp() {
         .mt-editable:focus { outline:none; border-color:var(--teal); background:#fff; }
         .mt-editable.mt-time:focus, .mt-editable[type=number]:focus { outline:none; border-color:var(--teal); background:#fff; }
         .mt-editable.mt-time { min-width:60px; font-weight:700; color:var(--ink); padding-inline-end:2px; }
-        .mt-computed-field { border-bottom:2px dotted var(--teal) !important; }
+        .mt-computed-field { border-bottom:2px dashed #3E7CB1 !important; }
         .mt-editable.mt-time::-webkit-calendar-picker-indicator { padding:1px; margin-inline-start:1px; width:10px; height:10px; opacity:.6; }
         .mt-editable[type=number] { min-width:38px; padding-inline-start:1px; -moz-appearance:textfield; }
         .mt-editable[type=number]::-webkit-outer-spin-button, .mt-editable[type=number]::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
@@ -4151,7 +4173,7 @@ export default function MyTripApp() {
         .mt-loc-grid { display:grid; grid-template-columns:auto auto 2fr auto 1fr; align-items:center; gap:6px 6px; margin-top:4px; }
         .mt-loc-col-header { font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; text-align:start; }
         .mt-loc-row-label { font-size:12px; font-weight:700; color:var(--ink); white-space:nowrap; }
-        .mt-loc-icons { display:flex; gap:0; }
+        .mt-loc-icons { display:flex; align-items:center; gap:0; }
         .mt-loc-icons .mt-btn-icon { padding:5px 5px; }
         .mt-loc-grid-input { width:100%; border:1px solid var(--border); border-radius:8px; padding:6px 8px; font-size:12.5px; font-family:inherit; background:#fff; color:var(--ink); }
         .mt-editable:disabled, .mt-loc-grid-input:disabled, .mt-loc-alias-cell input:disabled, .mt-loc-mobile-alias-row input:disabled { background:#F0F2F1; color:var(--muted); cursor:not-allowed; border-color:#E5E9E7; }
@@ -5009,7 +5031,9 @@ export default function MyTripApp() {
                 </div>
               </div>
 
-              <label className="mt-checkbox-row" style={{ marginBottom: 4 }}><input type="checkbox" checked={cardDraft.toFee === "yes"} onChange={(e) => setCardDraft({ ...cardDraft, toFee: e.target.checked ? "yes" : null })} />{T.requiresTicket}</label>
+              {(types.find((t) => t.id === cardDraft.typeId) || {}).category === "activities" && (
+                <label className="mt-checkbox-row" style={{ marginBottom: 4 }}><input type="checkbox" checked={cardDraft.toFee === "yes"} onChange={(e) => setCardDraft({ ...cardDraft, toFee: e.target.checked ? "yes" : null })} />{T.requiresTicket}</label>
+              )}
 
               <div className="mt-weather-row">
                 <span className="mt-link-icon mt-weather-icon-btn" title={T.weatherAtArrival}>
@@ -5039,7 +5063,7 @@ export default function MyTripApp() {
               </div>
 
               <div className="mt-field-row">
-                <div className="mt-field"><label>{T.start}</label><TimeField value={cardDraft.startTime} onChange={(e) => setCardDraft({ ...cardDraft, startTime: e.target.value, startTimeAuto: false })} T={T} /></div>
+                <div className="mt-field"><label>{T.start}</label><TimeField value={cardDraft.startTime} onChange={(e) => setCardDraft({ ...cardDraft, startTime: e.target.value, startTimeAuto: false })} T={T} className={cardDraft.startTimeAuto ? "mt-computed-field" : ""} title={cardDraft.startTimeAuto ? T.computedStartTimeHint : undefined} /></div>
                 <div className="mt-field"><label>{T.end}</label><TimeField value={cardDraft.endTime} onChange={(e) => setCardDraft({ ...cardDraft, endTime: e.target.value, endTimeAuto: false })} T={T} className={cardDraft.endTimeAuto ? "mt-computed-field" : ""} title={cardDraft.endTimeAuto ? T.computedEndTimeHint : undefined} /></div>
               </div>
               <label className="mt-checkbox-row"><input type="checkbox" checked={!!cardDraft.overnight} onChange={(e) => setCardDraft({ ...cardDraft, overnight: e.target.checked })} />{T.overnight}</label>
