@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "21.2.0";
+const APP_VERSION = "21.2.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -2278,7 +2278,7 @@ function TimeField({ value, onChange, T, className, title }) {
               <span>{T.selectTime}</span>
               <button className="mt-btn ghost" style={{ padding: "4px 6px" }} onClick={() => setOpen(false)}><X size={16} /></button>
             </div>
-            <div className="mt-clock-time-display">
+            <div className="mt-clock-time-display" dir="ltr">
               <span className={"mt-clock-hh" + (mode === "hour" ? " active" : "")} onClick={() => setMode("hour")}>{hh}</span>
               <span className="mt-clock-colon">:</span>
               <span className={"mt-clock-mm" + (mode === "minute" ? " active" : "")} onClick={() => setMode("minute")}>{mm}</span>
