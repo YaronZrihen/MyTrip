@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.0.0";
+const APP_VERSION = "22.1.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -211,6 +211,7 @@ const T_DICT = {
     deleteFrameOnly: "מחק מסגרת בלבד (התוכן יעבור למסגרת האם)", deleteFrameWithContent: "מחק מסגרת ואת כל התוכן שבתוכה",
     type: "תיאור", from: "מוצא", to: "יעד", start: "בשעה", end: "עד שעה", overnight: "חוצה חצות", arrivalMethod: "אמצעי הגעה",
     stayDuration: "משך שהות (דק')", stayDurationHint: "כמה זמן נשארים ביעד — קובע את שעת הסיום (שעת הגעה + משך שהות).",
+    stayNone: "ללא שהות", minutesShort: "דק'", hoursShort: "שע'",
     typeKindDesc: "תיאור", typeKindArrival: "אמצעי הגעה",
     requiresTicket: "דורש רכישת כרטיס כניסה", calcRoute: "חשב מסלול",
     ticketPurchased: "הכרטיס נרכש", flightCheckedIn: "בוצע צ'ק-אין לטיסה",
@@ -367,6 +368,7 @@ const T_DICT = {
     deleteFrameOnly: "Delete frame only (content moves to parent)", deleteFrameWithContent: "Delete frame and all its content",
     type: "Description", from: "Origin", to: "Destination", start: "At", end: "Until", overnight: "Crosses midnight", arrivalMethod: "Arrival method",
     stayDuration: "Stay duration (min)", stayDurationHint: "How long you stay at the destination — determines the end time (arrival + stay).",
+    stayNone: "No stay", minutesShort: "min", hoursShort: "hr",
     typeKindDesc: "Description", typeKindArrival: "Arrival method",
     requiresTicket: "Requires entrance ticket", calcRoute: "Calculate route",
     ticketPurchased: "Ticket purchased", flightCheckedIn: "Flight check-in done",
@@ -1210,7 +1212,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
           patch.startTime = `${String(Math.floor(arrTotal / 60)).padStart(2, "0")}:${String(arrTotal % 60).padStart(2, "0")}`;
         }
         const effectiveStart = patch.startTime || row.startTime;
-        if (effectiveStart && (!row.endTime || row.endTimeAuto)) {
+        if (effectiveStart && (!row.endTime || row.endTimeAuto !== false)) {
           const stay = row.stayDurationMin != null ? row.stayDurationMin : getDefaultStayMinutes(row.typeId);
           const [h, m] = effectiveStart.split(":").map(Number);
           const totalMin = (h * 60 + m + Math.round(stay) + 1440) % 1440;
@@ -1450,9 +1452,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
       case "startTime": return <TimeField value={row.startTime} onChange={(e) => ctx.setStartTimeWithCascade(row.id, e.target.value)} T={T} className={"mt-editable mt-time" + ((row.startTimeAuto !== false && row.startTime) ? " mt-computed-field" : "")} title={(row.startTimeAuto !== false && row.startTime) ? T.computedStartTimeHint : undefined} />;
       case "duration": return <span title={dur === null ? "" : dur} style={{ color: dur === null ? "var(--danger)" : "var(--muted)", fontSize: 12 }}>{dur === null ? "!" : dur}</span>;
       case "endTime": return <TimeField value={row.endTime} onChange={(e) => ctx.setEndTimeWithCascade(row.id, e.target.value)} T={T} className={"mt-editable mt-time" + ((row.endTimeAuto !== false && row.endTime) ? " mt-computed-field" : "")} title={(row.endTimeAuto !== false && row.endTime) ? T.computedEndTimeHint : undefined} />;
-      case "stay": return <input type="number" min="0" step="5" className="mt-editable" style={{ width: "100%", textAlign: "center", padding: "2px 1px" }} title={T.stayDurationHint}
-        value={row.stayDurationMin != null ? row.stayDurationMin : getDefaultStayMinutes(row.typeId)}
-        onChange={(e) => updateRow(row.id, { stayDurationMin: e.target.value === "" ? 0 : Math.max(0, Number(e.target.value)) })} />;
+      case "stay": return <StayDurationField compact value={row.stayDurationMin != null ? row.stayDurationMin : getDefaultStayMinutes(row.typeId)} onChange={(m) => updateRow(row.id, { stayDurationMin: m })} T={T} />;
       case "route": return (
         <span className="mt-route-mini">
           {routeUrl && <a className="mt-link-icon" href={routeUrl} target="_blank" rel="noreferrer" title={T.routeTooltip}><Route size={14} /></a>}
@@ -1885,7 +1885,7 @@ function MobileCardMeta({ row, prevRow, ctx }) {
           patch.startTime = `${String(Math.floor(arrTotal / 60)).padStart(2, "0")}:${String(arrTotal % 60).padStart(2, "0")}`;
         }
         const effectiveStart = patch.startTime || row.startTime;
-        if (effectiveStart && (!row.endTime || row.endTimeAuto)) {
+        if (effectiveStart && (!row.endTime || row.endTimeAuto !== false)) {
           const stay = row.stayDurationMin != null ? row.stayDurationMin : getDefaultStayMinutes(row.typeId);
           const [h, m] = effectiveStart.split(":").map(Number);
           const totalMin = (h * 60 + m + Math.round(stay) + 1440) % 1440;
@@ -2337,6 +2337,45 @@ function TimeField({ value, onChange, T, className, title }) {
   );
 }
 
+function formatStayLabel(min, T) {
+  const m = Number(min) || 0;
+  if (m === 0) return T.stayNone;
+  const h = Math.floor(m / 60), mm = m % 60;
+  if (h === 0) return `${mm} ${T.minutesShort}`;
+  if (mm === 0) return `${h} ${T.hoursShort}`;
+  return `${h}${T.hoursShort} ${mm}${T.minutesShort}`;
+}
+function StayDurationField({ value, onChange, T, max, compact }) {
+  const [open, setOpen] = useState(false);
+  const current = value != null ? value : 0;
+  const options = [];
+  for (let m = 0; m <= (max || 360); m += 30) options.push(m);
+  return (
+    <span style={{ position: "relative", display: "block" }}>
+      <button type="button" className={compact ? "mt-editable" : "mt-type-field-btn"} style={compact ? { width: "100%", textAlign: "center", padding: "2px 1px" } : undefined} onClick={() => setOpen(true)} title={T.stayDurationHint}>
+        {!compact && <Clock size={14} />}
+        <span className={compact ? undefined : "mt-type-text"}>{compact ? current : formatStayLabel(current, T)}</span>
+      </button>
+      {open && (
+        <div className="mt-modal-backdrop" onClick={() => setOpen(false)}>
+          <div className="mt-modal mt-type-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 220 }}>
+            <div className="mt-time-modal-header">
+              <span>{T.stayDuration}</span>
+              <button className="mt-btn ghost" style={{ padding: "4px 6px" }} onClick={() => setOpen(false)}><X size={16} /></button>
+            </div>
+            <div className="mt-type-list" style={{ maxHeight: 280 }}>
+              {options.map((m) => (
+                <button key={m} className={"opt" + (m === current ? " selected" : "")} onClick={() => { onChange(m); setOpen(false); }}>
+                  {formatStayLabel(m, T)}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </span>
+  );
+}
 function TypeFieldPicker({ typeId, types, lang, T, onChange, kindFilter, placeholder }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -5284,11 +5323,9 @@ export default function MyTripApp() {
               <div className="mt-field-row">
                 <div className="mt-field"><label>{T.start}</label><TimeField value={cardDraft.startTime} onChange={(e) => setCardDraft({ ...cardDraft, startTime: e.target.value, startTimeAuto: false })} T={T} className={(cardDraft.startTimeAuto !== false && cardDraft.startTime) ? "mt-computed-field" : ""} title={(cardDraft.startTimeAuto !== false && cardDraft.startTime) ? T.computedStartTimeHint : undefined} /></div>
                 <div className="mt-field"><label>{T.end}</label><TimeField value={cardDraft.endTime} onChange={(e) => setCardDraft({ ...cardDraft, endTime: e.target.value, endTimeAuto: false })} T={T} className={(cardDraft.endTimeAuto !== false && cardDraft.endTime) ? "mt-computed-field" : ""} title={(cardDraft.endTimeAuto !== false && cardDraft.endTime) ? T.computedEndTimeHint : undefined} /></div>
-                <div className="mt-field" style={{ maxWidth: 90 }}>
+                <div className="mt-field" style={{ maxWidth: 110 }}>
                   <label>{T.stayDuration}</label>
-                  <input type="number" min="0" step="5" title={T.stayDurationHint}
-                    value={cardDraft.stayDurationMin != null ? cardDraft.stayDurationMin : getDefaultStayMinutes(cardDraft.typeId)}
-                    onChange={(e) => setCardDraft({ ...cardDraft, stayDurationMin: e.target.value === "" ? 0 : Math.max(0, Number(e.target.value)) })} />
+                  <StayDurationField value={cardDraft.stayDurationMin != null ? cardDraft.stayDurationMin : getDefaultStayMinutes(cardDraft.typeId)} onChange={(m) => setCardDraft({ ...cardDraft, stayDurationMin: m })} T={T} />
                 </div>
               </div>
               <label className="mt-checkbox-row"><input type="checkbox" checked={!!cardDraft.overnight} onChange={(e) => setCardDraft({ ...cardDraft, overnight: e.target.checked })} />{T.overnight}</label>
