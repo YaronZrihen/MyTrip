@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.3.3";
+const APP_VERSION = "22.4.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -736,19 +736,23 @@ function isMovementType(typeId) { return isFlightType(typeId) || typeId === "tra
    an overnight leg that lands after midnight is still dated the day it departed, so the next day's
    first record must still be able to inherit its arrival time — resetting at the date boundary would
    silently break exactly that link.
-   Connection buffer: a row's own endTime, when auto, already equals startTime + its type's default
-   "stay" (e.g. 30 min at a check-in). But when endTime is manually locked (e.g. a real looked-up
-   flight arrival), that stay was never applied — the row is "worth" more time before you're free to
-   move on (deplaning, immigration, baggage). So the anchor handed to whatever comes next adds that
-   buffer on top of a locked endTime, and uses it as-is when it was already auto-computed.
-   Movement records (flight/domestic-flight/transfer) start right at that anchor — a transfer departs
-   the moment you're ready, it doesn't need its own travel time added before it can even begin — and
-   then use their own travel duration to compute when they arrive (their endTime). Flight-type rows
-   are the one exception: their own routeDurationMin is a driving-distance estimate between airports
-   (meaningless for actual flight time), so it's never used for them; they fall back to the type's
-   default duration guess instead, pending a real flight-schedule lookup. Dwell records use the
-   opposite order: their own travel duration determines when they're arrived at (startTime), and their
-   type's default dwell time determines when they're left (endTime). */
+   Connection buffer: a MOVEMENT row's own endTime, when manually locked (e.g. a real looked-up flight
+   arrival), never had its type's default "stay" applied — so that buffer is added on top of it for
+   whatever comes next (deplaning, immigration, baggage). This only applies when the PREVIOUS row is a
+   movement (flight/domestic-flight/transfer): a dwell record's (checkin, poi, ...) default stay is
+   never added as an invisible buffer to the next record, even if its own end time was set manually —
+   a manual dwell time already represents exactly when you're free to go, nothing implicit on top.
+   Movement records start right at that anchor — a transfer departs the moment you're ready, it
+   doesn't need its own travel time added before it can even begin — and then use their own travel
+   duration to compute when they arrive (their endTime). Flight-type rows are the one exception: their
+   own routeDurationMin is a driving-distance estimate between airports (meaningless for actual flight
+   time), so it's never used for them; they fall back to the type's default duration guess instead,
+   pending a real flight-schedule lookup. Dwell records use the opposite order: their own travel
+   duration determines when they're arrived at (startTime), and their type's default dwell time
+   determines when they're left (endTime).
+   Every auto-computed field is tagged with its source ('inherited' for a movement row's start, which
+   is a direct copy of the previous row's readiness with no arithmetic of its own; 'computed' for
+   everything else auto) so the UI can indicate provenance without guessing. */
 function recomputeChainTimesPure(rows, frames) {
   const order = buildGlobalRowOrderPure(rows, frames, null);
   const patches = new Map();
@@ -758,15 +762,19 @@ function recomputeChainTimesPure(rows, frames) {
     const patch = {};
     const movement = isMovementType(cur.typeId);
     if (cur.startTimeAuto !== false && prevInDate && prevInDate.endTime) {
+      const prevMovement = isMovementType(prevInDate.typeId);
       const prevStay = prevInDate.stayDurationMin != null ? prevInDate.stayDurationMin : getDefaultStayMinutes(prevInDate.typeId);
-      const anchor = prevInDate.endTimeAuto === false ? addMinutesToTime(prevInDate.endTime, prevStay) : prevInDate.endTime;
+      const anchor = (prevMovement && prevInDate.endTimeAuto === false) ? addMinutesToTime(prevInDate.endTime, prevStay) : prevInDate.endTime;
       let newStart = null;
       if (movement) {
         newStart = anchor;
       } else if (cur.routeDurationMin != null) {
         newStart = addMinutesToTime(anchor, cur.routeDurationMin);
       }
-      if (newStart != null && newStart !== cur.startTime) patch.startTime = newStart;
+      if (newStart != null) {
+        if (newStart !== cur.startTime) patch.startTime = newStart;
+        patch.startTimeSource = movement ? "inherited" : "computed";
+      }
     }
     const effectiveStart = patch.startTime !== undefined ? patch.startTime : cur.startTime;
     if (cur.endTimeAuto !== false && effectiveStart) {
@@ -774,12 +782,31 @@ function recomputeChainTimesPure(rows, frames) {
       const duration = useRouteDuration ? cur.routeDurationMin : (cur.stayDurationMin != null ? cur.stayDurationMin : getDefaultStayMinutes(cur.typeId));
       const newEnd = addMinutesToTime(effectiveStart, duration);
       if (newEnd !== cur.endTime) patch.endTime = newEnd;
+      patch.endTimeSource = "computed";
     }
     if (Object.keys(patch).length) patches.set(raw.id, patch);
     prevInDate = { ...cur, ...patch };
   }
   if (!patches.size) return rows;
   return rows.map((r) => (patches.has(r.id) ? { ...r, ...patches.get(r.id) } : r));
+}
+const TIME_FIELD_COLORS = { computed: "#2E9B57", inherited: "#3E7CB1", api: "#C9971E" };
+/* Determines which of the three provenance colors (if any) applies to a row's start/end time field.
+   'field' is 'start' or 'end'. Manual, plain user-typed values get no color at all. */
+function timeFieldColor(row, field) {
+  const time = field === "start" ? row.startTime : row.endTime;
+  if (!time) return null;
+  const auto = field === "start" ? row.startTimeAuto : row.endTimeAuto;
+  const source = field === "start" ? row.startTimeSource : row.endTimeSource;
+  if (auto === false) return source === "api" ? TIME_FIELD_COLORS.api : null;
+  return source === "inherited" ? TIME_FIELD_COLORS.inherited : TIME_FIELD_COLORS.computed;
+}
+/* The stay/dwell duration annotation shown next to a row's arrival time, e.g. "(2+)" for 2 hours or
+   "(30+)" for 30 minutes — informational only, never baked into the time field's own value. */
+function formatStayAnnotation(minutes) {
+  const m = minutes != null ? Math.round(minutes) : 0;
+  if (m <= 0) return null;
+  return m % 60 === 0 ? `(${m / 60}+)` : `(${m}+)`;
 }
 const TRAVEL_MODE_MAP = {
   taxi: "driving", "car-rental": "driving", caravan: "driving", motorcycle: "driving",
@@ -1544,9 +1571,9 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
           {lang !== "he" && toVerified && <a className="mt-loc-badge" href={row.toVerifiedUrl} target="_blank" rel="noreferrer" title={T.openMap}><MapPin size={11} /></a>}
         </span>
       );
-      case "startTime": return <TimeField value={row.startTime} onChange={(e) => ctx.setStartTimeWithCascade(row.id, e.target.value)} T={T} className={"mt-editable mt-time" + ((row.startTimeAuto !== false && row.startTime) ? " mt-computed-field" : "")} title={(row.startTimeAuto !== false && row.startTime) ? T.computedStartTimeHint : undefined} />;
+      case "startTime": { const c = timeFieldColor(row, "start"); return <TimeField value={row.startTime} onChange={(e) => ctx.setStartTimeWithCascade(row.id, e.target.value)} T={T} className="mt-editable mt-time" style={c ? { borderBottom: `2px dashed ${c}` } : undefined} title={c ? T.computedStartTimeHint : undefined} />; }
       case "duration": return <span title={dur === null ? "" : dur} style={{ color: dur === null ? "var(--danger)" : "var(--muted)", fontSize: 12 }}>{dur === null ? "!" : dur}</span>;
-      case "endTime": return <TimeField value={row.endTime} onChange={(e) => ctx.setEndTimeWithCascade(row.id, e.target.value)} T={T} className={"mt-editable mt-time" + ((row.endTimeAuto !== false && row.endTime) ? " mt-computed-field" : "")} title={(row.endTimeAuto !== false && row.endTime) ? T.computedEndTimeHint : undefined} />;
+      case "endTime": { const c = timeFieldColor(row, "end"); return <TimeField value={row.endTime} onChange={(e) => ctx.setEndTimeWithCascade(row.id, e.target.value)} T={T} className="mt-editable mt-time" style={c ? { borderBottom: `2px dashed ${c}` } : undefined} title={c ? T.computedEndTimeHint : undefined} />; }
       case "stay": return <StayDurationField compact value={row.stayDurationMin != null ? row.stayDurationMin : getDefaultStayMinutes(row.typeId)} onChange={(m) => updateRow(row.id, { stayDurationMin: m })} T={T} />;
       case "route": return (
         <span className="mt-route-mini">
@@ -2112,8 +2139,9 @@ function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
         </div>
         <div className="mt-card-top-end">
           <span className="mt-card-times" dir="ltr">
-            <span style={{ ...(r.startTime && Number(r.startTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...((r.startTimeAuto !== false && r.startTime) ? { borderBottom: "2px dashed #3E7CB1" } : {}) }}>{r.startTime || "—"}</span>
-            {r.endTime ? <> → <span style={{ ...(Number(r.endTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...((r.endTimeAuto !== false && r.endTime) ? { borderBottom: "2px dashed #3E7CB1" } : {}) }}>{r.endTime}</span></> : ""}
+            <span style={{ ...(r.startTime && Number(r.startTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "start") ? { borderBottom: `2px dashed ${timeFieldColor(r, "start")}` } : {}) }}>{r.startTime || "—"}</span>
+            {formatStayAnnotation(r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId)) && <span className="mt-stay-note">{formatStayAnnotation(r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId))}</span>}
+            {r.endTime ? <> → <span style={{ ...(Number(r.endTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "end") ? { borderBottom: `2px dashed ${timeFieldColor(r, "end")}` } : {}) }}>{r.endTime}</span></> : ""}
           </span>
           <span className="mt-card-drag-handle" onClick={(e) => e.stopPropagation()} {...dragListeners} {...dragAttrs}><GripVertical size={15} /></span>
         </div>
@@ -2341,7 +2369,7 @@ function FileManagerRow({ file, T, showCategory }) {
   );
 }
 
-function TimeField({ value, onChange, T, className, title }) {
+function TimeField({ value, onChange, T, className, title, style }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [mode, setMode] = useState("hour");
@@ -2393,7 +2421,7 @@ function TimeField({ value, onChange, T, className, title }) {
   const marks = mode === "hour" ? hourMarks : minMarks;
   return (
     <span style={{ position: "relative", display: "block" }}>
-      <button type="button" className={"mt-type-field-btn" + (className ? " " + className : "")} title={title} onClick={openPicker}>
+      <button type="button" className={"mt-type-field-btn" + (className ? " " + className : "")} style={style} title={title} onClick={openPicker}>
         <Clock size={14} />
         <span className="mt-type-text" dir="ltr" style={value && Number(value.split(":")[0]) < 6 ? { color: "#C1543A", fontWeight: 700 } : undefined}>{value || "--:--"}</span>
         {value && Number(value.split(":")[0]) < 6 && <span className="mt-hint" style={{ color: "#C1543A", fontSize: 10 }} title={T.afterMidnightHint}>🌙</span>}
@@ -3579,11 +3607,11 @@ export default function MyTripApp() {
      fill in the actual value and propagate forward — no local cascade loop needed here anymore. */
   function setStartTimeWithCascade(rowId, newStartTime) {
     const isManualSet = !!newStartTime;
-    applyRows((prev) => prev.map((r) => (r.id === rowId ? { ...r, startTime: newStartTime, startTimeAuto: !isManualSet } : r)));
+    applyRows((prev) => prev.map((r) => (r.id === rowId ? { ...r, startTime: newStartTime, startTimeAuto: !isManualSet, startTimeSource: undefined } : r)));
   }
   function setEndTimeWithCascade(rowId, newEndTime) {
     const isManualSet = !!newEndTime;
-    applyRows((prev) => prev.map((r) => (r.id === rowId ? { ...r, endTime: newEndTime, endTimeAuto: !isManualSet } : r)));
+    applyRows((prev) => prev.map((r) => (r.id === rowId ? { ...r, endTime: newEndTime, endTimeAuto: !isManualSet, endTimeSource: undefined } : r)));
   }
   function deleteRow(id) { applyRows((prev) => prev.filter((r) => r.id !== id && r.parentId !== id)); }
   function addRow(date, parentId = null, frameId = null) {
@@ -4017,8 +4045,8 @@ export default function MyTripApp() {
         const patch = { flightLookedUpFor: num };
         if (data.departureAirport) patch.from = data.departureAirport;
         if (data.arrivalAirport) patch.to = data.arrivalAirport;
-        if (data.departureTime) patch.startTime = data.departureTime;
-        if (data.arrivalTime) patch.endTime = data.arrivalTime;
+        if (data.departureTime) { patch.startTime = data.departureTime; patch.startTimeAuto = false; patch.startTimeSource = "api"; }
+        if (data.arrivalTime) { patch.endTime = data.arrivalTime; patch.endTimeAuto = false; patch.endTimeSource = "api"; }
         const extras = [data.status, data.terminal ? `${T.flightTerminal} ${data.terminal}` : null, data.gate ? `${T.flightGate} ${data.gate}` : null].filter(Boolean);
         if (extras.length) patch.notes = [cardDraft.notes, extras.join(" · ")].filter(Boolean).join(" — ");
         setCardDraft((d) => ({ ...d, ...patch }));
@@ -4333,6 +4361,8 @@ export default function MyTripApp() {
         .mt-editable.mt-time:focus, .mt-editable[type=number]:focus { outline:none; border-color:var(--teal); background:#fff; }
         .mt-editable.mt-time { min-width:60px; font-weight:700; color:var(--ink); padding-inline-end:2px; }
         .mt-computed-field { border-bottom:2px dashed #3E7CB1 !important; }
+        .mt-stay-note { font-size:10.5px; color:var(--muted); margin-inline-start:2px; }
+        .mt-time-cell { display:inline-flex; align-items:center; gap:2px; }
         .mt-editable.mt-time::-webkit-calendar-picker-indicator { padding:1px; margin-inline-start:1px; width:10px; height:10px; opacity:.6; }
         .mt-editable[type=number] { min-width:38px; padding-inline-start:1px; -moz-appearance:textfield; }
         .mt-editable[type=number]::-webkit-outer-spin-button, .mt-editable[type=number]::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
@@ -5368,8 +5398,8 @@ export default function MyTripApp() {
               </div>
 
               <div className="mt-field-row">
-                <div className="mt-field"><label>{T.start}</label><TimeField value={cardDraft.startTime} onChange={(e) => setCardDraft({ ...cardDraft, startTime: e.target.value, startTimeAuto: false })} T={T} className={(cardDraft.startTimeAuto !== false && cardDraft.startTime) ? "mt-computed-field" : ""} title={(cardDraft.startTimeAuto !== false && cardDraft.startTime) ? T.computedStartTimeHint : undefined} /></div>
-                <div className="mt-field"><label>{T.end}</label><TimeField value={cardDraft.endTime} onChange={(e) => setCardDraft({ ...cardDraft, endTime: e.target.value, endTimeAuto: false })} T={T} className={(cardDraft.endTimeAuto !== false && cardDraft.endTime) ? "mt-computed-field" : ""} title={(cardDraft.endTimeAuto !== false && cardDraft.endTime) ? T.computedEndTimeHint : undefined} /></div>
+                <div className="mt-field"><label>{T.start}</label><TimeField value={cardDraft.startTime} onChange={(e) => setCardDraft({ ...cardDraft, startTime: e.target.value, startTimeAuto: false, startTimeSource: undefined })} T={T} style={timeFieldColor(cardDraft, "start") ? { borderBottom: `2px dashed ${timeFieldColor(cardDraft, "start")}` } : undefined} title={timeFieldColor(cardDraft, "start") ? T.computedStartTimeHint : undefined} /></div>
+                <div className="mt-field"><label>{T.end}</label><TimeField value={cardDraft.endTime} onChange={(e) => setCardDraft({ ...cardDraft, endTime: e.target.value, endTimeAuto: false, endTimeSource: undefined })} T={T} style={timeFieldColor(cardDraft, "end") ? { borderBottom: `2px dashed ${timeFieldColor(cardDraft, "end")}` } : undefined} title={timeFieldColor(cardDraft, "end") ? T.computedEndTimeHint : undefined} /></div>
                 <div className="mt-field" style={{ maxWidth: 110 }}>
                   <label>{T.stayDuration}</label>
                   <StayDurationField value={cardDraft.stayDurationMin != null ? cardDraft.stayDurationMin : getDefaultStayMinutes(cardDraft.typeId)} onChange={(m) => setCardDraft({ ...cardDraft, stayDurationMin: m })} T={T} />
