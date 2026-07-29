@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "21.7.2";
+const APP_VERSION = "22.0.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -182,6 +182,7 @@ const DEFAULT_COLUMNS = [
   { key: "startTime", label_he: "בשעה", label_en: "At", visible: true },
   { key: "duration", label_he: "משך", label_en: "Dur.", visible: true },
   { key: "endTime", label_he: "עד שעה", label_en: "Until", visible: true },
+  { key: "stay", label_he: "שהות", label_en: "Stay", visible: true },
   { key: "route", label_he: "מסלול", label_en: "Route", visible: true },
   { key: "link", label_he: "קישור", label_en: "Link", visible: true },
   { key: "cost", label_he: "עלות", label_en: "Cost", visible: true },
@@ -209,6 +210,7 @@ const T_DICT = {
     checklistPackingSub: "{n} מתוך {total} הושלמו", checklistShoppingSub: "{n} פריטים", checklistShoppingEmpty: "הרשימה ריקה — הוסף פריט למטה",
     deleteFrameOnly: "מחק מסגרת בלבד (התוכן יעבור למסגרת האם)", deleteFrameWithContent: "מחק מסגרת ואת כל התוכן שבתוכה",
     type: "תיאור", from: "מוצא", to: "יעד", start: "בשעה", end: "עד שעה", overnight: "חוצה חצות", arrivalMethod: "אמצעי הגעה",
+    stayDuration: "משך שהות (דק')", stayDurationHint: "כמה זמן נשארים ביעד — קובע את שעת הסיום (שעת הגעה + משך שהות).",
     typeKindDesc: "תיאור", typeKindArrival: "אמצעי הגעה",
     requiresTicket: "דורש רכישת כרטיס כניסה", calcRoute: "חשב מסלול",
     ticketPurchased: "הכרטיס נרכש", flightCheckedIn: "בוצע צ'ק-אין לטיסה",
@@ -364,6 +366,7 @@ const T_DICT = {
     checklistPackingSub: "{n} of {total} done", checklistShoppingSub: "{n} items", checklistShoppingEmpty: "List is empty — add an item below",
     deleteFrameOnly: "Delete frame only (content moves to parent)", deleteFrameWithContent: "Delete frame and all its content",
     type: "Description", from: "Origin", to: "Destination", start: "At", end: "Until", overnight: "Crosses midnight", arrivalMethod: "Arrival method",
+    stayDuration: "Stay duration (min)", stayDurationHint: "How long you stay at the destination — determines the end time (arrival + stay).",
     typeKindDesc: "Description", typeKindArrival: "Arrival method",
     requiresTicket: "Requires entrance ticket", calcRoute: "Calculate route",
     ticketPurchased: "Ticket purchased", flightCheckedIn: "Flight check-in done",
@@ -688,6 +691,8 @@ function rowFrameIssue(draft, frames, T) {
 }
 function rowStartPoint(row) { return (row.from && row.from.trim()) || (row.fromAlias && row.fromAlias.trim()) || ""; }
 function rowEndPoint(row) { return (row.to && row.to.trim()) || (row.toAlias && row.toAlias.trim()) || ""; }
+const TYPE_STAY_MINUTES_DEFAULTS = {};
+function getDefaultStayMinutes(typeId) { return TYPE_STAY_MINUTES_DEFAULTS[typeId] != null ? TYPE_STAY_MINUTES_DEFAULTS[typeId] : 0; }
 const TRAVEL_MODE_MAP = {
   taxi: "driving", "car-rental": "driving", caravan: "driving", motorcycle: "driving",
   bicycle: "bicycling", scooter: "bicycling", walking: "walking",
@@ -1025,9 +1030,9 @@ function fetchWeather(lat, lon, dateStr) {
 const COL_WIDTHS = {
   handle: 26, actions: 72,
   date: 78, day: 48, icon: 43, type: 125, from: 165, to: 165, arrival: 132,
-  startTime: 90, duration: 45, endTime: 90, route: 92, link: 39, cost: 58, notes: 32, weather: 42,
+  startTime: 90, duration: 45, endTime: 90, stay: 40, route: 92, link: 39, cost: 58, notes: 32, weather: 42,
 };
-const COL_MIN_WIDTHS = { startTime: 90, endTime: 90, route: 70, from: 160, to: 160, type: 120, icon: 43, duration: 44, arrival: 132 };
+const COL_MIN_WIDTHS = { startTime: 90, endTime: 90, route: 70, from: 160, to: 160, type: 120, icon: 43, duration: 44, arrival: 132, stay: 36 };
 function colFixedWidth(key) {
   if (COL_WIDTHS[key] != null) return COL_WIDTHS[key];
   return 110; // fallback for custom columns
@@ -1199,26 +1204,27 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
         setRouteCalcError(null);
         const patch = { routeDistanceKm: info.distanceKm, routeDurationMin: info.durationMin, toLat: b.lat, toLon: b.lon };
         if (originSource === "own") { patch.fromLat = a.lat; patch.fromLon = a.lon; }
-        if (row.startTime && (!row.endTime || row.endTimeAuto)) {
-          const [h, m] = row.startTime.split(":").map(Number);
-          const totalMin = (h * 60 + m + Math.round(info.durationMin) + 1440) % 1440;
+        if (row.startTimeAuto !== false && prevRow && prevRow.endTime) {
+          const [ph, pm] = prevRow.endTime.split(":").map(Number);
+          const arrTotal = (ph * 60 + pm + Math.round(info.durationMin) + 1440) % 1440;
+          patch.startTime = `${String(Math.floor(arrTotal / 60)).padStart(2, "0")}:${String(arrTotal % 60).padStart(2, "0")}`;
+        }
+        const effectiveStart = patch.startTime || row.startTime;
+        if (effectiveStart && (!row.endTime || row.endTimeAuto)) {
+          const stay = row.stayDurationMin != null ? row.stayDurationMin : getDefaultStayMinutes(row.typeId);
+          const [h, m] = effectiveStart.split(":").map(Number);
+          const totalMin = (h * 60 + m + Math.round(stay) + 1440) % 1440;
           patch.endTime = `${String(Math.floor(totalMin / 60)).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
           patch.endTimeAuto = true;
         }
         updateRow(row.id, patch);
-        if (patch.endTime) {
-          const nextRow = ctx.nextRowMap.get(row.id);
-          if (nextRow && nextRow.date === row.date && nextRow.startTimeAuto !== false) {
-            updateRow(nextRow.id, { startTime: patch.endTime, startTimeAuto: true });
-          }
-        }
       });
     }).catch(() => { lastRouteCalcSig.current = null; setDistLoading(false); setRouteCalcError(T.routeErrNetwork); });
   }
   useEffect(() => {
     fetchRouteDistance();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [row.id, row.from, row.to, row.fromAlias, row.toAlias, row.startTime, row.typeId, row.fromLat, row.fromLon, row.toLat, row.toLon, prevRow && prevRow.from, prevRow && prevRow.fromAlias, prevRow && prevRow.fromLat, prevRow && prevRow.fromLon, prevRow && prevRow.to, prevRow && prevRow.toAlias, prevRow && prevRow.toLat, prevRow && prevRow.toLon]);
+  }, [row.id, row.from, row.to, row.fromAlias, row.toAlias, row.startTime, row.typeId, row.fromLat, row.fromLon, row.toLat, row.toLon, row.stayDurationMin, prevRow && prevRow.from, prevRow && prevRow.fromAlias, prevRow && prevRow.fromLat, prevRow && prevRow.fromLon, prevRow && prevRow.to, prevRow && prevRow.toAlias, prevRow && prevRow.toLat, prevRow && prevRow.toLon, prevRow && prevRow.endTime]);
 
   const [fromVerifyLoading, setFromVerifyLoading] = useState(false);
   useEffect(() => {
@@ -1444,6 +1450,9 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
       case "startTime": return <TimeField value={row.startTime} onChange={(e) => ctx.setStartTimeWithCascade(row.id, e.target.value)} T={T} className={"mt-editable mt-time" + ((row.startTimeAuto !== false && row.startTime) ? " mt-computed-field" : "")} title={(row.startTimeAuto !== false && row.startTime) ? T.computedStartTimeHint : undefined} />;
       case "duration": return <span title={dur === null ? "" : dur} style={{ color: dur === null ? "var(--danger)" : "var(--muted)", fontSize: 12 }}>{dur === null ? "!" : dur}</span>;
       case "endTime": return <TimeField value={row.endTime} onChange={(e) => ctx.setEndTimeWithCascade(row.id, e.target.value)} T={T} className={"mt-editable mt-time" + ((row.endTimeAuto !== false && row.endTime) ? " mt-computed-field" : "")} title={(row.endTimeAuto !== false && row.endTime) ? T.computedEndTimeHint : undefined} />;
+      case "stay": return <input type="number" min="0" step="5" className="mt-editable" style={{ width: "100%", textAlign: "center", padding: "2px 1px" }} title={T.stayDurationHint}
+        value={row.stayDurationMin != null ? row.stayDurationMin : getDefaultStayMinutes(row.typeId)}
+        onChange={(e) => updateRow(row.id, { stayDurationMin: e.target.value === "" ? 0 : Math.max(0, Number(e.target.value)) })} />;
       case "route": return (
         <span className="mt-route-mini">
           {routeUrl && <a className="mt-link-icon" href={routeUrl} target="_blank" rel="noreferrer" title={T.routeTooltip}><Route size={14} /></a>}
@@ -1870,23 +1879,24 @@ function MobileCardMeta({ row, prevRow, ctx }) {
         if (!info) { lastRouteCalcSig.current = null; return; }
         const patch = { routeDistanceKm: info.distanceKm, routeDurationMin: info.durationMin, toLat: b.lat, toLon: b.lon };
         if (originSource === "own") { patch.fromLat = a.lat; patch.fromLon = a.lon; }
-        if (row.startTime && (!row.endTime || row.endTimeAuto)) {
-          const [h, m] = row.startTime.split(":").map(Number);
-          const totalMin = (h * 60 + m + Math.round(info.durationMin) + 1440) % 1440;
+        if (row.startTimeAuto !== false && prevRow && prevRow.endTime) {
+          const [ph, pm] = prevRow.endTime.split(":").map(Number);
+          const arrTotal = (ph * 60 + pm + Math.round(info.durationMin) + 1440) % 1440;
+          patch.startTime = `${String(Math.floor(arrTotal / 60)).padStart(2, "0")}:${String(arrTotal % 60).padStart(2, "0")}`;
+        }
+        const effectiveStart = patch.startTime || row.startTime;
+        if (effectiveStart && (!row.endTime || row.endTimeAuto)) {
+          const stay = row.stayDurationMin != null ? row.stayDurationMin : getDefaultStayMinutes(row.typeId);
+          const [h, m] = effectiveStart.split(":").map(Number);
+          const totalMin = (h * 60 + m + Math.round(stay) + 1440) % 1440;
           patch.endTime = `${String(Math.floor(totalMin / 60)).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
           patch.endTimeAuto = true;
         }
         updateRow(row.id, patch);
-        if (patch.endTime) {
-          const nextRow = ctx.nextRowMap.get(row.id);
-          if (nextRow && nextRow.date === row.date && nextRow.startTimeAuto !== false) {
-            updateRow(nextRow.id, { startTime: patch.endTime, startTimeAuto: true });
-          }
-        }
       });
     }).catch(() => { lastRouteCalcSig.current = null; setDistLoading(false); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [row.id, row.from, row.to, row.fromAlias, row.toAlias, row.startTime, row.typeId, row.fromLat, row.fromLon, row.toLat, row.toLon, prevRow && prevRow.from, prevRow && prevRow.fromAlias, prevRow && prevRow.fromLat, prevRow && prevRow.fromLon, prevRow && prevRow.to, prevRow && prevRow.toAlias, prevRow && prevRow.toLat, prevRow && prevRow.toLon]);
+  }, [row.id, row.from, row.to, row.fromAlias, row.toAlias, row.startTime, row.typeId, row.fromLat, row.fromLon, row.toLat, row.toLon, row.stayDurationMin, prevRow && prevRow.from, prevRow && prevRow.fromAlias, prevRow && prevRow.fromLat, prevRow && prevRow.fromLon, prevRow && prevRow.to, prevRow && prevRow.toAlias, prevRow && prevRow.toLat, prevRow && prevRow.toLon, prevRow && prevRow.endTime]);
 
   const [fromVerifyLoading, setFromVerifyLoading] = useState(false);
   useEffect(() => {
@@ -3424,24 +3434,28 @@ export default function MyTripApp() {
     const patches = new Map();
     patches.set(rowId, { startTime: effectiveStart, startTimeAuto: !isManualSet });
     let currentId = rowId;
-    let currentStart = effectiveStart;
+    let currentArrival = effectiveStart;
     let guard = 0;
     while (guard++ < 200) {
       const currentRow = rows.find((r) => r.id === currentId);
-      if (!currentRow || currentRow.routeDurationMin == null) break;
+      if (!currentRow) break;
       const priorPatch = patches.get(currentId) || {};
       const effectiveEndTimeAuto = priorPatch.endTimeAuto !== undefined ? priorPatch.endTimeAuto : currentRow.endTimeAuto;
       const effectiveEndTime = priorPatch.endTime !== undefined ? priorPatch.endTime : currentRow.endTime;
       if (effectiveEndTime && effectiveEndTimeAuto === false) break;
-      const [h, m] = currentStart.split(":").map(Number);
-      const totalMin = (h * 60 + m + Math.round(currentRow.routeDurationMin) + 1440) % 1440;
-      const newEnd = `${String(Math.floor(totalMin / 60)).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
-      patches.set(currentId, { ...patches.get(currentId), endTime: newEnd, endTimeAuto: true });
+      const stay = currentRow.stayDurationMin != null ? currentRow.stayDurationMin : getDefaultStayMinutes(currentRow.typeId);
+      const [h, m] = currentArrival.split(":").map(Number);
+      const depTotal = (h * 60 + m + Math.round(stay) + 1440) % 1440;
+      const departure = `${String(Math.floor(depTotal / 60)).padStart(2, "0")}:${String(depTotal % 60).padStart(2, "0")}`;
+      patches.set(currentId, { ...patches.get(currentId), endTime: departure, endTimeAuto: true });
       const nextRow = nextRowMap.get(currentId);
-      if (!nextRow || nextRow.date !== currentRow.date || nextRow.startTimeAuto === false) break;
-      patches.set(nextRow.id, { startTime: newEnd, startTimeAuto: true });
+      if (!nextRow || nextRow.date !== currentRow.date || nextRow.startTimeAuto === false || nextRow.routeDurationMin == null) break;
+      const [dh, dm] = departure.split(":").map(Number);
+      const arrTotal = (dh * 60 + dm + Math.round(nextRow.routeDurationMin) + 1440) % 1440;
+      const arrival = `${String(Math.floor(arrTotal / 60)).padStart(2, "0")}:${String(arrTotal % 60).padStart(2, "0")}`;
+      patches.set(nextRow.id, { startTime: arrival, startTimeAuto: true });
       currentId = nextRow.id;
-      currentStart = newEnd;
+      currentArrival = arrival;
     }
     setRows((prev) => prev.map((r) => (patches.has(r.id) ? { ...r, ...patches.get(r.id) } : r)));
   }
@@ -3451,9 +3465,10 @@ export default function MyTripApp() {
     if (!startRow) return;
     let effectiveEnd = newEndTime;
     if (!isManualSet) {
-      if (startRow.startTime && startRow.routeDurationMin != null) {
+      if (startRow.startTime) {
+        const stay = startRow.stayDurationMin != null ? startRow.stayDurationMin : getDefaultStayMinutes(startRow.typeId);
         const [h, m] = startRow.startTime.split(":").map(Number);
-        const totalMin = (h * 60 + m + Math.round(startRow.routeDurationMin) + 1440) % 1440;
+        const totalMin = (h * 60 + m + Math.round(stay) + 1440) % 1440;
         effectiveEnd = `${String(Math.floor(totalMin / 60)).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
       } else {
         updateRow(rowId, { endTime: "", endTimeAuto: true }); return;
@@ -3463,20 +3478,23 @@ export default function MyTripApp() {
     patches.set(rowId, { endTime: effectiveEnd, endTimeAuto: !isManualSet });
     let currentDate = startRow.date;
     let nextRow = nextRowMap.get(rowId);
-    let currentEnd = effectiveEnd;
+    let currentDeparture = effectiveEnd;
     let guard = 0;
-    while (nextRow && nextRow.date === currentDate && nextRow.startTimeAuto !== false && guard++ < 200) {
-      patches.set(nextRow.id, { ...patches.get(nextRow.id), startTime: currentEnd, startTimeAuto: true });
-      if (nextRow.routeDurationMin == null) break;
+    while (nextRow && nextRow.date === currentDate && nextRow.startTimeAuto !== false && nextRow.routeDurationMin != null && guard++ < 200) {
+      const [dh, dm] = currentDeparture.split(":").map(Number);
+      const arrTotal = (dh * 60 + dm + Math.round(nextRow.routeDurationMin) + 1440) % 1440;
+      const arrival = `${String(Math.floor(arrTotal / 60)).padStart(2, "0")}:${String(arrTotal % 60).padStart(2, "0")}`;
+      patches.set(nextRow.id, { ...patches.get(nextRow.id), startTime: arrival, startTimeAuto: true });
       const priorPatch = patches.get(nextRow.id) || {};
       const effectiveEndTimeAuto = priorPatch.endTimeAuto !== undefined ? priorPatch.endTimeAuto : nextRow.endTimeAuto;
       const effectiveEndTime = priorPatch.endTime !== undefined ? priorPatch.endTime : nextRow.endTime;
       if (effectiveEndTime && effectiveEndTimeAuto === false) break;
-      const [h, m] = currentEnd.split(":").map(Number);
-      const totalMin = (h * 60 + m + Math.round(nextRow.routeDurationMin) + 1440) % 1440;
-      const newEnd = `${String(Math.floor(totalMin / 60)).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
-      patches.set(nextRow.id, { ...patches.get(nextRow.id), endTime: newEnd, endTimeAuto: true });
-      currentEnd = newEnd;
+      const stay = nextRow.stayDurationMin != null ? nextRow.stayDurationMin : getDefaultStayMinutes(nextRow.typeId);
+      const [ah, am] = arrival.split(":").map(Number);
+      const depTotal = (ah * 60 + am + Math.round(stay) + 1440) % 1440;
+      const departure = `${String(Math.floor(depTotal / 60)).padStart(2, "0")}:${String(depTotal % 60).padStart(2, "0")}`;
+      patches.set(nextRow.id, { ...patches.get(nextRow.id), endTime: departure, endTimeAuto: true });
+      currentDeparture = departure;
       nextRow = nextRowMap.get(nextRow.id);
     }
     setRows((prev) => prev.map((r) => (patches.has(r.id) ? { ...r, ...patches.get(r.id) } : r)));
@@ -3485,7 +3503,7 @@ export default function MyTripApp() {
   function addRow(date, parentId = null, frameId = null) {
     const nr = {
       id: uid(), parentId, frameId, date: date || toLocalISODate(new Date()),
-      typeId: "unset", arrivalTypeId: "walking", from: "", to: "", startTime: "", startTimeAuto: true, endTime: "", overnight: false,
+      typeId: "unset", arrivalTypeId: "walking", from: "", to: "", startTime: "", startTimeAuto: true, endTime: "", overnight: false, stayDurationMin: null,
       destination: "", link: "", mapLink: "", flightNumber: "", costAmount: 0, costCurrency: "₪", fromAlias: "", toAlias: "",
       notes: "", fromVerifiedUrl: "", fromVerifiedText: "", toVerifiedUrl: "", toVerifiedText: "",
       fromLat: null, fromLon: null, toLat: null, toLon: null, routeDistanceKm: null, routeDurationMin: null, custom: {},
@@ -3941,8 +3959,24 @@ export default function MyTripApp() {
   const frameIssue = frameDraft ? frameDateIssue(frameDraft, rows, frames, T) : null;
   function saveFrame() {
     if (!frameDraft.name.trim() || !frameDraft.startDate || !frameDraft.endDate || frameIssue) return;
-    if (frameDraft.id) setFrames((prev) => prev.map((f) => (f.id === frameDraft.id ? { ...frameDraft } : f)));
-    else setFrames((prev) => [...prev, { ...frameDraft, id: uid() }]);
+    if (frameDraft.id) {
+      setFrames((prev) => prev.map((f) => (f.id === frameDraft.id ? { ...frameDraft } : f)));
+    } else {
+      const newFrameId = uid();
+      setFrames((prev) => [...prev, { ...frameDraft, id: newFrameId }]);
+      if (frameDraft.frameType === "hotel") {
+        const name = frameDraft.name.trim();
+        const checkIn = frameDraft.startDate, checkOut = frameDraft.endDate;
+        const idTransferIn = addRow(checkIn, null, newFrameId);
+        updateRow(idTransferIn, { typeId: "transfer", to: name });
+        const id1 = addRow(checkIn, null, newFrameId);
+        updateRow(id1, { typeId: "checkin", startTime: "15:00", to: name });
+        const id2 = addRow(checkOut, null, newFrameId);
+        updateRow(id2, { typeId: "checkout", endTime: "11:00", to: name });
+        const idTransferOut = addRow(checkOut, null, newFrameId);
+        updateRow(idTransferOut, { typeId: "transfer" });
+      }
+    }
     closeFrameModal();
   }
   function deleteFrameOnly(id) {
@@ -5250,6 +5284,12 @@ export default function MyTripApp() {
               <div className="mt-field-row">
                 <div className="mt-field"><label>{T.start}</label><TimeField value={cardDraft.startTime} onChange={(e) => setCardDraft({ ...cardDraft, startTime: e.target.value, startTimeAuto: false })} T={T} className={(cardDraft.startTimeAuto !== false && cardDraft.startTime) ? "mt-computed-field" : ""} title={(cardDraft.startTimeAuto !== false && cardDraft.startTime) ? T.computedStartTimeHint : undefined} /></div>
                 <div className="mt-field"><label>{T.end}</label><TimeField value={cardDraft.endTime} onChange={(e) => setCardDraft({ ...cardDraft, endTime: e.target.value, endTimeAuto: false })} T={T} className={(cardDraft.endTimeAuto !== false && cardDraft.endTime) ? "mt-computed-field" : ""} title={(cardDraft.endTimeAuto !== false && cardDraft.endTime) ? T.computedEndTimeHint : undefined} /></div>
+                <div className="mt-field" style={{ maxWidth: 90 }}>
+                  <label>{T.stayDuration}</label>
+                  <input type="number" min="0" step="5" title={T.stayDurationHint}
+                    value={cardDraft.stayDurationMin != null ? cardDraft.stayDurationMin : getDefaultStayMinutes(cardDraft.typeId)}
+                    onChange={(e) => setCardDraft({ ...cardDraft, stayDurationMin: e.target.value === "" ? 0 : Math.max(0, Number(e.target.value)) })} />
+                </div>
               </div>
               <label className="mt-checkbox-row"><input type="checkbox" checked={!!cardDraft.overnight} onChange={(e) => setCardDraft({ ...cardDraft, overnight: e.target.checked })} />{T.overnight}</label>
               {cardHasTimeError && <div className="mt-error"><AlertTriangle /> {T.timeError}</div>}
