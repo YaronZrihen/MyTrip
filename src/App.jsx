@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.1.0";
+const APP_VERSION = "22.2.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -210,7 +210,7 @@ const T_DICT = {
     checklistPackingSub: "{n} מתוך {total} הושלמו", checklistShoppingSub: "{n} פריטים", checklistShoppingEmpty: "הרשימה ריקה — הוסף פריט למטה",
     deleteFrameOnly: "מחק מסגרת בלבד (התוכן יעבור למסגרת האם)", deleteFrameWithContent: "מחק מסגרת ואת כל התוכן שבתוכה",
     type: "תיאור", from: "מוצא", to: "יעד", start: "בשעה", end: "עד שעה", overnight: "חוצה חצות", arrivalMethod: "אמצעי הגעה",
-    stayDuration: "משך שהות (דק')", stayDurationHint: "כמה זמן נשארים ביעד — קובע את שעת הסיום (שעת הגעה + משך שהות).",
+    stayDuration: "משך שהות", stayDurationHint: "כמה זמן נשארים ביעד — קובע את שעת הסיום (שעת הגעה + משך שהות).",
     stayNone: "ללא שהות", minutesShort: "דק'", hoursShort: "שע'",
     typeKindDesc: "תיאור", typeKindArrival: "אמצעי הגעה",
     requiresTicket: "דורש רכישת כרטיס כניסה", calcRoute: "חשב מסלול",
@@ -367,7 +367,7 @@ const T_DICT = {
     checklistPackingSub: "{n} of {total} done", checklistShoppingSub: "{n} items", checklistShoppingEmpty: "List is empty — add an item below",
     deleteFrameOnly: "Delete frame only (content moves to parent)", deleteFrameWithContent: "Delete frame and all its content",
     type: "Description", from: "Origin", to: "Destination", start: "At", end: "Until", overnight: "Crosses midnight", arrivalMethod: "Arrival method",
-    stayDuration: "Stay duration (min)", stayDurationHint: "How long you stay at the destination — determines the end time (arrival + stay).",
+    stayDuration: "Stay duration", stayDurationHint: "How long you stay at the destination — determines the end time (arrival + stay).",
     stayNone: "No stay", minutesShort: "min", hoursShort: "hr",
     typeKindDesc: "Description", typeKindArrival: "Arrival method",
     requiresTicket: "Requires entrance ticket", calcRoute: "Calculate route",
@@ -693,7 +693,7 @@ function rowFrameIssue(draft, frames, T) {
 }
 function rowStartPoint(row) { return (row.from && row.from.trim()) || (row.fromAlias && row.fromAlias.trim()) || ""; }
 function rowEndPoint(row) { return (row.to && row.to.trim()) || (row.toAlias && row.toAlias.trim()) || ""; }
-const TYPE_STAY_MINUTES_DEFAULTS = {};
+const TYPE_STAY_MINUTES_DEFAULTS = { flight: 120, "domestic-flight": 60, checkin: 30, checkout: 30 };
 function getDefaultStayMinutes(typeId) { return TYPE_STAY_MINUTES_DEFAULTS[typeId] != null ? TYPE_STAY_MINUTES_DEFAULTS[typeId] : 0; }
 const TRAVEL_MODE_MAP = {
   taxi: "driving", "car-rental": "driving", caravan: "driving", motorcycle: "driving",
@@ -1227,6 +1227,15 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
     fetchRouteDistance();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [row.id, row.from, row.to, row.fromAlias, row.toAlias, row.startTime, row.typeId, row.fromLat, row.fromLon, row.toLat, row.toLon, row.stayDurationMin, prevRow && prevRow.from, prevRow && prevRow.fromAlias, prevRow && prevRow.fromLat, prevRow && prevRow.fromLon, prevRow && prevRow.to, prevRow && prevRow.toAlias, prevRow && prevRow.toLat, prevRow && prevRow.toLon, prevRow && prevRow.endTime]);
+  useEffect(() => {
+    if (!row.startTime || (row.endTime && row.endTimeAuto === false)) return;
+    const stay = row.stayDurationMin != null ? row.stayDurationMin : getDefaultStayMinutes(row.typeId);
+    const [h, m] = row.startTime.split(":").map(Number);
+    const totalMin = (h * 60 + m + Math.round(stay) + 1440) % 1440;
+    const newEnd = `${String(Math.floor(totalMin / 60)).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
+    if (newEnd !== row.endTime) updateRow(row.id, { endTime: newEnd, endTimeAuto: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [row.id, row.startTime, row.stayDurationMin, row.typeId, row.endTime, row.endTimeAuto]);
 
   const [fromVerifyLoading, setFromVerifyLoading] = useState(false);
   useEffect(() => {
@@ -1897,6 +1906,15 @@ function MobileCardMeta({ row, prevRow, ctx }) {
     }).catch(() => { lastRouteCalcSig.current = null; setDistLoading(false); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [row.id, row.from, row.to, row.fromAlias, row.toAlias, row.startTime, row.typeId, row.fromLat, row.fromLon, row.toLat, row.toLon, row.stayDurationMin, prevRow && prevRow.from, prevRow && prevRow.fromAlias, prevRow && prevRow.fromLat, prevRow && prevRow.fromLon, prevRow && prevRow.to, prevRow && prevRow.toAlias, prevRow && prevRow.toLat, prevRow && prevRow.toLon, prevRow && prevRow.endTime]);
+  useEffect(() => {
+    if (!row.startTime || (row.endTime && row.endTimeAuto === false)) return;
+    const stay = row.stayDurationMin != null ? row.stayDurationMin : getDefaultStayMinutes(row.typeId);
+    const [h, m] = row.startTime.split(":").map(Number);
+    const totalMin = (h * 60 + m + Math.round(stay) + 1440) % 1440;
+    const newEnd = `${String(Math.floor(totalMin / 60)).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
+    if (newEnd !== row.endTime) updateRow(row.id, { endTime: newEnd, endTimeAuto: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [row.id, row.startTime, row.stayDurationMin, row.typeId, row.endTime, row.endTimeAuto]);
 
   const [fromVerifyLoading, setFromVerifyLoading] = useState(false);
   useEffect(() => {
