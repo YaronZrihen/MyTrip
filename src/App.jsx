@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.3.2";
+const APP_VERSION = "22.3.3";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -721,6 +721,12 @@ function buildGlobalRowOrderPure(rows, frames, fid) {
   });
   return result;
 }
+/* A "movement" record represents departing one place and arriving at another (flight, domestic
+   flight, transfer) — its startTime is when you leave, and its endTime is when you arrive, i.e.
+   startTime + its own travel duration. A "dwell" record (checkin, checkout, poi, attraction, ...)
+   represents being at a place — its startTime is when you arrive (previous departure + travel time
+   to get there), and its endTime is when you leave, i.e. startTime + the type's default dwell time. */
+function isMovementType(typeId) { return isFlightType(typeId) || typeId === "transfer"; }
 /* Recomputes every auto (non-manually-edited) start/end time in the whole trip, in one continuous
    forward pass over the visual row order. Manually-set fields (Auto === false) are never overwritten,
    but their value is still used as the anchor for computing whatever comes after them — so one manual
@@ -735,9 +741,14 @@ function buildGlobalRowOrderPure(rows, frames, fid) {
    flight arrival), that stay was never applied — the row is "worth" more time before you're free to
    move on (deplaning, immigration, baggage). So the anchor handed to whatever comes next adds that
    buffer on top of a locked endTime, and uses it as-is when it was already auto-computed.
-   Flight legs (flight/domestic-flight) never use their own routeDurationMin to compute their start —
-   that field is a driving-distance estimate between airports (meaningless for actual flight time), so
-   a flight simply starts right after the previous stop's connection buffer, not after a "drive." */
+   Movement records (flight/domestic-flight/transfer) start right at that anchor — a transfer departs
+   the moment you're ready, it doesn't need its own travel time added before it can even begin — and
+   then use their own travel duration to compute when they arrive (their endTime). Flight-type rows
+   are the one exception: their own routeDurationMin is a driving-distance estimate between airports
+   (meaningless for actual flight time), so it's never used for them; they fall back to the type's
+   default duration guess instead, pending a real flight-schedule lookup. Dwell records use the
+   opposite order: their own travel duration determines when they're arrived at (startTime), and their
+   type's default dwell time determines when they're left (endTime). */
 function recomputeChainTimesPure(rows, frames) {
   const order = buildGlobalRowOrderPure(rows, frames, null);
   const patches = new Map();
@@ -745,11 +756,12 @@ function recomputeChainTimesPure(rows, frames) {
   for (const raw of order) {
     const cur = { ...raw, ...(patches.get(raw.id) || {}) };
     const patch = {};
+    const movement = isMovementType(cur.typeId);
     if (cur.startTimeAuto !== false && prevInDate && prevInDate.endTime) {
       const prevStay = prevInDate.stayDurationMin != null ? prevInDate.stayDurationMin : getDefaultStayMinutes(prevInDate.typeId);
       const anchor = prevInDate.endTimeAuto === false ? addMinutesToTime(prevInDate.endTime, prevStay) : prevInDate.endTime;
       let newStart = null;
-      if (isFlightType(cur.typeId)) {
+      if (movement) {
         newStart = anchor;
       } else if (cur.routeDurationMin != null) {
         newStart = addMinutesToTime(anchor, cur.routeDurationMin);
@@ -758,8 +770,9 @@ function recomputeChainTimesPure(rows, frames) {
     }
     const effectiveStart = patch.startTime !== undefined ? patch.startTime : cur.startTime;
     if (cur.endTimeAuto !== false && effectiveStart) {
-      const stay = cur.stayDurationMin != null ? cur.stayDurationMin : getDefaultStayMinutes(cur.typeId);
-      const newEnd = addMinutesToTime(effectiveStart, stay);
+      const useRouteDuration = movement && !isFlightType(cur.typeId) && cur.routeDurationMin != null;
+      const duration = useRouteDuration ? cur.routeDurationMin : (cur.stayDurationMin != null ? cur.stayDurationMin : getDefaultStayMinutes(cur.typeId));
+      const newEnd = addMinutesToTime(effectiveStart, duration);
       if (newEnd !== cur.endTime) patch.endTime = newEnd;
     }
     if (Object.keys(patch).length) patches.set(raw.id, patch);
