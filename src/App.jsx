@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.2.0";
+const APP_VERSION = "22.3.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -695,6 +695,63 @@ function rowStartPoint(row) { return (row.from && row.from.trim()) || (row.fromA
 function rowEndPoint(row) { return (row.to && row.to.trim()) || (row.toAlias && row.toAlias.trim()) || ""; }
 const TYPE_STAY_MINUTES_DEFAULTS = { flight: 120, "domestic-flight": 60, checkin: 30, checkout: 30 };
 function getDefaultStayMinutes(typeId) { return TYPE_STAY_MINUTES_DEFAULTS[typeId] != null ? TYPE_STAY_MINUTES_DEFAULTS[typeId] : 0; }
+function pad2(n) { return String(n).padStart(2, "0"); }
+function addMinutesToTime(time, minutes) {
+  const [h, m] = time.split(":").map(Number);
+  const total = (h * 60 + m + Math.round(minutes) + 1440) % 1440;
+  return `${pad2(Math.floor(total / 60))}:${pad2(total % 60)}`;
+}
+/* Builds the same visual top-to-bottom row order used throughout the app (days, then nested frames),
+   but as a pure function of (rows, frames) so it can be re-run on any candidate array — not just current state. */
+function buildGlobalRowOrderPure(rows, frames, fid) {
+  const cf = childFramesPure(frames, fid || null);
+  const dg = dayGroupsAtPure(rows, fid || null);
+  const nodes = [
+    ...cf.map((f) => ({ type: "frame", sort: f.startDate || "", frame: f })),
+    ...dg.map((g) => ({ type: "day", sort: g.date, group: g })),
+  ].sort((a, b) => {
+    if (a.sort !== b.sort) return a.sort.localeCompare(b.sort);
+    if (a.type !== b.type) return a.type === "day" ? -1 : 1;
+    return 0;
+  });
+  let result = [];
+  nodes.forEach((n) => {
+    if (n.type === "day") result = result.concat(n.group.rows);
+    else result = result.concat(buildGlobalRowOrderPure(rows, frames, n.frame.id));
+  });
+  return result;
+}
+/* Recomputes every auto (non-manually-edited) start/end time in the whole trip, in one continuous
+   forward pass over the visual row order. Manually-set fields (Auto === false) are never overwritten,
+   but their value is still used as the anchor for computing whatever comes after them — so one manual
+   entry no longer blocks the rest of the chain from updating. This is re-run after every rows mutation
+   (add/delete/reorder/edit/route-duration arrival), so times stay live and don't require a manual
+   "recalculate" step. Chain resets at day boundaries, matching the app's existing day-based grouping. */
+function recomputeChainTimesPure(rows, frames) {
+  const order = buildGlobalRowOrderPure(rows, frames, null);
+  const patches = new Map();
+  let prevInDate = null;
+  let prevDate = undefined;
+  for (const raw of order) {
+    const cur = { ...raw, ...(patches.get(raw.id) || {}) };
+    if (cur.date !== prevDate) { prevInDate = null; prevDate = cur.date; }
+    const patch = {};
+    if (cur.startTimeAuto !== false && prevInDate && prevInDate.endTime && cur.routeDurationMin != null) {
+      const newStart = addMinutesToTime(prevInDate.endTime, cur.routeDurationMin);
+      if (newStart !== cur.startTime) patch.startTime = newStart;
+    }
+    const effectiveStart = patch.startTime !== undefined ? patch.startTime : cur.startTime;
+    if (cur.endTimeAuto !== false && effectiveStart) {
+      const stay = cur.stayDurationMin != null ? cur.stayDurationMin : getDefaultStayMinutes(cur.typeId);
+      const newEnd = addMinutesToTime(effectiveStart, stay);
+      if (newEnd !== cur.endTime) patch.endTime = newEnd;
+    }
+    if (Object.keys(patch).length) patches.set(raw.id, patch);
+    prevInDate = { ...cur, ...patch };
+  }
+  if (!patches.size) return rows;
+  return rows.map((r) => (patches.has(r.id) ? { ...r, ...patches.get(r.id) } : r));
+}
 const TRAVEL_MODE_MAP = {
   taxi: "driving", "car-rental": "driving", caravan: "driving", motorcycle: "driving",
   bicycle: "bicycling", scooter: "bicycling", walking: "walking",
@@ -2905,14 +2962,14 @@ export default function MyTripApp() {
     if (historyIndex <= 0) return;
     const snap = history[historyIndex - 1];
     isApplyingHistory.current = true;
-    setRows(snap.rows); setFrames(snap.frames);
+    setRows(recomputeChainTimesPure(snap.rows, snap.frames)); setFrames(snap.frames);
     setHistoryIndex(historyIndex - 1);
   }
   function redo() {
     if (historyIndex >= history.length - 1) return;
     const snap = history[historyIndex + 1];
     isApplyingHistory.current = true;
-    setRows(snap.rows); setFrames(snap.frames);
+    setRows(recomputeChainTimesPure(snap.rows, snap.frames)); setFrames(snap.frames);
     setHistoryIndex(historyIndex + 1);
   }
   const canUndo = historyIndex > 0;
@@ -2976,7 +3033,7 @@ export default function MyTripApp() {
     const all = listSavedTrips();
     const trip = all[name];
     if (!trip) return;
-    setRows(trip.rows || []);
+    setRows(recomputeChainTimesPure(trip.rows || [], trip.frames || []));
     setFrames(trip.frames || []);
     if (trip.displayCurrency) setDisplayCurrency(trip.displayCurrency);
     setLoadTripOpen(false);
@@ -3171,7 +3228,7 @@ export default function MyTripApp() {
       const frameIdSet = new Set(preWizardCreatedIds.frameIds);
       const rowIdSet = new Set(preWizardCreatedIds.rowIds);
       setFrames((prev) => prev.filter((f) => !frameIdSet.has(f.id)));
-      setRows((prev) => prev.filter((r) => !rowIdSet.has(r.id)));
+      applyRows((prev) => prev.filter((r) => !rowIdSet.has(r.id)));
     }
     const flights = d.hasFlights === "yes" ? d.flights.filter((f) => f.depDate) : [];
     const domesticFlights = d.hasDomestic === "yes" ? d.domesticFlights.filter((f) => f.depDate) : [];
@@ -3391,8 +3448,9 @@ export default function MyTripApp() {
       try {
         const data = JSON.parse(reader.result);
         if (!data || !Array.isArray(data.rows)) throw new Error("bad-format");
-        setRows(data.rows);
-        setFrames(Array.isArray(data.frames) ? data.frames : []);
+        const importedFrames = Array.isArray(data.frames) ? data.frames : [];
+        setRows(recomputeChainTimesPure(data.rows, importedFrames));
+        setFrames(importedFrames);
         if (data.displayCurrency) setDisplayCurrency(data.displayCurrency);
         setImportMsg({ ok: true });
       } catch (e) {
@@ -3470,93 +3528,35 @@ export default function MyTripApp() {
     const start = dates[0], end = dates[dates.length - 1];
     const nf = { id: uid(), name: lang === "he" ? "הטיול שלנו לרומא" : "Our trip to Rome", startDate: start, endDate: end, parentFrameId: null, collapsed: false };
     setFrames((prev) => [...prev, nf]);
-    setRows((prev) => prev.map((r) => (!r.parentId && !r.frameId && r.date >= start && r.date <= end) ? { ...r, frameId: nf.id } : r));
+    applyRows((prev) => prev.map((r) => (!r.parentId && !r.frameId && r.date >= start && r.date <= end) ? { ...r, frameId: nf.id } : r));
     setDismissedKey(suggestionKey);
   }
 
   /* ---------- row mutators ---------- */
-  function updateRow(id, patch) { setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r))); }
+  /* Single choke point for all rows mutations: re-runs the global time chain after every change
+     (add row, delete row, reorder, edit, route-duration arrival, load/undo) so times recompute live
+     instead of needing a manual "recalculate" action. */
+  function applyRows(updater) {
+    setRows((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      return recomputeChainTimesPure(next, frames);
+    });
+  }
+  function updateRow(id, patch) { applyRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r))); }
   function getDayGroupRows(row) {
     return rows.filter((r) => !r.parentId && (r.frameId || null) === (row.frameId || null) && r.date === row.date);
   }
+  /* Marks the field manual (or clears it back to auto) and lets applyRows' global recompute pass
+     fill in the actual value and propagate forward — no local cascade loop needed here anymore. */
   function setStartTimeWithCascade(rowId, newStartTime) {
     const isManualSet = !!newStartTime;
-    let effectiveStart = newStartTime;
-    if (!isManualSet) {
-      const row = rows.find((r) => r.id === rowId);
-      const prevRow = row ? prevRowMap.get(rowId) : null;
-      effectiveStart = (row && prevRow && prevRow.date === row.date && prevRow.endTime) ? prevRow.endTime : "";
-      if (!effectiveStart) { updateRow(rowId, { startTime: "", startTimeAuto: true }); return; }
-    }
-    const patches = new Map();
-    patches.set(rowId, { startTime: effectiveStart, startTimeAuto: !isManualSet });
-    let currentId = rowId;
-    let currentArrival = effectiveStart;
-    let guard = 0;
-    while (guard++ < 200) {
-      const currentRow = rows.find((r) => r.id === currentId);
-      if (!currentRow) break;
-      const priorPatch = patches.get(currentId) || {};
-      const effectiveEndTimeAuto = priorPatch.endTimeAuto !== undefined ? priorPatch.endTimeAuto : currentRow.endTimeAuto;
-      const effectiveEndTime = priorPatch.endTime !== undefined ? priorPatch.endTime : currentRow.endTime;
-      if (effectiveEndTime && effectiveEndTimeAuto === false) break;
-      const stay = currentRow.stayDurationMin != null ? currentRow.stayDurationMin : getDefaultStayMinutes(currentRow.typeId);
-      const [h, m] = currentArrival.split(":").map(Number);
-      const depTotal = (h * 60 + m + Math.round(stay) + 1440) % 1440;
-      const departure = `${String(Math.floor(depTotal / 60)).padStart(2, "0")}:${String(depTotal % 60).padStart(2, "0")}`;
-      patches.set(currentId, { ...patches.get(currentId), endTime: departure, endTimeAuto: true });
-      const nextRow = nextRowMap.get(currentId);
-      if (!nextRow || nextRow.date !== currentRow.date || nextRow.startTimeAuto === false || nextRow.routeDurationMin == null) break;
-      const [dh, dm] = departure.split(":").map(Number);
-      const arrTotal = (dh * 60 + dm + Math.round(nextRow.routeDurationMin) + 1440) % 1440;
-      const arrival = `${String(Math.floor(arrTotal / 60)).padStart(2, "0")}:${String(arrTotal % 60).padStart(2, "0")}`;
-      patches.set(nextRow.id, { startTime: arrival, startTimeAuto: true });
-      currentId = nextRow.id;
-      currentArrival = arrival;
-    }
-    setRows((prev) => prev.map((r) => (patches.has(r.id) ? { ...r, ...patches.get(r.id) } : r)));
+    applyRows((prev) => prev.map((r) => (r.id === rowId ? { ...r, startTime: newStartTime, startTimeAuto: !isManualSet } : r)));
   }
   function setEndTimeWithCascade(rowId, newEndTime) {
     const isManualSet = !!newEndTime;
-    const startRow = rows.find((r) => r.id === rowId);
-    if (!startRow) return;
-    let effectiveEnd = newEndTime;
-    if (!isManualSet) {
-      if (startRow.startTime) {
-        const stay = startRow.stayDurationMin != null ? startRow.stayDurationMin : getDefaultStayMinutes(startRow.typeId);
-        const [h, m] = startRow.startTime.split(":").map(Number);
-        const totalMin = (h * 60 + m + Math.round(stay) + 1440) % 1440;
-        effectiveEnd = `${String(Math.floor(totalMin / 60)).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
-      } else {
-        updateRow(rowId, { endTime: "", endTimeAuto: true }); return;
-      }
-    }
-    const patches = new Map();
-    patches.set(rowId, { endTime: effectiveEnd, endTimeAuto: !isManualSet });
-    let currentDate = startRow.date;
-    let nextRow = nextRowMap.get(rowId);
-    let currentDeparture = effectiveEnd;
-    let guard = 0;
-    while (nextRow && nextRow.date === currentDate && nextRow.startTimeAuto !== false && nextRow.routeDurationMin != null && guard++ < 200) {
-      const [dh, dm] = currentDeparture.split(":").map(Number);
-      const arrTotal = (dh * 60 + dm + Math.round(nextRow.routeDurationMin) + 1440) % 1440;
-      const arrival = `${String(Math.floor(arrTotal / 60)).padStart(2, "0")}:${String(arrTotal % 60).padStart(2, "0")}`;
-      patches.set(nextRow.id, { ...patches.get(nextRow.id), startTime: arrival, startTimeAuto: true });
-      const priorPatch = patches.get(nextRow.id) || {};
-      const effectiveEndTimeAuto = priorPatch.endTimeAuto !== undefined ? priorPatch.endTimeAuto : nextRow.endTimeAuto;
-      const effectiveEndTime = priorPatch.endTime !== undefined ? priorPatch.endTime : nextRow.endTime;
-      if (effectiveEndTime && effectiveEndTimeAuto === false) break;
-      const stay = nextRow.stayDurationMin != null ? nextRow.stayDurationMin : getDefaultStayMinutes(nextRow.typeId);
-      const [ah, am] = arrival.split(":").map(Number);
-      const depTotal = (ah * 60 + am + Math.round(stay) + 1440) % 1440;
-      const departure = `${String(Math.floor(depTotal / 60)).padStart(2, "0")}:${String(depTotal % 60).padStart(2, "0")}`;
-      patches.set(nextRow.id, { ...patches.get(nextRow.id), endTime: departure, endTimeAuto: true });
-      currentDeparture = departure;
-      nextRow = nextRowMap.get(nextRow.id);
-    }
-    setRows((prev) => prev.map((r) => (patches.has(r.id) ? { ...r, ...patches.get(r.id) } : r)));
+    applyRows((prev) => prev.map((r) => (r.id === rowId ? { ...r, endTime: newEndTime, endTimeAuto: !isManualSet } : r)));
   }
-  function deleteRow(id) { setRows((prev) => prev.filter((r) => r.id !== id && r.parentId !== id)); }
+  function deleteRow(id) { applyRows((prev) => prev.filter((r) => r.id !== id && r.parentId !== id)); }
   function addRow(date, parentId = null, frameId = null) {
     const nr = {
       id: uid(), parentId, frameId, date: date || toLocalISODate(new Date()),
@@ -3565,11 +3565,11 @@ export default function MyTripApp() {
       notes: "", fromVerifiedUrl: "", fromVerifiedText: "", toVerifiedUrl: "", toVerifiedText: "",
       fromLat: null, fromLon: null, toLat: null, toLon: null, routeDistanceKm: null, routeDurationMin: null, custom: {},
     };
-    setRows((prev) => [...prev, nr]);
+    applyRows((prev) => [...prev, nr]);
     return nr.id;
   }
   function sortDayByTime(fid, date) {
-    setRows((prev) => {
+    applyRows((prev) => {
       const topRows = prev.filter((r) => !r.parentId && (r.frameId || null) === (fid || null) && r.date === date);
       const usedIds = new Set();
       const blocks = topRows.map((p) => { const children = prev.filter((c) => c.parentId === p.id); usedIds.add(p.id); children.forEach((c) => usedIds.add(c.id)); return { parent: p, children }; });
@@ -3582,7 +3582,7 @@ export default function MyTripApp() {
   }
   function onDropRow(sourceId, targetId) {
     if (!sourceId || sourceId === targetId) return;
-    setRows((prev) => {
+    applyRows((prev) => {
       const from = prev.find((r) => r.id === sourceId), to = prev.find((r) => r.id === targetId);
       if (!from || !to) return prev;
       const needsMove = from.date !== to.date || (from.frameId || null) !== (to.frameId || null) || from.parentId !== to.parentId;
@@ -3604,7 +3604,7 @@ export default function MyTripApp() {
     const fidPart = dayKey.slice(0, sep), datePart = dayKey.slice(sep + 2);
     const sourceFid = fidPart === "root" ? null : fidPart;
     if ((sourceFid || null) === (targetFid || null)) return;
-    setRows((prev) => prev.map((r) => (((r.frameId || null) === (sourceFid || null)) && r.date === datePart) ? { ...r, frameId: targetFid } : r));
+    applyRows((prev) => prev.map((r) => (((r.frameId || null) === (sourceFid || null)) && r.date === datePart) ? { ...r, frameId: targetFid } : r));
   }
   const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const { setNodeRef: setRootDropRef, isOver: isRootOver } = useDroppable({ id: "root-zone", data: { type: "root" } });
@@ -4039,7 +4039,7 @@ export default function MyTripApp() {
   function deleteFrameOnly(id) {
     const f = frames.find((x) => x.id === id);
     setFrames((prev) => prev.filter((x) => x.id !== id).map((x) => (x.parentFrameId === id ? { ...x, parentFrameId: f.parentFrameId } : x)));
-    setRows((prev) => prev.map((r) => (r.frameId === id ? { ...r, frameId: f.parentFrameId } : r)));
+    applyRows((prev) => prev.map((r) => (r.frameId === id ? { ...r, frameId: f.parentFrameId } : r)));
   }
   function deleteFrameWithContent(id) {
     const idsToDelete = new Set([id]);
@@ -4051,7 +4051,7 @@ export default function MyTripApp() {
       });
     }
     setFrames((prev) => prev.filter((x) => !idsToDelete.has(x.id)));
-    setRows((prev) => prev.filter((r) => !(r.frameId && idsToDelete.has(r.frameId))));
+    applyRows((prev) => prev.filter((r) => !(r.frameId && idsToDelete.has(r.frameId))));
   }
   function toggleFrameCollapse(id) { setFrames((prev) => prev.map((f) => (f.id === id ? { ...f, collapsed: !f.collapsed } : f))); }
   function updateFrameDates(frameId, start, end) { setFrames((prev) => prev.map((f) => (f.id === frameId ? { ...f, startDate: start, endDate: end } : f))); }
