@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.3.1";
+const APP_VERSION = "22.3.2";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -729,7 +729,15 @@ function buildGlobalRowOrderPure(rows, frames, fid) {
    "recalculate" step. The chain runs continuously across the whole trip (not reset per calendar day):
    an overnight leg that lands after midnight is still dated the day it departed, so the next day's
    first record must still be able to inherit its arrival time — resetting at the date boundary would
-   silently break exactly that link. */
+   silently break exactly that link.
+   Connection buffer: a row's own endTime, when auto, already equals startTime + its type's default
+   "stay" (e.g. 30 min at a check-in). But when endTime is manually locked (e.g. a real looked-up
+   flight arrival), that stay was never applied — the row is "worth" more time before you're free to
+   move on (deplaning, immigration, baggage). So the anchor handed to whatever comes next adds that
+   buffer on top of a locked endTime, and uses it as-is when it was already auto-computed.
+   Flight legs (flight/domestic-flight) never use their own routeDurationMin to compute their start —
+   that field is a driving-distance estimate between airports (meaningless for actual flight time), so
+   a flight simply starts right after the previous stop's connection buffer, not after a "drive." */
 function recomputeChainTimesPure(rows, frames) {
   const order = buildGlobalRowOrderPure(rows, frames, null);
   const patches = new Map();
@@ -737,9 +745,16 @@ function recomputeChainTimesPure(rows, frames) {
   for (const raw of order) {
     const cur = { ...raw, ...(patches.get(raw.id) || {}) };
     const patch = {};
-    if (cur.startTimeAuto !== false && prevInDate && prevInDate.endTime && cur.routeDurationMin != null) {
-      const newStart = addMinutesToTime(prevInDate.endTime, cur.routeDurationMin);
-      if (newStart !== cur.startTime) patch.startTime = newStart;
+    if (cur.startTimeAuto !== false && prevInDate && prevInDate.endTime) {
+      const prevStay = prevInDate.stayDurationMin != null ? prevInDate.stayDurationMin : getDefaultStayMinutes(prevInDate.typeId);
+      const anchor = prevInDate.endTimeAuto === false ? addMinutesToTime(prevInDate.endTime, prevStay) : prevInDate.endTime;
+      let newStart = null;
+      if (isFlightType(cur.typeId)) {
+        newStart = anchor;
+      } else if (cur.routeDurationMin != null) {
+        newStart = addMinutesToTime(anchor, cur.routeDurationMin);
+      }
+      if (newStart != null && newStart !== cur.startTime) patch.startTime = newStart;
     }
     const effectiveStart = patch.startTime !== undefined ? patch.startTime : cur.startTime;
     if (cur.endTimeAuto !== false && effectiveStart) {
