@@ -1024,10 +1024,10 @@ function fetchWeather(lat, lon, dateStr) {
 
 const COL_WIDTHS = {
   handle: 26, actions: 72,
-  date: 78, day: 48, icon: 40, type: 125, from: 165, to: 165,
+  date: 78, day: 48, icon: 43, type: 125, from: 165, to: 165, arrival: 132,
   startTime: 90, duration: 45, endTime: 90, route: 92, link: 39, cost: 58, notes: 32, weather: 42,
 };
-const COL_MIN_WIDTHS = { startTime: 90, endTime: 90, route: 70, from: 165, to: 165, type: 125, icon: 25, duration: 44 };
+const COL_MIN_WIDTHS = { startTime: 90, endTime: 90, route: 70, from: 160, to: 160, type: 120, icon: 43, duration: 44, arrival: 132 };
 function colFixedWidth(key) {
   if (COL_WIDTHS[key] != null) return COL_WIDTHS[key];
   return 110; // fallback for custom columns
