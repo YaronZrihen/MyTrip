@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "21.2.1";
+const APP_VERSION = "21.3.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -207,6 +207,8 @@ const T_DICT = {
     type: "תיאור", from: "מוצא", to: "יעד", start: "בשעה", end: "עד שעה", overnight: "חוצה חצות", arrivalMethod: "אמצעי הגעה",
     typeKindDesc: "תיאור", typeKindArrival: "אמצעי הגעה",
     requiresTicket: "דורש רכישת כרטיס כניסה", calcRoute: "חשב מסלול",
+    ticketPurchased: "הכרטיס נרכש", flightCheckedIn: "בוצע צ'ק-אין לטיסה",
+    tripAlerts: "התראות טיול", noTripAlerts: "אין התראות פתוחות כרגע.",
     routeErrNoOrigin: "אין מוצא זמין לחישוב (גם לא ברשומה הקודמת)", routeErrNoDest: "אין יעד ברשומה זו",
     routeErrGeocodeOrigin: "לא ניתן לאתר את המוצא", routeErrGeocodeDest: "לא ניתן לאתר את היעד",
     routeErrNoRoute: "לא נמצא מסלול בין הנקודות", routeErrNetwork: "שגיאת רשת בעת החישוב",
@@ -242,6 +244,7 @@ const T_DICT = {
     demoHotelRaw: "Hilton Garden Inn Rome Airport", demoHotelAlias: "הילטון גארדן אין רומא",
     demoRestaurantRaw: "Ristorante dei Musei", demoRestaurantName: "מסעדת המוזיאון",
     pickSavedHotel: "בחר ממלונות שמורים", noSavedHotels: "אין עדיין מלונות שמורים — הם יישמרו אוטומטית ככל שתשתמש בהם.",
+    pickTripHotel: "בחר ממלונות הטיול", noTripHotels: "אין עדיין מלונות בטיול זה — הוסף מלון דרך אשף הטיול.",
     verify: "אמת מול מפות", verified: "מאומת", openMap: "פתח במפה", pickFromMap: "בחר מהמפה", moreDetails: "עוד פרטים",
     fromAlias: "כינוי למוצא", toAlias: "כינוי ליעד", aliasHint: "יוצג בעמודה במקום הטקסט המלא. מתמלא אוטומטית בשם מקוצר בעת אימות מיקום (לפי הכתובת שנמצאה) — ניתן תמיד לשנות ידנית.",
     flightAliasPlaceholder: "לדוגמה: תל אביב (TLV)", copyPrevDest: "העתק יעד משורה קודמת",
@@ -358,6 +361,8 @@ const T_DICT = {
     type: "Description", from: "Origin", to: "Destination", start: "At", end: "Until", overnight: "Crosses midnight", arrivalMethod: "Arrival method",
     typeKindDesc: "Description", typeKindArrival: "Arrival method",
     requiresTicket: "Requires entrance ticket", calcRoute: "Calculate route",
+    ticketPurchased: "Ticket purchased", flightCheckedIn: "Flight check-in done",
+    tripAlerts: "Trip alerts", noTripAlerts: "No open alerts right now.",
     routeErrNoOrigin: "No origin available for calculation (not even from the previous record)", routeErrNoDest: "This record has no destination",
     routeErrGeocodeOrigin: "Couldn't locate the origin", routeErrGeocodeDest: "Couldn't locate the destination",
     routeErrNoRoute: "No route found between these points", routeErrNetwork: "Network error during calculation",
@@ -393,6 +398,7 @@ const T_DICT = {
     demoHotelRaw: "Hilton Garden Inn Rome Airport", demoHotelAlias: "Hilton Garden Inn Rome",
     demoRestaurantRaw: "Ristorante dei Musei", demoRestaurantName: "Museum Restaurant",
     pickSavedHotel: "Pick from saved hotels", noSavedHotels: "No saved hotels yet — they'll be remembered automatically as you use them.",
+    pickTripHotel: "Pick from trip hotels", noTripHotels: "No hotels in this trip yet — add one via the trip wizard.",
     verify: "Verify with Maps", verified: "Verified", openMap: "Open in Maps", pickFromMap: "Pick from map", moreDetails: "More details",
     fromAlias: "Origin nickname", toAlias: "Destination nickname", aliasHint: "Shown in the table instead of the full text. Auto-filled with a short name when you verify a location (based on the matched address) — you can always edit it manually.",
     flightAliasPlaceholder: "e.g. Tel Aviv (TLV)", copyPrevDest: "Copy previous row's destination",
@@ -2638,6 +2644,8 @@ export default function MyTripApp() {
   const actionsMenu = useFloatingMenu(actionsMenuOpen, setActionsMenuOpen);
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
   const settingsMenu = useFloatingMenu(settingsMenuOpen, setSettingsMenuOpen);
+  const [alertsMenuOpen, setAlertsMenuOpen] = useState(false);
+  const alertsMenu = useFloatingMenu(alertsMenuOpen, setAlertsMenuOpen);
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const [aiMessages, setAiMessages] = useState([]);
   const [aiInput, setAiInput] = useState("");
@@ -3800,6 +3808,38 @@ export default function MyTripApp() {
   function getSavedHotels() {
     try { return JSON.parse(localStorage.getItem(SAVED_HOTELS_KEY) || "[]"); } catch (e) { return []; }
   }
+  function getTripAlerts() {
+    const now = new Date();
+    const alerts = [];
+    rows.forEach((r) => {
+      if (r.toFee === "yes" && !r.ticketPurchased) {
+        const d = r.date ? new Date(r.date + "T" + (r.startTime || "00:00")) : null;
+        const hoursUntil = d ? (d - now) / 3600000 : Infinity;
+        alerts.push({ id: r.id + "-ticket", severity: hoursUntil < 24 ? "red" : hoursUntil < 24 * 7 ? "orange" : "orange", label: `${T.requiresTicket}: ${r.to || r.toAlias || ""}`, date: r.date });
+      }
+      if ((r.typeId === "flight" || r.typeId === "domestic-flight") && !r.checkedIn && r.date) {
+        const d = new Date(r.date + "T" + (r.startTime || "00:00"));
+        const hoursUntil = (d - now) / 3600000;
+        if (hoursUntil < 24 * 7) {
+          alerts.push({ id: r.id + "-checkin", severity: hoursUntil < 24 ? "red" : "orange", label: `${T.flightCheckedIn}: ${r.flightNumber || r.to || ""}`, date: r.date });
+        }
+      }
+    });
+    return alerts;
+  }
+  function getTripHotels() {
+    const hotelFrames = frames.filter((f) => effectiveFrameTypeOf(f, rows) === "hotel");
+    return hotelFrames.map((hf) => {
+      const checkinRow = rows.find((r) => r.frameId === hf.id && r.typeId === "checkin");
+      return {
+        name: hf.name || (checkinRow && checkinRow.to) || "",
+        alias: (checkinRow && checkinRow.toAlias) || "",
+        lat: (checkinRow && checkinRow.toLat) || null, lon: (checkinRow && checkinRow.toLon) || null,
+        placeId: (checkinRow && checkinRow.toPlaceId) || null, verifiedUrl: (checkinRow && checkinRow.toVerifiedUrl) || "",
+        verifiedText: (checkinRow && checkinRow.toVerifiedText) || "",
+      };
+    }).filter((h) => h.name);
+  }
   function saveHotelToMemory(info) {
     if (!info || !info.name) return;
     try {
@@ -4422,6 +4462,33 @@ export default function MyTripApp() {
       </div>
       <div className="mt-toolbar">
         <div className="mt-toolbar-group">
+          {(() => {
+            const alerts = getTripAlerts();
+            const severity = alerts.some((a) => a.severity === "red") ? "red" : alerts.length ? "orange" : "green";
+            const color = severity === "red" ? "#C1443A" : severity === "orange" ? "#D98E3F" : "#3E8E5A";
+            return (
+              <span style={{ position: "relative", display: "inline-flex" }}>
+                <button className="mt-icon-btn" ref={alertsMenu.refs.setReference} {...alertsMenu.getReferenceProps()} title={T.tripAlerts} style={{ color }}>
+                  <Bell size={16} fill={severity === "green" ? "none" : color} />
+                </button>
+                {alertsMenuOpen && (
+                  <>
+                    <div className="mt-floating-backdrop" onClick={() => setAlertsMenuOpen(false)} />
+                    <div ref={alertsMenu.refs.setFloating} style={{ ...alertsMenu.floatingStyles, zIndex: 400, minWidth: 220 }} {...alertsMenu.getFloatingProps()} className="mt-floating-menu">
+                      {alerts.length === 0 ? (
+                        <div className="mt-hint" style={{ padding: 8 }}>{T.noTripAlerts}</div>
+                      ) : alerts.map((a) => (
+                        <div key={a.id} className="mt-share-opt" style={{ cursor: "default" }}>
+                          <span style={{ width: 8, height: 8, borderRadius: "50%", background: a.severity === "red" ? "#C1443A" : "#D98E3F", flexShrink: 0 }} />
+                          <span style={{ flex: 1, textAlign: "start", fontSize: 12 }}>{a.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </span>
+            );
+          })()}
           <button className="mt-icon-btn" ref={(el) => { settingsBtnRef.current = el; settingsMenu.refs.setReference(el); }} {...settingsMenu.getReferenceProps()}><Menu /> {T.settings}</button>
         </div>
         <div className="mt-toolbar-group">
@@ -5045,6 +5112,7 @@ export default function MyTripApp() {
                     <button className="mt-btn ghost" onClick={fetchFlightData}><Download size={13} /> {T.fetchFlightData}</button>
                   </div>
                   {flightLookupMsg && <div className="mt-hint" style={{ marginTop: 4 }}>{flightLookupMsg}</div>}
+                  <label className="mt-checkbox-row" style={{ marginTop: 6 }}><input type="checkbox" checked={!!cardDraft.checkedIn} onChange={(e) => setCardDraft({ ...cardDraft, checkedIn: e.target.checked })} />{T.flightCheckedIn}</label>
                 </div>
               )}
 
@@ -5069,6 +5137,29 @@ export default function MyTripApp() {
                 </div>
               )}
 
+              {["checkin", "checkout", "transfer"].includes(cardDraft.typeId) && (
+                <div style={{ position: "relative", marginBottom: 6 }}>
+                  <button type="button" className="mt-btn ghost" ref={savedHotelsMenu.refs.setReference} {...savedHotelsMenu.getReferenceProps()}><BedDouble size={13} /> {T.pickTripHotel}</button>
+                  {savedHotelsOpen && (
+                    <>
+                      <div className="mt-floating-backdrop" onClick={() => setSavedHotelsOpen(false)} />
+                      <div ref={savedHotelsMenu.refs.setFloating} style={{ ...savedHotelsMenu.floatingStyles, zIndex: 400 }} {...savedHotelsMenu.getFloatingProps()} className="mt-floating-menu" >
+                        {getTripHotels().length === 0 ? (
+                          <div className="mt-hint" style={{ padding: 8 }}>{T.noTripHotels}</div>
+                        ) : getTripHotels().map((h) => (
+                          <button key={h.placeId || h.name} className="mt-share-opt" onClick={() => {
+                            setCardDraft((d) => ({ ...d, to: h.name, toAlias: h.alias, toLat: h.lat, toLon: h.lon, toPlaceId: h.placeId, toVerifiedUrl: h.verifiedUrl, toVerifiedText: h.verifiedText }));
+                            setSavedHotelsOpen(false);
+                          }}>
+                            <BedDouble size={13} /> <span style={{ flex: 1, textAlign: "start" }}>{h.alias || h.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
               <div className="mt-field">
                 <label>{T.to}</label>
                 <div className="mt-loc-icons" style={{ marginBottom: 4 }}>
@@ -5089,7 +5180,12 @@ export default function MyTripApp() {
               </div>
 
               {(types.find((t) => t.id === cardDraft.typeId) || {}).category === "activities" && (
-                <label className="mt-checkbox-row" style={{ marginBottom: 4 }}><input type="checkbox" checked={cardDraft.toFee === "yes"} onChange={(e) => setCardDraft({ ...cardDraft, toFee: e.target.checked ? "yes" : null })} />{T.requiresTicket}</label>
+                <>
+                  <label className="mt-checkbox-row" style={{ marginBottom: 4 }}><input type="checkbox" checked={cardDraft.toFee === "yes"} onChange={(e) => setCardDraft({ ...cardDraft, toFee: e.target.checked ? "yes" : null, ...(e.target.checked ? {} : { ticketPurchased: false }) })} />{T.requiresTicket}</label>
+                  {cardDraft.toFee === "yes" && (
+                    <label className="mt-checkbox-row" style={{ marginBottom: 4, marginInlineStart: 20 }}><input type="checkbox" checked={!!cardDraft.ticketPurchased} onChange={(e) => setCardDraft({ ...cardDraft, ticketPurchased: e.target.checked })} />{T.ticketPurchased}</label>
+                  )}
+                </>
               )}
 
               <div className="mt-weather-row">
@@ -5126,29 +5222,6 @@ export default function MyTripApp() {
               <label className="mt-checkbox-row"><input type="checkbox" checked={!!cardDraft.overnight} onChange={(e) => setCardDraft({ ...cardDraft, overnight: e.target.checked })} />{T.overnight}</label>
               {cardHasTimeError && <div className="mt-error"><AlertTriangle /> {T.timeError}</div>}
               {showTzHint && <div className="mt-hint">{T.tzNote}</div>}
-
-              {isAccommodationType(cardDraft.typeId) && (
-                <div style={{ position: "relative", marginBottom: 4 }}>
-                  <button type="button" className="mt-btn ghost" ref={savedHotelsMenu.refs.setReference} {...savedHotelsMenu.getReferenceProps()}><BedDouble size={13} /> {T.pickSavedHotel}</button>
-                  {savedHotelsOpen && (
-                    <>
-                      <div className="mt-floating-backdrop" onClick={() => setSavedHotelsOpen(false)} />
-                      <div ref={savedHotelsMenu.refs.setFloating} style={{ ...savedHotelsMenu.floatingStyles, zIndex: 400 }} {...savedHotelsMenu.getFloatingProps()} className="mt-floating-menu" >
-                        {getSavedHotels().length === 0 ? (
-                          <div className="mt-hint" style={{ padding: 8 }}>{T.noSavedHotels}</div>
-                        ) : getSavedHotels().map((h) => (
-                          <button key={h.placeId || h.name} className="mt-share-opt" onClick={() => {
-                            setCardDraft((d) => ({ ...d, to: h.name, toAlias: h.alias, toLat: h.lat, toLon: h.lon, toPlaceId: h.placeId, toVerifiedUrl: h.verifiedUrl, toVerifiedText: h.verifiedText }));
-                            setSavedHotelsOpen(false);
-                          }}>
-                            <BedDouble size={13} /> <span style={{ flex: 1, textAlign: "start" }}>{h.alias || h.name}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
 
               <div className="mt-field"><label>{T.link}</label><input value={cardDraft.link} placeholder="https://..." onChange={(e) => setCardDraft({ ...cardDraft, link: e.target.value })} /></div>
               <div className="mt-field-row">
