@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "21.5.0";
+const APP_VERSION = "21.6.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1027,6 +1027,7 @@ const COL_WIDTHS = {
   date: 78, day: 48, icon: 40, type: 125, from: 165, to: 165,
   startTime: 90, duration: 45, endTime: 90, route: 92, link: 39, cost: 58, notes: 32, weather: 42,
 };
+const COL_MIN_WIDTHS = { startTime: 90, endTime: 90, route: 70, from: 165, to: 165, type: 125, icon: 25, duration: 44 };
 function colFixedWidth(key) {
   if (COL_WIDTHS[key] != null) return COL_WIDTHS[key];
   return 110; // fallback for custom columns
@@ -2804,13 +2805,13 @@ export default function MyTripApp() {
   const effectiveMobile = viewMode === "mobile" || (viewMode === "auto" && narrowScreen);
   function getColWidth(key) {
     const w = columnWidths[key] != null ? columnWidths[key] : colFixedWidth(key);
-    return (key === "startTime" || key === "endTime") ? Math.max(90, w) : w;
+    return COL_MIN_WIDTHS[key] != null ? Math.max(COL_MIN_WIDTHS[key], w) : w;
   }
   function startResize(e, key) {
     e.preventDefault(); e.stopPropagation();
     const startX = e.clientX;
     const startWidth = getColWidth(key);
-    const minW = (key === "startTime" || key === "endTime") ? 90 : 24;
+    const minW = COL_MIN_WIDTHS[key] != null ? COL_MIN_WIDTHS[key] : 24;
     function onMove(ev) {
       const delta = ev.clientX - startX;
       const signed = dir === "rtl" ? -delta : delta;
