@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "21.7.1";
+const APP_VERSION = "21.7.2";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -2891,7 +2891,7 @@ export default function MyTripApp() {
   function listSavedTrips() {
     let stored = {};
     try { stored = JSON.parse(localStorage.getItem(SAVED_TRIPS_KEY) || "{}"); } catch (e) { stored = {}; }
-    return { ...BUILT_IN_TRIP_TEMPLATES, ...stored };
+    return { ...stored, ...BUILT_IN_TRIP_TEMPLATES };
   }
   function openSaveTripModal() { setSaveTripName(""); setSaveTripMsg(null); setSaveTripOpen(true); setActionsMenuOpen(false); }
   function confirmSaveTrip() {
