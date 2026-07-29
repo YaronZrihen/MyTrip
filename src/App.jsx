@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.3.0";
+const APP_VERSION = "22.3.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -726,15 +726,16 @@ function buildGlobalRowOrderPure(rows, frames, fid) {
    but their value is still used as the anchor for computing whatever comes after them — so one manual
    entry no longer blocks the rest of the chain from updating. This is re-run after every rows mutation
    (add/delete/reorder/edit/route-duration arrival), so times stay live and don't require a manual
-   "recalculate" step. Chain resets at day boundaries, matching the app's existing day-based grouping. */
+   "recalculate" step. The chain runs continuously across the whole trip (not reset per calendar day):
+   an overnight leg that lands after midnight is still dated the day it departed, so the next day's
+   first record must still be able to inherit its arrival time — resetting at the date boundary would
+   silently break exactly that link. */
 function recomputeChainTimesPure(rows, frames) {
   const order = buildGlobalRowOrderPure(rows, frames, null);
   const patches = new Map();
   let prevInDate = null;
-  let prevDate = undefined;
   for (const raw of order) {
     const cur = { ...raw, ...(patches.get(raw.id) || {}) };
-    if (cur.date !== prevDate) { prevInDate = null; prevDate = cur.date; }
     const patch = {};
     if (cur.startTimeAuto !== false && prevInDate && prevInDate.endTime && cur.routeDurationMin != null) {
       const newStart = addMinutesToTime(prevInDate.endTime, cur.routeDurationMin);
