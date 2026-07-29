@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "21.3.0";
+const APP_VERSION = "21.4.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1019,7 +1019,7 @@ function fetchWeather(lat, lon, dateStr) {
 const COL_WIDTHS = {
   handle: 26, actions: 72,
   date: 78, day: 48, icon: 40, type: 125, from: 165, to: 165,
-  startTime: 68, duration: 45, endTime: 68, route: 92, link: 39, cost: 58, notes: 32, weather: 42,
+  startTime: 90, duration: 45, endTime: 90, route: 92, link: 39, cost: 58, notes: 32, weather: 42,
 };
 function colFixedWidth(key) {
   if (COL_WIDTHS[key] != null) return COL_WIDTHS[key];
@@ -2796,15 +2796,19 @@ export default function MyTripApp() {
   }
 
   const effectiveMobile = viewMode === "mobile" || (viewMode === "auto" && narrowScreen);
-  function getColWidth(key) { return columnWidths[key] != null ? columnWidths[key] : colFixedWidth(key); }
+  function getColWidth(key) {
+    const w = columnWidths[key] != null ? columnWidths[key] : colFixedWidth(key);
+    return (key === "startTime" || key === "endTime") ? Math.max(90, w) : w;
+  }
   function startResize(e, key) {
     e.preventDefault(); e.stopPropagation();
     const startX = e.clientX;
     const startWidth = getColWidth(key);
+    const minW = (key === "startTime" || key === "endTime") ? 90 : 24;
     function onMove(ev) {
       const delta = ev.clientX - startX;
       const signed = dir === "rtl" ? -delta : delta;
-      setColumnWidths((prev) => ({ ...prev, [key]: Math.max(24, startWidth + signed) }));
+      setColumnWidths((prev) => ({ ...prev, [key]: Math.max(minW, startWidth + signed) }));
     }
     function onUp() { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); }
     window.addEventListener("mousemove", onMove);
@@ -3811,6 +3815,11 @@ export default function MyTripApp() {
   function getTripAlerts() {
     const now = new Date();
     const alerts = [];
+    if (checklistProgressPct < 100) {
+      const earliestDate = rows.reduce((min, r) => (r.date && (!min || r.date < min)) ? r.date : min, null);
+      const hoursUntilTrip = earliestDate ? (new Date(earliestDate) - now) / 3600000 : Infinity;
+      alerts.push({ id: "checklist", severity: hoursUntilTrip < 24 * 3 ? "red" : "orange", label: `${T.preFlightChecklist}: ${checklistProgressPct}%`, date: earliestDate });
+    }
     rows.forEach((r) => {
       if (r.toFee === "yes" && !r.ticketPurchased) {
         const d = r.date ? new Date(r.date + "T" + (r.startTime || "00:00")) : null;
@@ -3829,7 +3838,7 @@ export default function MyTripApp() {
   }
   function getTripHotels() {
     const hotelFrames = frames.filter((f) => effectiveFrameTypeOf(f, rows) === "hotel");
-    return hotelFrames.map((hf) => {
+    const list = hotelFrames.map((hf) => {
       const checkinRow = rows.find((r) => r.frameId === hf.id && r.typeId === "checkin");
       return {
         name: hf.name || (checkinRow && checkinRow.to) || "",
@@ -3839,6 +3848,13 @@ export default function MyTripApp() {
         verifiedText: (checkinRow && checkinRow.toVerifiedText) || "",
       };
     }).filter((h) => h.name);
+    const seen = new Set();
+    return list.filter((h) => {
+      const key = `${h.name}|${h.alias}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }
   function saveHotelToMemory(info) {
     if (!info || !info.name) return;
