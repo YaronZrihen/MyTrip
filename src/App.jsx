@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.6.0";
+const APP_VERSION = "22.7.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -774,7 +774,9 @@ function recomputeChainTimesPure(rows, frames) {
     }
     const patch = {};
     const movement = isMovementType(cur.typeId);
-    if (cur.startTimeAuto !== false && prevInDate && prevInDate.endTime) {
+    const startBroken = cur.startTimeAuto === false && !cur.startTime;
+    const endBroken = cur.endTimeAuto === false && !cur.endTime;
+    if ((cur.startTimeAuto !== false || startBroken) && prevInDate && prevInDate.endTime) {
       const prevMovement = isMovementType(prevInDate.typeId);
       const prevStay = prevInDate.stayDurationMin != null ? prevInDate.stayDurationMin : getDefaultStayMinutes(prevInDate.typeId);
       const anchor = (prevMovement && prevInDate.endTimeAuto === false) ? addMinutesToTime(prevInDate.endTime, prevStay) : prevInDate.endTime;
@@ -787,15 +789,17 @@ function recomputeChainTimesPure(rows, frames) {
       if (newStart != null) {
         if (newStart !== cur.startTime) patch.startTime = newStart;
         patch.startTimeSource = "inherited";
+        if (startBroken) patch.startTimeAuto = true;
       }
     }
     const effectiveStart = patch.startTime !== undefined ? patch.startTime : cur.startTime;
-    if (cur.endTimeAuto !== false && effectiveStart) {
+    if ((cur.endTimeAuto !== false || endBroken) && effectiveStart) {
       const useRouteDuration = movement && !isFlightType(cur.typeId) && cur.routeDurationMin != null;
       const duration = useRouteDuration ? cur.routeDurationMin : (cur.stayDurationMin != null ? cur.stayDurationMin : getDefaultStayMinutes(cur.typeId));
       const newEnd = addMinutesToTime(effectiveStart, duration);
       if (newEnd !== cur.endTime) patch.endTime = newEnd;
       patch.endTimeSource = "computed";
+      if (endBroken) patch.endTimeAuto = true;
       if (newEnd < effectiveStart) { if (!cur.overnight) patch.overnight = true; }
       else if (cur.overnight) patch.overnight = false;
     }
@@ -5372,8 +5376,8 @@ export default function MyTripApp() {
               </div>
 
               <div className="mt-field-row">
-                <div className="mt-field"><label>{T.start}</label><TimeField value={cardDraft.startTime} onChange={(e) => setCardDraft({ ...cardDraft, startTime: e.target.value, startTimeAuto: false, startTimeSource: undefined })} T={T} style={timeFieldColor(cardDraft, "start") ? { borderBottom: `2px dashed ${timeFieldColor(cardDraft, "start")}` } : undefined} title={timeFieldColor(cardDraft, "start") ? T.computedStartTimeHint : undefined} /></div>
-                <div className="mt-field"><label>{T.end}</label><TimeField value={cardDraft.endTime} onChange={(e) => setCardDraft({ ...cardDraft, endTime: e.target.value, endTimeAuto: false, endTimeSource: undefined })} T={T} style={timeFieldColor(cardDraft, "end") ? { borderBottom: `2px dashed ${timeFieldColor(cardDraft, "end")}` } : undefined} title={timeFieldColor(cardDraft, "end") ? T.computedEndTimeHint : undefined} /></div>
+                <div className="mt-field"><label>{T.start}</label><TimeField value={cardDraft.startTime} onChange={(e) => setCardDraft({ ...cardDraft, startTime: e.target.value, startTimeAuto: !e.target.value, startTimeSource: undefined })} T={T} style={timeFieldColor(cardDraft, "start") ? { borderBottom: `2px dashed ${timeFieldColor(cardDraft, "start")}` } : undefined} title={timeFieldColor(cardDraft, "start") ? T.computedStartTimeHint : undefined} /></div>
+                <div className="mt-field"><label>{T.end}</label><TimeField value={cardDraft.endTime} onChange={(e) => setCardDraft({ ...cardDraft, endTime: e.target.value, endTimeAuto: !e.target.value, endTimeSource: undefined })} T={T} style={timeFieldColor(cardDraft, "end") ? { borderBottom: `2px dashed ${timeFieldColor(cardDraft, "end")}` } : undefined} title={timeFieldColor(cardDraft, "end") ? T.computedEndTimeHint : undefined} /></div>
                 <div className="mt-field" style={{ maxWidth: 110 }}>
                   <label>{T.stayDuration}</label>
                   <StayDurationField value={cardDraft.stayDurationMin != null ? cardDraft.stayDurationMin : getDefaultStayMinutes(cardDraft.typeId)} onChange={(m) => setCardDraft({ ...cardDraft, stayDurationMin: m })} T={T} />
