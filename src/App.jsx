@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.4.0";
+const APP_VERSION = "22.5.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -752,13 +752,25 @@ function isMovementType(typeId) { return isFlightType(typeId) || typeId === "tra
    determines when they're left (endTime).
    Every auto-computed field is tagged with its source ('inherited' for a movement row's start, which
    is a direct copy of the previous row's readiness with no arithmetic of its own; 'computed' for
-   everything else auto) so the UI can indicate provenance without guessing. */
+   everything else auto) so the UI can indicate provenance without guessing.
+   Day boundary: the chain only carries across a change in the row's own `date` field when the row
+   that's about to become the anchor is explicitly marked `overnight` (the "crosses midnight" checkbox)
+   — that's what makes an overnight flight's next-day arrival a valid anchor for the first record of
+   the following day. Any other day change resets the chain, so a later, unrelated day (e.g. day 3 of
+   a multi-day hotel stay) doesn't silently inherit a time from days earlier. When this engine computes
+   a row's own end time and it wraps past midnight relative to its start, `overnight` is set to true to
+   keep that flag (and computeDuration, which relies on it) correct without a manual toggle. */
 function recomputeChainTimesPure(rows, frames) {
   const order = buildGlobalRowOrderPure(rows, frames, null);
   const patches = new Map();
   let prevInDate = null;
+  let prevDate;
   for (const raw of order) {
     const cur = { ...raw, ...(patches.get(raw.id) || {}) };
+    if (cur.date !== prevDate) {
+      if (!(prevInDate && prevInDate.overnight)) prevInDate = null;
+      prevDate = cur.date;
+    }
     const patch = {};
     const movement = isMovementType(cur.typeId);
     if (cur.startTimeAuto !== false && prevInDate && prevInDate.endTime) {
@@ -783,6 +795,8 @@ function recomputeChainTimesPure(rows, frames) {
       const newEnd = addMinutesToTime(effectiveStart, duration);
       if (newEnd !== cur.endTime) patch.endTime = newEnd;
       patch.endTimeSource = "computed";
+      if (newEnd < effectiveStart) { if (!cur.overnight) patch.overnight = true; }
+      else if (cur.overnight) patch.overnight = false;
     }
     if (Object.keys(patch).length) patches.set(raw.id, patch);
     prevInDate = { ...cur, ...patch };
@@ -790,6 +804,9 @@ function recomputeChainTimesPure(rows, frames) {
   if (!patches.size) return rows;
   return rows.map((r) => (patches.has(r.id) ? { ...r, ...patches.get(r.id) } : r));
 }
+/* Which field represents "arrival" for annotation purposes: movement rows (flight/domestic-flight/
+   transfer) depart at startTime and arrive at endTime; dwell rows arrive at startTime. */
+function arrivalTimeField(row) { return isMovementType(row.typeId) ? "end" : "start"; }
 const TIME_FIELD_COLORS = { computed: "#2E9B57", inherited: "#3E7CB1", api: "#C9971E" };
 /* Determines which of the three provenance colors (if any) applies to a row's start/end time field.
    'field' is 'start' or 'end'. Manual, plain user-typed values get no color at all. */
@@ -1319,19 +1336,6 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
         setRouteCalcError(null);
         const patch = { routeDistanceKm: info.distanceKm, routeDurationMin: info.durationMin, toLat: b.lat, toLon: b.lon };
         if (originSource === "own") { patch.fromLat = a.lat; patch.fromLon = a.lon; }
-        if (row.startTimeAuto !== false && prevRow && prevRow.endTime) {
-          const [ph, pm] = prevRow.endTime.split(":").map(Number);
-          const arrTotal = (ph * 60 + pm + Math.round(info.durationMin) + 1440) % 1440;
-          patch.startTime = `${String(Math.floor(arrTotal / 60)).padStart(2, "0")}:${String(arrTotal % 60).padStart(2, "0")}`;
-        }
-        const effectiveStart = patch.startTime || row.startTime;
-        if (effectiveStart && (!row.endTime || row.endTimeAuto !== false)) {
-          const stay = row.stayDurationMin != null ? row.stayDurationMin : getDefaultStayMinutes(row.typeId);
-          const [h, m] = effectiveStart.split(":").map(Number);
-          const totalMin = (h * 60 + m + Math.round(stay) + 1440) % 1440;
-          patch.endTime = `${String(Math.floor(totalMin / 60)).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
-          patch.endTimeAuto = true;
-        }
         updateRow(row.id, patch);
       });
     }).catch(() => { lastRouteCalcSig.current = null; setDistLoading(false); setRouteCalcError(T.routeErrNetwork); });
@@ -1340,15 +1344,6 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
     fetchRouteDistance();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [row.id, row.from, row.to, row.fromAlias, row.toAlias, row.startTime, row.typeId, row.fromLat, row.fromLon, row.toLat, row.toLon, row.stayDurationMin, prevRow && prevRow.from, prevRow && prevRow.fromAlias, prevRow && prevRow.fromLat, prevRow && prevRow.fromLon, prevRow && prevRow.to, prevRow && prevRow.toAlias, prevRow && prevRow.toLat, prevRow && prevRow.toLon, prevRow && prevRow.endTime]);
-  useEffect(() => {
-    if (!row.startTime || (row.endTime && row.endTimeAuto === false)) return;
-    const stay = row.stayDurationMin != null ? row.stayDurationMin : getDefaultStayMinutes(row.typeId);
-    const [h, m] = row.startTime.split(":").map(Number);
-    const totalMin = (h * 60 + m + Math.round(stay) + 1440) % 1440;
-    const newEnd = `${String(Math.floor(totalMin / 60)).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
-    if (newEnd !== row.endTime) updateRow(row.id, { endTime: newEnd, endTimeAuto: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [row.id, row.startTime, row.stayDurationMin, row.typeId, row.endTime, row.endTimeAuto]);
 
   const [fromVerifyLoading, setFromVerifyLoading] = useState(false);
   useEffect(() => {
@@ -2001,33 +1996,11 @@ function MobileCardMeta({ row, prevRow, ctx }) {
         if (!info) { lastRouteCalcSig.current = null; return; }
         const patch = { routeDistanceKm: info.distanceKm, routeDurationMin: info.durationMin, toLat: b.lat, toLon: b.lon };
         if (originSource === "own") { patch.fromLat = a.lat; patch.fromLon = a.lon; }
-        if (row.startTimeAuto !== false && prevRow && prevRow.endTime) {
-          const [ph, pm] = prevRow.endTime.split(":").map(Number);
-          const arrTotal = (ph * 60 + pm + Math.round(info.durationMin) + 1440) % 1440;
-          patch.startTime = `${String(Math.floor(arrTotal / 60)).padStart(2, "0")}:${String(arrTotal % 60).padStart(2, "0")}`;
-        }
-        const effectiveStart = patch.startTime || row.startTime;
-        if (effectiveStart && (!row.endTime || row.endTimeAuto !== false)) {
-          const stay = row.stayDurationMin != null ? row.stayDurationMin : getDefaultStayMinutes(row.typeId);
-          const [h, m] = effectiveStart.split(":").map(Number);
-          const totalMin = (h * 60 + m + Math.round(stay) + 1440) % 1440;
-          patch.endTime = `${String(Math.floor(totalMin / 60)).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
-          patch.endTimeAuto = true;
-        }
         updateRow(row.id, patch);
       });
     }).catch(() => { lastRouteCalcSig.current = null; setDistLoading(false); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [row.id, row.from, row.to, row.fromAlias, row.toAlias, row.startTime, row.typeId, row.fromLat, row.fromLon, row.toLat, row.toLon, row.stayDurationMin, prevRow && prevRow.from, prevRow && prevRow.fromAlias, prevRow && prevRow.fromLat, prevRow && prevRow.fromLon, prevRow && prevRow.to, prevRow && prevRow.toAlias, prevRow && prevRow.toLat, prevRow && prevRow.toLon, prevRow && prevRow.endTime]);
-  useEffect(() => {
-    if (!row.startTime || (row.endTime && row.endTimeAuto === false)) return;
-    const stay = row.stayDurationMin != null ? row.stayDurationMin : getDefaultStayMinutes(row.typeId);
-    const [h, m] = row.startTime.split(":").map(Number);
-    const totalMin = (h * 60 + m + Math.round(stay) + 1440) % 1440;
-    const newEnd = `${String(Math.floor(totalMin / 60)).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
-    if (newEnd !== row.endTime) updateRow(row.id, { endTime: newEnd, endTimeAuto: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [row.id, row.startTime, row.stayDurationMin, row.typeId, row.endTime, row.endTimeAuto]);
 
   const [fromVerifyLoading, setFromVerifyLoading] = useState(false);
   useEffect(() => {
@@ -2140,8 +2113,10 @@ function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
         <div className="mt-card-top-end">
           <span className="mt-card-times" dir="ltr">
             <span style={{ ...(r.startTime && Number(r.startTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "start") ? { borderBottom: `2px dashed ${timeFieldColor(r, "start")}` } : {}) }}>{r.startTime || "—"}</span>
-            {formatStayAnnotation(r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId)) && <span className="mt-stay-note">{formatStayAnnotation(r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId))}</span>}
-            {r.endTime ? <> → <span style={{ ...(Number(r.endTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "end") ? { borderBottom: `2px dashed ${timeFieldColor(r, "end")}` } : {}) }}>{r.endTime}</span></> : ""}
+            {arrivalTimeField(r) === "start" && formatStayAnnotation(r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId)) && <span className="mt-stay-note">{formatStayAnnotation(r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId))}</span>}
+            {r.endTime ? <> → <span style={{ ...(Number(r.endTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "end") ? { borderBottom: `2px dashed ${timeFieldColor(r, "end")}` } : {}) }}>{r.endTime}</span>
+              {arrivalTimeField(r) === "end" && formatStayAnnotation(r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId)) && <span className="mt-stay-note">{formatStayAnnotation(r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId))}</span>}
+            </> : ""}
           </span>
           <span className="mt-card-drag-handle" onClick={(e) => e.stopPropagation()} {...dragListeners} {...dragAttrs}><GripVertical size={15} /></span>
         </div>
