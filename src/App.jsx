@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.5.0";
+const APP_VERSION = "22.6.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -750,9 +750,10 @@ function isMovementType(typeId) { return isFlightType(typeId) || typeId === "tra
    pending a real flight-schedule lookup. Dwell records use the opposite order: their own travel
    duration determines when they're arrived at (startTime), and their type's default dwell time
    determines when they're left (endTime).
-   Every auto-computed field is tagged with its source ('inherited' for a movement row's start, which
-   is a direct copy of the previous row's readiness with no arithmetic of its own; 'computed' for
-   everything else auto) so the UI can indicate provenance without guessing.
+   Every auto-computed field is tagged with its source so the UI can indicate provenance without
+   guessing: a start time is always 'inherited' (it's a handoff from whatever came before, whether or
+   not travel time was added getting here), and an end time is always 'computed' (it's derived from
+   this row's own start plus its own duration).
    Day boundary: the chain only carries across a change in the row's own `date` field when the row
    that's about to become the anchor is explicitly marked `overnight` (the "crosses midnight" checkbox)
    — that's what makes an overnight flight's next-day arrival a valid anchor for the first record of
@@ -785,7 +786,7 @@ function recomputeChainTimesPure(rows, frames) {
       }
       if (newStart != null) {
         if (newStart !== cur.startTime) patch.startTime = newStart;
-        patch.startTimeSource = movement ? "inherited" : "computed";
+        patch.startTimeSource = "inherited";
       }
     }
     const effectiveStart = patch.startTime !== undefined ? patch.startTime : cur.startTime;
@@ -804,9 +805,10 @@ function recomputeChainTimesPure(rows, frames) {
   if (!patches.size) return rows;
   return rows.map((r) => (patches.has(r.id) ? { ...r, ...patches.get(r.id) } : r));
 }
-/* Which field represents "arrival" for annotation purposes: movement rows (flight/domestic-flight/
-   transfer) depart at startTime and arrive at endTime; dwell rows arrive at startTime. */
-function arrivalTimeField(row) { return isMovementType(row.typeId) ? "end" : "start"; }
+/* The stay annotation always sits next to the end time — the right-hand value in the LTR "start →
+   end" span — since that's the field it actually explains (end = start + this duration). Placing it
+   next to start read as if the stay were feeding into the arrival calculation, which it never was. */
+function arrivalTimeField(row) { return "end"; }
 const TIME_FIELD_COLORS = { computed: "#2E9B57", inherited: "#3E7CB1", api: "#C9971E" };
 /* Determines which of the three provenance colors (if any) applies to a row's start/end time field.
    'field' is 'start' or 'end'. Manual, plain user-typed values get no color at all. */
@@ -4003,8 +4005,6 @@ export default function MyTripApp() {
       }
     }
     updateRow(cardRowId, cardDraft);
-    if (cardDraft.startTimeAuto === false) setStartTimeWithCascade(cardRowId, cardDraft.startTime);
-    if (cardDraft.endTimeAuto === false) setEndTimeWithCascade(cardRowId, cardDraft.endTime);
     closeCard();
   }
   function fetchFlightData() {
@@ -5269,7 +5269,6 @@ export default function MyTripApp() {
                     <button className="mt-btn ghost" onClick={fetchFlightData}><Download size={13} /> {T.fetchFlightData}</button>
                   </div>
                   {flightLookupMsg && <div className="mt-hint" style={{ marginTop: 4 }}>{flightLookupMsg}</div>}
-                  <label className="mt-checkbox-row" style={{ marginTop: 6 }}><input type="checkbox" checked={!!cardDraft.checkedIn} onChange={(e) => setCardDraft({ ...cardDraft, checkedIn: e.target.checked })} />{T.flightCheckedIn}</label>
                 </div>
               )}
 
