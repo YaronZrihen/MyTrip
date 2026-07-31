@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.8.0";
+const APP_VERSION = "22.8.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -826,18 +826,13 @@ function timeFieldColor(row, field) {
   if (auto === false) return source === "api" ? TIME_FIELD_COLORS.api : null;
   return source === "inherited" ? TIME_FIELD_COLORS.inherited : TIME_FIELD_COLORS.computed;
 }
-/* The duration that actually determines a row's own end time — mirrors the exact rule used in
-   recomputeChainTimesPure so the annotation never shows a number other than what was really used. */
-function endDurationFor(row) {
-  const useRoute = isMovementType(row.typeId) && !isFlightType(row.typeId) && row.routeDurationMin != null;
-  return useRoute ? row.routeDurationMin : (row.stayDurationMin != null ? row.stayDurationMin : getDefaultStayMinutes(row.typeId));
-}
-/* The stay/dwell duration annotation shown next to a row's arrival time, e.g. "(2+)" for 2 hours or
-   "(30+)" for 30 minutes — informational only, never baked into the time field's own value. */
+/* The stay duration at the row's own location, in decimal hours, e.g. "(1.5+)" for an hour and a
+   half, "(0.5+)" for 30 minutes — informational only, never baked into the time field's own value. */
 function formatStayAnnotation(minutes) {
-  const m = minutes != null ? Math.round(minutes) : 0;
+  const m = minutes != null ? minutes : 0;
   if (m <= 0) return null;
-  return m % 60 === 0 ? `(${m / 60}+)` : `(${m}+)`;
+  const hours = Number((m / 60).toFixed(2));
+  return `(${hours}+)`;
 }
 const TRAVEL_MODE_MAP = {
   taxi: "driving", "car-rental": "driving", caravan: "driving", motorcycle: "driving",
@@ -2127,9 +2122,9 @@ function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
         <div className="mt-card-top-end">
           <span className="mt-card-times" dir="ltr">
             <span style={{ ...(r.startTime && Number(r.startTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "start") ? { borderBottom: `2px dashed ${timeFieldColor(r, "start")}` } : {}) }}>{r.startTime || "—"}</span>
-            {arrivalTimeField(r) === "start" && formatStayAnnotation(endDurationFor(r)) && <span className="mt-stay-note">{formatStayAnnotation(endDurationFor(r))}</span>}
+            {arrivalTimeField(r) === "start" && formatStayAnnotation(r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId)) && <span className="mt-stay-note">{formatStayAnnotation(r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId))}</span>}
             {r.endTime ? <> → <span style={{ ...(Number(r.endTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "end") ? { borderBottom: `2px dashed ${timeFieldColor(r, "end")}` } : {}) }}>{r.endTime}</span>
-              {arrivalTimeField(r) === "end" && formatStayAnnotation(endDurationFor(r)) && <span className="mt-stay-note">{formatStayAnnotation(endDurationFor(r))}</span>}
+              {arrivalTimeField(r) === "end" && formatStayAnnotation(r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId)) && <span className="mt-stay-note">{formatStayAnnotation(r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId))}</span>}
             </> : ""}
           </span>
           <span className="mt-card-drag-handle" onClick={(e) => e.stopPropagation()} {...dragListeners} {...dragAttrs}><GripVertical size={15} /></span>
