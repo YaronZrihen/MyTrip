@@ -57,14 +57,21 @@ function normalize(entry) {
   const dep = entry.departure || {};
   const arr = entry.arrival || {};
   return {
-    departureAirport: dep.iata || dep.airport || "",
-    arrivalAirport: arr.iata || arr.airport || "",
+    departureAirport: combineAirportNameAndCode(dep),
+    arrivalAirport: combineAirportNameAndCode(arr),
     departureTime: toHHMM(dep.scheduled || dep.estimated),
     arrivalTime: toHHMM(arr.scheduled || arr.estimated),
     terminal: dep.terminal || "",
     gate: dep.gate || "",
     status: entry.flight_status || "",
   };
+}
+
+function combineAirportNameAndCode(side) {
+  const name = side.airport || "";
+  const code = side.iata || "";
+  if (name && code) return `${name} (${code})`;
+  return name || code || "";
 }
 
 function toHHMM(iso) {
