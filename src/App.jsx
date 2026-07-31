@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.20.0";
+const APP_VERSION = "22.20.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -2183,7 +2183,7 @@ function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
       <div className="mt-card-bottom">
         <MobileCardMeta row={r} prevRow={prevRow} ctx={ctx} />
         {formatStayAnnotation(r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId)) && (
-          <span className="mt-stay-note">{ctx.T.stayDuration}: {formatStayAnnotation(r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId)).replace(/[()+]/g, "")}</span>
+          <span className="mt-stay-note">{formatStayAnnotation(r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId))}</span>
         )}
       </div>
     </div>
