@@ -12,7 +12,7 @@ import {
   Smartphone, Monitor, AlertTriangle, GripVertical, Check, FolderPlus, Sparkles,
   Route, Waypoints, Download, Upload, MapPin, Search, CircleCheck, Clock, ArrowDownUp, Copy, StickyNote, TrainFront,
   Bus, Motorbike, Bike, Scooter, Sailboat, ShipWheel, Anchor, Kayak, Helicopter, Caravan, Building2, Landmark, Home,
-  CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2, MoreVertical, Menu, Calendar as CalendarIcon, Undo2, Redo2, Info, ExternalLink, Phone, Save, FolderOpen, ImagePlus, BookOpen, RefreshCw, Workflow, ArrowLeft, ArrowRight, CheckSquare, Paperclip, Briefcase, Compass, FolderTree, LayoutGrid, HelpCircle, Wine, Beer, PartyPopper, Mic2
+  CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, BellRing, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2, MoreVertical, Menu, Calendar as CalendarIcon, Undo2, Redo2, Info, ExternalLink, Phone, Save, FolderOpen, ImagePlus, BookOpen, RefreshCw, Workflow, ArrowLeft, ArrowRight, CheckSquare, Paperclip, Briefcase, Compass, FolderTree, LayoutGrid, HelpCircle, Wine, Beer, PartyPopper, Mic2
 } from "lucide-react";
 
 /* ---------------------------------------------------------------------- */
@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.20.2";
+const APP_VERSION = "22.21.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -301,6 +301,9 @@ const T_DICT = {
     intlFlightsFrameName: "טיסות בינלאומיות", hotelFrameNameFallback: "מלון",
     newTripAction: "צור טיול חדש", editTripDetails: "ערוך פרטי טיול",
     refreshAllFlights: "רענן את כל הטיסות", flightRefreshRunning: "מרענן טיסות…",
+    remindersManagerTitle: "תזכורות והתראות", remindersManagerEmpty: "אין עדיין תזכורות בטיול (מתווספות אוטומטית לרשומות טיסה וצ'ק-אאוט).",
+    remindersManagerHint: "כל תזכורת מחושבת אוטומטית מהשעה של הרשומה שלה. אפשר לכבות, או לשנות כמה שעות לפני שהיא תופיע.",
+    hoursBeforeShort: "שעות לפני",
     flightManagerTitle: "ניהול טיסות", refreshEligibleNow: "רענן זכאיות עכשיו", refreshNow: "רענן",
     flightManagerCooldownHint: "טיסות עד {near} ימים נבדקות פעם ביום; טיסות רחוקות יותר — פעם בשבוע. אותה מגבלה חלה גם על כפתור הרענון הפרטני לכל שורה.",
     flightManagerOnCooldown: "בהמתנה",
@@ -468,6 +471,9 @@ const T_DICT = {
     intlFlightsFrameName: "International Flights", hotelFrameNameFallback: "Hotel",
     newTripAction: "Create new trip", editTripDetails: "Edit trip details",
     refreshAllFlights: "Refresh all flights", flightRefreshRunning: "Refreshing flights…",
+    remindersManagerTitle: "Reminders & Alerts", remindersManagerEmpty: "No reminders yet (added automatically to flight and check-out records).",
+    remindersManagerHint: "Each reminder is computed from its record's own time. Turn any off, or change how many hours before it fires.",
+    hoursBeforeShort: "hours before",
     flightManagerTitle: "Flight Manager", refreshEligibleNow: "Refresh eligible now", refreshNow: "Refresh",
     flightManagerCooldownHint: "Flights within {near} days are checked daily; farther-out flights weekly. The same limit now applies to each row's individual refresh button too.",
     flightManagerOnCooldown: "On cooldown",
@@ -550,6 +556,63 @@ function useFloatingMenu(open, onOpenChange) {
 function toLocalISODate(d) {
   const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, "0"), day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+/* Default reminder/alert rules per record type. Each rule fires at rowAnchorTime + offsetMinutes
+   (offset is negative = before the anchor). 'kind' is 'reminder' (heads-up, less urgent) or 'alert'
+   (more urgent, closer to the moment). These are starting defaults — every instance can be enabled/
+   disabled or time-shifted individually from the reminders management page; adjusting a rule here
+   only changes what NEW/unconfigured rows default to. */
+const REMINDER_TYPE_DEFAULTS = {
+  flight: [
+    { id: "checkin_online", kind: "reminder", anchor: "start", offsetMinutes: -3 * 24 * 60, label_he: "בצע צ'ק-אין מקוון", label_en: "Do online check-in" },
+    { id: "head_to_airport_early", kind: "reminder", anchor: "start", offsetMinutes: -7 * 60, label_he: "צא לשדה התעופה", label_en: "Head to the airport" },
+    { id: "head_to_airport_alert", kind: "alert", anchor: "start", offsetMinutes: -4 * 60, label_he: "הגעה לשדה התעופה", label_en: "Arrive at the airport" },
+    { id: "boarding", kind: "alert", anchor: "start", offsetMinutes: -2 * 60, label_he: "עלייה לטיסה", label_en: "Boarding" },
+  ],
+  "domestic-flight": [
+    { id: "head_to_airport_early", kind: "reminder", anchor: "start", offsetMinutes: -3 * 60, label_he: "צא לשדה התעופה", label_en: "Head to the airport" },
+    { id: "head_to_airport_alert", kind: "alert", anchor: "start", offsetMinutes: -2 * 60, label_he: "הגעה לשדה התעופה", label_en: "Arrive at the airport" },
+    { id: "boarding", kind: "alert", anchor: "start", offsetMinutes: -45, label_he: "עלייה לטיסה", label_en: "Boarding" },
+  ],
+  checkout: [
+    { id: "before_checkout", kind: "reminder", anchor: "start", offsetMinutes: -24 * 60, label_he: "לפני צ'ק-אאוט מהמלון", label_en: "Before hotel check-out" },
+  ],
+};
+/* Combines a row's date with one of its time fields into a real Date object. Handles the case where
+   endTime is on the next calendar day (the `overnight` flag) — startTime is always assumed to be on
+   the row's own date. */
+function rowAnchorDateTime(row, anchor) {
+  if (!row.date) return null;
+  const time = anchor === "end" ? row.endTime : row.startTime;
+  if (!time) return null;
+  const [y, m, d] = row.date.split("-").map(Number);
+  const [hh, mm] = time.split(":").map(Number);
+  let dt = new Date(y, m - 1, d, hh, mm);
+  if (anchor === "end" && row.overnight) dt = new Date(dt.getTime() + 24 * 60 * 60 * 1000);
+  return dt;
+}
+/* Builds the full, chronologically-sorted list of reminder/alert instances for the whole trip:
+   one entry per (row, rule) pair from REMINDER_TYPE_DEFAULTS, with any per-row overrides applied
+   (row.reminderSettings[ruleId] = { enabled, offsetMinutes }), skipping rows missing the anchor time
+   needed to compute it. */
+function buildReminderInstances(rows) {
+  const out = [];
+  rows.forEach((row) => {
+    const rules = REMINDER_TYPE_DEFAULTS[row.typeId];
+    if (!rules) return;
+    const overrides = row.reminderSettings || {};
+    rules.forEach((rule) => {
+      const override = overrides[rule.id] || {};
+      if (override.enabled === false) return;
+      const offsetMinutes = override.offsetMinutes != null ? override.offsetMinutes : rule.offsetMinutes;
+      const anchorDt = rowAnchorDateTime(row, rule.anchor);
+      if (!anchorDt) return;
+      const fireAt = new Date(anchorDt.getTime() + offsetMinutes * 60000);
+      out.push({ rowId: row.id, ruleId: rule.id, kind: rule.kind, label_he: rule.label_he, label_en: rule.label_en, offsetMinutes, fireAt, row });
+    });
+  });
+  out.sort((a, b) => a.fireAt - b.fireAt);
+  return out;
 }
 function heDay(dateStr, lang) { if (!dateStr) return "—"; const d = new Date(dateStr + "T00:00:00"); if (isNaN(d)) return "—"; return lang === "he" ? HE_DAYS[d.getDay()] : EN_DAYS[d.getDay()]; }
 function fmtDate(dateStr, lang) { if (!dateStr) return "—"; const d = new Date(dateStr + "T00:00:00"); if (isNaN(d)) return dateStr; const dd = String(d.getDate()).padStart(2, "0"); const mm = String(d.getMonth() + 1).padStart(2, "0"); return `${dd}/${mm}/${d.getFullYear()}`; }
@@ -2958,6 +3021,7 @@ export default function MyTripApp() {
   const [preWizardOpen, setPreWizardOpen] = useState(false);
   const [flightRefreshStatus, setFlightRefreshStatus] = useState(null);
   const [flightManagerOpen, setFlightManagerOpen] = useState(false);
+  const [remindersManagerOpen, setRemindersManagerOpen] = useState(false);
   const [flightManagerRowStatus, setFlightManagerRowStatus] = useState({});
   const [preWizardEditMode, setPreWizardEditMode] = useState(false);
   const [preWizardScreen, setPreWizardScreen] = useState(0);
@@ -3743,6 +3807,13 @@ export default function MyTripApp() {
     });
   }
   function updateRow(id, patch) { applyRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r))); }
+  function setReminderOverride(rowId, ruleId, patch) {
+    applyRows((prev) => prev.map((r) => {
+      if (r.id !== rowId) return r;
+      const current = (r.reminderSettings && r.reminderSettings[ruleId]) || {};
+      return { ...r, reminderSettings: { ...(r.reminderSettings || {}), [ruleId]: { ...current, ...patch } } };
+    }));
+  }
   function getDayGroupRows(row) {
     return rows.filter((r) => !r.parentId && (r.frameId || null) === (row.frameId || null) && r.date === row.date);
   }
@@ -4721,6 +4792,18 @@ export default function MyTripApp() {
         .mt-help-section-title { display:flex; align-items:center; gap:7px; font-size:14.5px; font-weight:700; color:var(--ink); margin-bottom:6px; text-align:right; }
         .mt-file-manager-tabs { display:flex; gap:6px; padding:10px 16px 0; border-bottom:1px solid var(--border); }
         .mt-flight-manager-toolbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:4px; }
+        .mt-reminders-day-group { margin-bottom:14px; }
+        .mt-reminders-day-header { font-weight:700; font-size:13px; color:var(--teal); margin-bottom:6px; padding-bottom:4px; border-bottom:1px solid var(--border); }
+        .mt-reminder-row { display:flex; align-items:center; gap:9px; padding:7px 2px; border-bottom:1px solid var(--border); }
+        .mt-reminder-row.disabled { opacity:0.45; }
+        .mt-reminder-row:last-child { border-bottom:none; }
+        .mt-reminder-kind-icon { flex-shrink:0; display:flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:8px; }
+        .mt-reminder-kind-icon.reminder { background:var(--teal-tint); color:var(--teal); }
+        .mt-reminder-kind-icon.alert { background:#FBEAEA; color:var(--danger); }
+        .mt-reminder-main { flex:1; min-width:0; }
+        .mt-reminder-label { font-weight:600; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .mt-reminder-offset { display:flex; align-items:center; gap:4px; flex-shrink:0; }
+        .mt-reminder-offset-input { width:44px; padding:3px 4px; border:1px solid var(--border); border-radius:6px; text-align:center; font-size:12.5px; }
         .mt-flight-manager-row { border:1px solid var(--border); border-radius:10px; padding:9px 11px; margin-bottom:8px; display:flex; flex-direction:column; gap:4px; }
         .mt-flight-manager-row-top { display:flex; align-items:center; justify-content:space-between; gap:8px; font-weight:700; font-size:13.5px; }
         .mt-flight-manager-route { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -4937,6 +5020,7 @@ export default function MyTripApp() {
             <button className="mt-share-opt" onClick={() => { openPreWizard(); setActionsMenuOpen(false); }}><Wand2 size={14} /> {T.tripWizard}</button>
             <button className="mt-share-opt" onClick={() => { openEditTripDetails(); setActionsMenuOpen(false); }}><Pencil size={14} /> {T.editTripDetails}</button>
             <button className="mt-share-opt" onClick={() => { setFlightManagerOpen(true); setActionsMenuOpen(false); }}><RefreshCw size={14} /> {T.refreshAllFlights}</button>
+            <button className="mt-share-opt" onClick={() => { setRemindersManagerOpen(true); setActionsMenuOpen(false); }}><Bell size={14} /> {T.remindersManagerTitle}</button>
             <div className="mt-action-cat-label"><span>{T.catSaveExport}</span><HelpButton topic="sharing" lang={lang} T={T} onOpenFull={openHelpTopic} size={13} openTopic={helpPopoverOpen} setOpenTopic={setHelpPopoverOpen} /></div>
             <button className="mt-share-opt" onClick={openSaveTripModal}><Save size={14} /> {T.saveTripByName}</button>
             <button className="mt-share-opt" onClick={openLoadTripModal}><FolderOpen size={14} /> {T.loadSavedTrip}</button>
@@ -5772,6 +5856,56 @@ export default function MyTripApp() {
         </div>
       )}
 
+      {remindersManagerOpen && (
+        <div className="mt-modal-backdrop" onClick={() => setRemindersManagerOpen(false)}>
+          <div className="mt-modal" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+            <div className="mt-modal-header"><span className="mt-modal-title">{T.remindersManagerTitle}</span><button className="mt-btn ghost" onClick={() => setRemindersManagerOpen(false)}><X size={16} /></button></div>
+            <div className="mt-modal-body">
+              <p className="mt-hint" style={{ margin: "2px 0 10px" }}>{T.remindersManagerHint}</p>
+              {(() => {
+                const instances = buildReminderInstances(rows);
+                if (!instances.length) return <p className="mt-hint">{T.remindersManagerEmpty}</p>;
+                const groups = [];
+                let lastDateKey = null;
+                instances.forEach((inst) => {
+                  const dateKey = toLocalISODate(inst.fireAt);
+                  if (dateKey !== lastDateKey) { groups.push({ dateKey, items: [] }); lastDateKey = dateKey; }
+                  groups[groups.length - 1].items.push(inst);
+                });
+                return groups.map((g) => (
+                  <div key={g.dateKey} className="mt-reminders-day-group">
+                    <div className="mt-reminders-day-header">{fmtDate(g.dateKey, lang)} · {heDay(g.dateKey, lang)}</div>
+                    {g.items.map((inst) => {
+                      const override = (inst.row.reminderSettings && inst.row.reminderSettings[inst.ruleId]) || {};
+                      const enabled = override.enabled !== false;
+                      const hoursBefore = Math.round((-inst.offsetMinutes / 60) * 10) / 10;
+                      const hh = String(inst.fireAt.getHours()).padStart(2, "0");
+                      const mm = String(inst.fireAt.getMinutes()).padStart(2, "0");
+                      const recordLabel = inst.row.toAlias || inst.row.to || typeMeta(inst.row.typeId, types, T, lang).name;
+                      return (
+                        <div key={inst.rowId + inst.ruleId} className={"mt-reminder-row" + (enabled ? "" : " disabled")}>
+                          <span className={"mt-reminder-kind-icon " + inst.kind}>{inst.kind === "alert" ? <BellRing size={14} /> : <Bell size={14} />}</span>
+                          <div className="mt-reminder-main">
+                            <div className="mt-reminder-label">{lang === "he" ? inst.label_he : inst.label_en}</div>
+                            <div className="mt-hint" dir="auto">{recordLabel} · <span dir="ltr">{hh}:{mm}</span></div>
+                          </div>
+                          <div className="mt-reminder-offset">
+                            <input type="number" step="0.5" min="0" className="mt-reminder-offset-input" value={hoursBefore}
+                              disabled={!enabled}
+                              onChange={(e) => setReminderOverride(inst.rowId, inst.ruleId, { offsetMinutes: -Number(e.target.value) * 60 })} />
+                            <span className="mt-hint">{T.hoursBeforeShort}</span>
+                          </div>
+                          <input type="checkbox" checked={enabled} onChange={(e) => setReminderOverride(inst.rowId, inst.ruleId, { enabled: e.target.checked })} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                ));
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
       {helpCenterOpen && (
         <div className="mt-modal-backdrop" onClick={() => setHelpCenterOpen(false)}>
           <div className="mt-modal" style={{ maxWidth: 500 }} onClick={(e) => e.stopPropagation()}>
