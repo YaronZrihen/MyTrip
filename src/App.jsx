@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.17.0";
+const APP_VERSION = "22.18.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -301,6 +301,12 @@ const T_DICT = {
     intlFlightsFrameName: "טיסות בינלאומיות", hotelFrameNameFallback: "מלון",
     newTripAction: "צור טיול חדש", editTripDetails: "ערוך פרטי טיול",
     refreshAllFlights: "רענן את כל הטיסות", flightRefreshRunning: "מרענן טיסות…",
+    flightManagerTitle: "ניהול טיסות", refreshEligibleNow: "רענן זכאיות עכשיו", refreshNow: "רענן",
+    flightManagerCooldownHint: "טיסות עד {near} ימים נבדקות פעם ביום; טיסות רחוקות יותר — פעם בשבוע. הכפתור לכל רשומה תמיד זמין, בלי הגבלה.",
+    flightManagerEmpty: "אין עדיין רשומות טיסה בטיול.",
+    flightManagerNoNumber: "אין מספר טיסה",
+    flightManagerLastSynced: "סונכרן", flightManagerNeverSynced: "טרם סונכרן", flightManagerNextCheck: "בדיקה הבאה",
+    flightManagerUpdated: "עודכן", flightManagerUnchanged: "ללא שינוי",
     flightRefreshSummary: "{updated} עודכנו · {unchanged} ללא שינוי · {skipped} עדיין בהמתנה",
     wizardDestination: "יעד", wizardDestinationHint: "לדוגמה: רומא, איטליה",
     wizardOutboundHint: "פרטי הטיסות קובעים את תאריכי תחילת וסיום הטיול.",
@@ -461,6 +467,12 @@ const T_DICT = {
     intlFlightsFrameName: "International Flights", hotelFrameNameFallback: "Hotel",
     newTripAction: "Create new trip", editTripDetails: "Edit trip details",
     refreshAllFlights: "Refresh all flights", flightRefreshRunning: "Refreshing flights…",
+    flightManagerTitle: "Flight Manager", refreshEligibleNow: "Refresh eligible now", refreshNow: "Refresh",
+    flightManagerCooldownHint: "Flights within {near} days are checked daily; farther-out flights weekly. The per-row button is always available, no limit.",
+    flightManagerEmpty: "No flight records in this trip yet.",
+    flightManagerNoNumber: "No flight number",
+    flightManagerLastSynced: "Synced", flightManagerNeverSynced: "Never synced", flightManagerNextCheck: "Next check",
+    flightManagerUpdated: "Updated", flightManagerUnchanged: "Unchanged",
     flightRefreshSummary: "{updated} updated · {unchanged} unchanged · {skipped} still on cooldown",
     wizardDestination: "Destination", wizardDestinationHint: "e.g. Rome, Italy",
     wizardOutboundHint: "Flight details set the trip's start and end dates.",
@@ -749,6 +761,29 @@ function shouldFetchFlight(row, nowMs) {
   const daysUntil = (new Date(y, m - 1, d).getTime() - new Date(nowMs).setHours(0, 0, 0, 0)) / 86400000;
   const cooldown = daysUntil <= FLIGHT_REFRESH_NEAR_DAYS ? FLIGHT_REFRESH_NEAR_COOLDOWN_MS : FLIGHT_REFRESH_FAR_COOLDOWN_MS;
   return nowMs - row.flightLastFetchedAt >= cooldown;
+}
+/* When the bulk refresh will next consider this flight eligible again — null means "now". */
+function nextFetchEligibleAt(row, nowMs) {
+  if (!row.flightLastFetchedAt) return null;
+  const [y, m, d] = (row.date || "").split("-").map(Number);
+  if (!y) return null;
+  const daysUntil = (new Date(y, m - 1, d).getTime() - new Date(nowMs).setHours(0, 0, 0, 0)) / 86400000;
+  const cooldown = daysUntil <= FLIGHT_REFRESH_NEAR_DAYS ? FLIGHT_REFRESH_NEAR_COOLDOWN_MS : FLIGHT_REFRESH_FAR_COOLDOWN_MS;
+  const eligibleAt = row.flightLastFetchedAt + cooldown;
+  return eligibleAt > nowMs ? eligibleAt : null;
+}
+/* Simple relative-time label ("3h ago" / "in 2d") for the flight manager panel — doesn't need
+   locale-perfect grammar, just a quick, readable indicator of freshness. */
+function formatRelativeTime(ms, nowMs, lang) {
+  const diffMin = Math.round((ms - nowMs) / 60000);
+  const past = diffMin < 0;
+  const abs = Math.abs(diffMin);
+  let value, unit;
+  if (abs < 60) { value = abs; unit = lang === "he" ? "דק'" : "m"; }
+  else if (abs < 1440) { value = Math.round(abs / 60); unit = lang === "he" ? "שע'" : "h"; }
+  else { value = Math.round(abs / 1440); unit = lang === "he" ? "ימים" : "d"; }
+  if (lang === "he") return past ? `לפני ${value} ${unit}` : `בעוד ${value} ${unit}`;
+  return past ? `${value}${unit} ago` : `in ${value}${unit}`;
 }
 /* Recomputes every auto (non-manually-edited) start/end time in the whole trip, in one continuous
    forward pass over the visual row order. Manually-set fields (Auto === false) are never overwritten,
@@ -2936,6 +2971,8 @@ export default function MyTripApp() {
   };
   const [preWizardOpen, setPreWizardOpen] = useState(false);
   const [flightRefreshStatus, setFlightRefreshStatus] = useState(null);
+  const [flightManagerOpen, setFlightManagerOpen] = useState(false);
+  const [flightManagerRowStatus, setFlightManagerRowStatus] = useState({});
   const [preWizardEditMode, setPreWizardEditMode] = useState(false);
   const [preWizardScreen, setPreWizardScreen] = useState(0);
   const [preWizardData, setPreWizardData] = useState(PRE_WIZARD_DEFAULTS);
@@ -4178,6 +4215,39 @@ export default function MyTripApp() {
      cooldown), sequentially to avoid hammering the flight-data API, updating in place only what
      actually changed. Manual single-record fetches (fetchFlightData above) are never subject to
      this cooldown — it only governs this bulk action. */
+  async function fetchFlightForRow(row) {
+    const num = row.flightNumber.trim();
+    try {
+      const params = new URLSearchParams({ flight: num, date: row.date || "" });
+      const res = await fetch(`/api/flight-lookup?${params.toString()}`);
+      const data = await res.json();
+      if (!res.ok || !data || data.error) return { ok: false };
+      const patch = { flightLookedUpFor: num, flightLastFetchedAt: Date.now() };
+      if (data.departureLocation) patch.from = data.departureLocation;
+      if (data.arrivalLocation) patch.to = data.arrivalLocation;
+      if (data.departureAlias) patch.fromAlias = data.departureAlias;
+      if (data.arrivalAlias) patch.toAlias = data.arrivalAlias;
+      if (data.departureTime) { patch.startTime = data.departureTime; patch.startTimeAuto = false; patch.startTimeSource = "api"; }
+      if (data.arrivalTime) { patch.endTime = data.arrivalTime; patch.endTimeAuto = false; patch.endTimeSource = "api"; }
+      const extras = [data.status, data.terminal ? `${T.flightTerminal} ${data.terminal}` : null, data.gate ? `${T.flightGate} ${data.gate}` : null].filter(Boolean);
+      if (extras.length) patch.notes = [row.notes, extras.join(" · ")].filter(Boolean).join(" — ");
+      const changed = (patch.startTime !== undefined && patch.startTime !== row.startTime) || (patch.endTime !== undefined && patch.endTime !== row.endTime) || (patch.from !== undefined && patch.from !== row.from) || (patch.to !== undefined && patch.to !== row.to);
+      updateRow(row.id, patch);
+      return { ok: true, changed };
+    } catch {
+      return { ok: false };
+    }
+  }
+  /* Manual per-row refresh from the flight manager panel — always allowed, never subject to the
+     bulk cooldown (same rule as the single-record fetch inside the record's own edit modal). */
+  async function refreshOneFlightRow(rowId) {
+    const row = rows.find((r) => r.id === rowId);
+    if (!row || !row.flightNumber || !row.flightNumber.trim()) return;
+    setFlightManagerRowStatus((s) => ({ ...s, [rowId]: "running" }));
+    const result = await fetchFlightForRow(row);
+    setFlightManagerRowStatus((s) => ({ ...s, [rowId]: result.ok ? (result.changed ? "updated" : "unchanged") : "failed" }));
+    setTimeout(() => setFlightManagerRowStatus((s) => { const n = { ...s }; delete n[rowId]; return n; }), 5000);
+  }
   async function refreshAllFlights() {
     const now = Date.now();
     const flightRows = rows.filter((r) => isFlightType(r.typeId) && r.flightNumber && r.flightNumber.trim());
@@ -4190,25 +4260,10 @@ export default function MyTripApp() {
     setFlightRefreshStatus({ running: true });
     let updated = 0, unchanged = 0, failed = 0;
     for (const row of eligible) {
-      const num = row.flightNumber.trim();
-      try {
-        const params = new URLSearchParams({ flight: num, date: row.date || "" });
-        const res = await fetch(`/api/flight-lookup?${params.toString()}`);
-        const data = await res.json();
-        if (!res.ok || !data || data.error) { failed++; continue; }
-        const patch = { flightLookedUpFor: num, flightLastFetchedAt: Date.now() };
-        if (data.departureLocation) patch.from = data.departureLocation;
-        if (data.arrivalLocation) patch.to = data.arrivalLocation;
-        if (data.departureAlias) patch.fromAlias = data.departureAlias;
-        if (data.arrivalAlias) patch.toAlias = data.arrivalAlias;
-        if (data.departureTime) { patch.startTime = data.departureTime; patch.startTimeAuto = false; patch.startTimeSource = "api"; }
-        if (data.arrivalTime) { patch.endTime = data.arrivalTime; patch.endTimeAuto = false; patch.endTimeSource = "api"; }
-        const extras = [data.status, data.terminal ? `${T.flightTerminal} ${data.terminal}` : null, data.gate ? `${T.flightGate} ${data.gate}` : null].filter(Boolean);
-        if (extras.length) patch.notes = [row.notes, extras.join(" · ")].filter(Boolean).join(" — ");
-        const changed = (patch.startTime !== undefined && patch.startTime !== row.startTime) || (patch.endTime !== undefined && patch.endTime !== row.endTime) || (patch.from !== undefined && patch.from !== row.from) || (patch.to !== undefined && patch.to !== row.to);
-        updateRow(row.id, patch);
-        if (changed) updated++; else unchanged++;
-      } catch { failed++; }
+      const result = await fetchFlightForRow(row);
+      if (!result.ok) failed++;
+      else if (result.changed) updated++;
+      else unchanged++;
     }
     setFlightRefreshStatus({ updated, unchanged, failed, skipped: flightRows.length - eligible.length });
     setTimeout(() => setFlightRefreshStatus(null), 8000);
@@ -4677,6 +4732,15 @@ export default function MyTripApp() {
         .mt-help-section.focused { background:var(--teal-tint); border-radius:8px; padding:12px 10px; }
         .mt-help-section-title { display:flex; align-items:center; gap:7px; font-size:14.5px; font-weight:700; color:var(--ink); margin-bottom:6px; text-align:right; }
         .mt-file-manager-tabs { display:flex; gap:6px; padding:10px 16px 0; border-bottom:1px solid var(--border); }
+        .mt-flight-manager-toolbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:4px; }
+        .mt-flight-manager-row { border:1px solid var(--border); border-radius:10px; padding:9px 11px; margin-bottom:8px; display:flex; flex-direction:column; gap:4px; }
+        .mt-flight-manager-row-top { display:flex; align-items:center; justify-content:space-between; gap:8px; font-weight:700; font-size:13.5px; }
+        .mt-flight-manager-route { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .mt-flight-manager-num { color:var(--teal); font-size:12.5px; flex-shrink:0; }
+        .mt-flight-manager-row-mid { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12.5px; color:var(--muted); }
+        .mt-flight-manager-row-bottom { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+        .mt-spin { animation:mt-spin-anim 1s linear infinite; }
+        @keyframes mt-spin-anim { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
         .mt-file-manager-tab { border:none; background:none; padding:8px 10px; font-size:12px; font-weight:600; color:var(--muted); border-bottom:2px solid transparent; }
         .mt-file-manager-tab.active { color:var(--teal-dark); border-bottom-color:var(--teal); }
         .mt-file-manager-icon { width:30px; height:30px; border-radius:8px; background:var(--teal-tint); color:var(--teal-dark); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
@@ -4884,15 +4948,7 @@ export default function MyTripApp() {
             <button className="mt-share-opt" onClick={() => { openFrameModal(null, null); setActionsMenuOpen(false); }}><FolderPlus size={14} /> {T.newFrame}</button>
             <button className="mt-share-opt" onClick={() => { openPreWizard(); setActionsMenuOpen(false); }}><Wand2 size={14} /> {T.tripWizard}</button>
             <button className="mt-share-opt" onClick={() => { openEditTripDetails(); setActionsMenuOpen(false); }}><Pencil size={14} /> {T.editTripDetails}</button>
-            <button className="mt-share-opt" onClick={refreshAllFlights} disabled={flightRefreshStatus && flightRefreshStatus.running}><RefreshCw size={14} /> {T.refreshAllFlights}</button>
-            {flightRefreshStatus && (
-              <div className="mt-hint" style={{ padding: "2px 10px 6px" }}>
-                {flightRefreshStatus.running ? T.flightRefreshRunning : T.flightRefreshSummary
-                  .replace("{updated}", flightRefreshStatus.updated)
-                  .replace("{unchanged}", flightRefreshStatus.unchanged)
-                  .replace("{skipped}", flightRefreshStatus.skipped)}
-              </div>
-            )}
+            <button className="mt-share-opt" onClick={() => { setFlightManagerOpen(true); setActionsMenuOpen(false); }}><RefreshCw size={14} /> {T.refreshAllFlights}</button>
             <div className="mt-action-cat-label"><span>{T.catSaveExport}</span><HelpButton topic="sharing" lang={lang} T={T} onOpenFull={openHelpTopic} size={13} openTopic={helpPopoverOpen} setOpenTopic={setHelpPopoverOpen} /></div>
             <button className="mt-share-opt" onClick={openSaveTripModal}><Save size={14} /> {T.saveTripByName}</button>
             <button className="mt-share-opt" onClick={openLoadTripModal}><FolderOpen size={14} /> {T.loadSavedTrip}</button>
@@ -5659,6 +5715,69 @@ export default function MyTripApp() {
                   .filter((f) => fileManagerFilter === "all" || (fileManagerFilter === "images" && f.type === "image") || (fileManagerFilter === "documents" && f.type === "document"))
                   .map((f) => <FileManagerRow key={f.id} file={f} T={T} showCategory />)
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {flightManagerOpen && (
+        <div className="mt-modal-backdrop" onClick={() => setFlightManagerOpen(false)}>
+          <div className="mt-modal" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+            <div className="mt-modal-header"><span className="mt-modal-title">{T.flightManagerTitle}</span><button className="mt-btn ghost" onClick={() => setFlightManagerOpen(false)}><X size={16} /></button></div>
+            <div className="mt-modal-body">
+              <div className="mt-flight-manager-toolbar">
+                <button className="mt-btn primary" onClick={refreshAllFlights} disabled={flightRefreshStatus && flightRefreshStatus.running}>
+                  <RefreshCw size={13} /> {flightRefreshStatus && flightRefreshStatus.running ? T.flightRefreshRunning : T.refreshEligibleNow}
+                </button>
+                {flightRefreshStatus && !flightRefreshStatus.running && (
+                  <span className="mt-hint">
+                    {T.flightRefreshSummary
+                      .replace("{updated}", flightRefreshStatus.updated)
+                      .replace("{unchanged}", flightRefreshStatus.unchanged)
+                      .replace("{skipped}", flightRefreshStatus.skipped)}
+                  </span>
+                )}
+              </div>
+              <p className="mt-hint" style={{ margin: "2px 0 10px" }}>{T.flightManagerCooldownHint.replace("{near}", FLIGHT_REFRESH_NEAR_DAYS)}</p>
+              {(() => {
+                const now = Date.now();
+                const flightRows = rows.filter((r) => isFlightType(r.typeId)).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+                if (!flightRows.length) return <p className="mt-hint">{T.flightManagerEmpty}</p>;
+                return flightRows.map((r) => {
+                  const hasNumber = r.flightNumber && r.flightNumber.trim();
+                  const rowStatus = flightManagerRowStatus[r.id];
+                  const nextAt = hasNumber ? nextFetchEligibleAt(r, now) : null;
+                  return (
+                    <div className="mt-flight-manager-row" key={r.id}>
+                      <div className="mt-flight-manager-row-top">
+                        <span className="mt-flight-manager-route" dir="auto">
+                          {truncateChars(r.fromAlias || r.from, 16) || "—"} → {truncateChars(r.toAlias || r.to, 16) || "—"}
+                        </span>
+                        <span className="mt-flight-manager-num">{r.flightNumber || T.flightManagerNoNumber}</span>
+                      </div>
+                      <div className="mt-flight-manager-row-mid">
+                        <span>{r.date}</span>
+                        <span dir="ltr">{r.startTime || "—:—"} → {r.endTime || "—:—"}</span>
+                      </div>
+                      {hasNumber && (
+                        <div className="mt-flight-manager-row-bottom">
+                          <span className="mt-hint">
+                            {r.flightLastFetchedAt
+                              ? `${T.flightManagerLastSynced}: ${formatRelativeTime(r.flightLastFetchedAt, now, lang)}`
+                              : T.flightManagerNeverSynced}
+                            {nextAt && ` · ${T.flightManagerNextCheck}: ${formatRelativeTime(nextAt, now, lang)}`}
+                          </span>
+                          <button className="mt-btn ghost" style={{ padding: "3px 8px" }} disabled={rowStatus === "running"} onClick={() => refreshOneFlightRow(r.id)}>
+                            {rowStatus === "running" ? <RefreshCw size={12} className="mt-spin" /> : <RefreshCw size={12} />}
+                            {" "}
+                            {rowStatus === "updated" ? T.flightManagerUpdated : rowStatus === "unchanged" ? T.flightManagerUnchanged : rowStatus === "failed" ? T.flightLookupError : T.refreshNow}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
             </div>
           </div>
         </div>
