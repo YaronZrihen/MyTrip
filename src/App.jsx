@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.15.3";
+const APP_VERSION = "22.16.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -2617,6 +2617,12 @@ function hotelCityLabel(city, lang) {
   }
   return city;
 }
+/* Hotel frame names can get long ("Saturdays Residence by Brown Starling..."), wrapping to a
+   second line and breaking the compact header layout — truncate to a fixed length instead. */
+function truncateFrameName(name, max) {
+  if (!name || name.length <= max) return name;
+  return name.slice(0, max) + "...";
+}
 function hotelCityForFrame(frame, rows) {
   if (frame.hotelRef && frame.hotelRef.city) return frame.hotelRef.city;
   const parenMatch = frame.name.match(/\(([^)]+)\)\s*$/);
@@ -2655,14 +2661,17 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
               ) : (
                 <button className="mt-frame-type-icon mt-frame-type-icon-btn" onClick={(e) => { e.stopPropagation(); if (hotelRowWithPlace) openHotelInfo(hotelRowWithPlace); }} title={hotelRowWithPlace ? T.placeInfo : undefined}><BedDouble size={15} /></button>
               )}
-              <span className="mt-frame-name-full">{frame.name}</span>
+              <span className="mt-frame-name-full" title={frame.name}>{effectiveFrameType === "hotel" ? truncateFrameName(frame.name, 25) : frame.name}</span>
             </div>
             {effectiveFrameType === "hotel" && hotelCityForFrame(frame, rows) && (
-              <div className="mt-frame-city">{hotelCityLabel(hotelCityForFrame(frame, rows), lang)}</div>
+              <div className="mt-frame-city">
+                {hotelCityLabel(hotelCityForFrame(frame, rows), lang)}
+                {dayCount > 0 && ` (${formatDayCount(dayCount, lang)})`}
+              </div>
             )}
             <div className="mt-frame-header-row2">
               <div className="mt-frame-header-row2-start">
-                {dayCount > 0 && <span className="mt-frame-daycount">{formatDayCount(dayCount, lang)}</span>}
+                {effectiveFrameType !== "hotel" && dayCount > 0 && <span className="mt-frame-daycount">{formatDayCount(dayCount, lang)}</span>}
                 {convertedTotal > 0 && (
                   <span className="mt-frame-cost-inline">{displayCurrency} {convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                 )}
@@ -4316,7 +4325,7 @@ export default function MyTripApp() {
         .mt-frame-header-top { display:flex; align-items:center; gap:9px; }
         .mt-frame-header-special-wrap { display:flex; flex-direction:column; gap:6px; width:100%; }
         .mt-frame-header-row1 { display:flex; align-items:center; gap:9px; }
-        .mt-frame-name-full { font-weight:700; font-size:15px; overflow-wrap:break-word; min-width:24px; }
+        .mt-frame-name-full { font-weight:700; font-size:15px; overflow-wrap:break-word; min-width:24px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         .mt-frame-city { font-size:12.5px; font-weight:700; color:var(--frame-color, var(--teal)); margin-top:1px; text-align:right !important; width:100%; direction:rtl; }
         .mt-frame-header-row2 { display:flex; align-items:center; justify-content:space-between; gap:9px; padding-inline-start:24px; }
         .mt-frame-header-row2-start { display:flex; align-items:center; gap:10px; min-width:0; }
