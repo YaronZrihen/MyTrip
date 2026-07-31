@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.15.1";
+const APP_VERSION = "22.15.3";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -4317,7 +4317,7 @@ export default function MyTripApp() {
         .mt-frame-header-special-wrap { display:flex; flex-direction:column; gap:6px; width:100%; }
         .mt-frame-header-row1 { display:flex; align-items:center; gap:9px; }
         .mt-frame-name-full { font-weight:700; font-size:15px; overflow-wrap:break-word; min-width:24px; }
-        .mt-frame-city { font-size:12.5px; font-weight:700; color:var(--frame-color, var(--teal)); margin-top:1px; text-align:end; width:100%; }
+        .mt-frame-city { font-size:12.5px; font-weight:700; color:var(--frame-color, var(--teal)); margin-top:1px; text-align:right !important; width:100%; direction:rtl; }
         .mt-frame-header-row2 { display:flex; align-items:center; justify-content:space-between; gap:9px; padding-inline-start:24px; }
         .mt-frame-header-row2-start { display:flex; align-items:center; gap:10px; min-width:0; }
         .mt-frame-header-row2-end { display:flex; align-items:center; gap:9px; flex-shrink:0; }
@@ -4375,7 +4375,7 @@ export default function MyTripApp() {
         .mt-group-add:hover { text-decoration:underline; }
         .mt-group-add.disabled { color:var(--border); cursor:default; }
         .mt-group-add-bottom { display:flex; margin-top:6px; padding:6px 4px; }
-        .mt-group-footer-actions { display:flex; align-items:center; justify-content:flex-start; gap:10px; flex-wrap:wrap; margin-top:3px; padding:4px 4px; }
+        .mt-group-footer-actions { display:flex; align-items:center; justify-content:flex-start; gap:10px; flex-wrap:wrap; margin-top:0; padding:2px 4px; }
         .mt-chrono-warning { display:flex; align-items:center; gap:7px; background:#FBEAE8; color:var(--danger); font-size:11.5px; padding:6px 10px; border-radius:8px; margin:0 4px 8px; }
         .mt-table-wrap { width:100%; overflow-x:auto; border-radius:10px; }
         .mt-flow-view { display:flex; align-items:flex-start; gap:4px; flex-wrap:wrap; padding:16px 8px; background:var(--surface); border-radius:10px; border:1px solid var(--border); }
