@@ -71,8 +71,13 @@ function normalize(entry) {
 
 // The precise, geocodable value for the from/to fields: the full airport name with no code or
 // parentheses attached (which can confuse geocoding and route calculation between the two points).
+// If the name doesn't mention "airport" at all (AviationStack sometimes returns just a bare place
+// name like "Koh Samui" instead of "Samui International Airport"), append it — otherwise geocoding
+// can resolve to the whole island/city instead of the actual airport.
 function preciseLocation(side) {
-  return side.airport || side.iata || "";
+  const name = side.airport || "";
+  if (!name) return side.iata || "";
+  return /airport/i.test(name) ? name : `${name} Airport`;
 }
 
 // The short display label for the alias fields: shortened name + IATA code, e.g. "Suvarnabhumi (BKK)".
