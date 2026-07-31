@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.11.1";
+const APP_VERSION = "22.13.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -2600,6 +2600,22 @@ function FrameDateBadge({ date, lang }) {
    "Hotel (City)" conventions first; falls back to the verified address of one of its own
    checkin/checkout/transfer records — Google/Nominatim addresses for this trip consistently end in
    "..., City, Postal Code, Country", so the segment third from the end is the city/province. */
+const CITY_NAME_HE = {
+  "bangkok": "בנגקוק", "phuket": "פוקט", "pai": "פאי", "koh samui": "קוסמוי", "samui": "קוסמוי",
+  "koh phangan": "קופנגן", "phangan": "קופנגן", "kanchanaburi": "קנצ'נבורי", "chiang mai": "צ'אנג מאי",
+  "krabi": "קרבי", "koh tao": "קוטאו", "koh lanta": "קולנטה", "hua hin": "הואהין", "pattaya": "פטאיה",
+  "ayutthaya": "איוטהאיה", "chiang rai": "צ'אנג ראי",
+};
+/* Shows the city label in Hebrew when the app is in Hebrew mode and a translation is known;
+   otherwise falls back to whatever value is already stored (which may already be Hebrew). */
+function hotelCityLabel(city, lang) {
+  if (!city) return city;
+  if (lang === "he") {
+    const he = CITY_NAME_HE[city.trim().toLowerCase()];
+    if (he) return he;
+  }
+  return city;
+}
 function hotelCityForFrame(frame, rows) {
   if (frame.hotelRef && frame.hotelRef.city) return frame.hotelRef.city;
   const parenMatch = frame.name.match(/\(([^)]+)\)\s*$/);
@@ -2638,11 +2654,13 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
               ) : (
                 <button className="mt-frame-type-icon mt-frame-type-icon-btn" onClick={(e) => { e.stopPropagation(); if (hotelRowWithPlace) openHotelInfo(hotelRowWithPlace); }} title={hotelRowWithPlace ? T.placeInfo : undefined}><BedDouble size={15} /></button>
               )}
-              <span className="mt-frame-name-full">{frame.name}</span>
+              <span className="mt-frame-title-group">
+                {effectiveFrameType === "hotel" && hotelCityForFrame(frame, rows) && (
+                  <span className="mt-frame-city">{hotelCityLabel(hotelCityForFrame(frame, rows), lang)}</span>
+                )}
+                <span className="mt-frame-name-full">{frame.name}</span>
+              </span>
             </div>
-            {effectiveFrameType === "hotel" && hotelCityForFrame(frame, rows) && (
-              <div className="mt-frame-city">{hotelCityForFrame(frame, rows)}</div>
-            )}
             <div className="mt-frame-header-row2">
               <div className="mt-frame-header-row2-start">
                 {dayCount > 0 && <span className="mt-frame-daycount">{formatDayCount(dayCount, lang)}</span>}
@@ -3280,8 +3298,10 @@ export default function MyTripApp() {
       .then(({ ok, data }) => {
         if (!ok || !data || data.error) { updatePreWizardArrayItem(field, idx, { flightLookupMsg: (data && data.error) || T.flightLookupError }); return; }
         const patch = { flightLookupMsg: T.flightLookupSuccess };
-        if (data.departureAirport) patch.from = data.departureAirport;
-        if (data.arrivalAirport) patch.to = data.arrivalAirport;
+        if (data.departureLocation) patch.from = data.departureLocation;
+        if (data.arrivalLocation) patch.to = data.arrivalLocation;
+        if (data.departureAlias) patch.fromAlias = data.departureAlias;
+        if (data.arrivalAlias) patch.toAlias = data.arrivalAlias;
         if (data.departureDate) patch.depDate = data.departureDate;
         if (data.departureTime) patch.depTime = data.departureTime;
         if (data.arrivalTime) patch.landTime = data.arrivalTime;
@@ -4103,8 +4123,10 @@ export default function MyTripApp() {
       .then(({ ok, data }) => {
         if (!ok || !data || data.error) { setFlightLookupMsg((data && data.error) || T.flightLookupError); return; }
         const patch = { flightLookedUpFor: num };
-        if (data.departureAirport) patch.from = data.departureAirport;
-        if (data.arrivalAirport) patch.to = data.arrivalAirport;
+        if (data.departureLocation) patch.from = data.departureLocation;
+        if (data.arrivalLocation) patch.to = data.arrivalLocation;
+        if (data.departureAlias) patch.fromAlias = data.departureAlias;
+        if (data.arrivalAlias) patch.toAlias = data.arrivalAlias;
         if (data.departureTime) { patch.startTime = data.departureTime; patch.startTimeAuto = false; patch.startTimeSource = "api"; }
         if (data.arrivalTime) { patch.endTime = data.arrivalTime; patch.endTimeAuto = false; patch.endTimeSource = "api"; }
         const extras = [data.status, data.terminal ? `${T.flightTerminal} ${data.terminal}` : null, data.gate ? `${T.flightGate} ${data.gate}` : null].filter(Boolean);
@@ -4287,7 +4309,8 @@ export default function MyTripApp() {
         .mt-frame-header-special-wrap { display:flex; flex-direction:column; gap:6px; width:100%; }
         .mt-frame-header-row1 { display:flex; align-items:center; gap:9px; }
         .mt-frame-name-full { font-weight:700; font-size:15px; overflow-wrap:break-word; min-width:24px; }
-        .mt-frame-city { font-size:11.5px; color:var(--muted); margin-inline-start:23px; margin-top:-2px; }
+        .mt-frame-city { font-size:12.5px; font-weight:700; color:var(--frame-color, var(--teal)); }
+        .mt-frame-title-group { display:flex; align-items:center; gap:4px; min-width:24px; overflow:hidden; }
         .mt-frame-header-row2 { display:flex; align-items:center; justify-content:space-between; gap:9px; padding-inline-start:24px; }
         .mt-frame-header-row2-start { display:flex; align-items:center; gap:10px; min-width:0; }
         .mt-frame-header-row2-end { display:flex; align-items:center; gap:9px; flex-shrink:0; }
