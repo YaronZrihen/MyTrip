@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.11.0";
+const APP_VERSION = "22.11.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -3201,8 +3201,7 @@ export default function MyTripApp() {
     setPreWizardOpen(true);
   }
   function buildWizardDataFromLive() {
-    if (!preWizardCreatedIds) return null;
-    const mainFrame = frames.find((f) => preWizardCreatedIds.frameIds.includes(f.id) && !f.parentFrameId);
+    const mainFrame = frames.find((f) => !f.parentFrameId);
     if (!mainFrame) return null;
     function mapFlightRows(typeId) {
       return rows.filter((r) => r.frameId === mainFrame.id && r.typeId === typeId).map((r) => ({
@@ -3222,6 +3221,7 @@ export default function MyTripApp() {
       };
     });
     return {
+      hasTripPlan: "yes",
       tripName: mainFrame.name || "", planStartDate: mainFrame.startDate || "", planEndDate: mainFrame.endDate || "",
       hasFlights: liveFlights.length ? "yes" : "no", flights: liveFlights.length ? liveFlights : PRE_WIZARD_DEFAULTS.flights,
       hasDomestic: liveDomestic.length ? "yes" : "no", domesticFlights: liveDomestic.length ? liveDomestic : PRE_WIZARD_DEFAULTS.domesticFlights,
