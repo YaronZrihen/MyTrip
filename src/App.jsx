@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.10.0";
+const APP_VERSION = "22.10.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -4081,7 +4081,6 @@ export default function MyTripApp() {
   function fetchFlightData() {
     const num = cardDraft.flightNumber && cardDraft.flightNumber.trim();
     if (!num) { setFlightLookupMsg(T.flightNoNumber); return; }
-    if (cardDraft.flightLookedUpFor === num) { setFlightLookupMsg(T.flightAlreadyLookedUp); return; }
     setFlightLookupMsg(T.flightLookupLoading);
     const params = new URLSearchParams({ flight: num, date: cardDraft.date || "" });
     fetch(`/api/flight-lookup?${params.toString()}`)
