@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.16.0";
+const APP_VERSION = "22.17.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -300,6 +300,8 @@ const T_DICT = {
     preWizardSummary: "מוכן! בלחיצה על \"צור טיול\" ניצור עבורך מסגרת ראשית, מסגרת לטיסות הבינלאומיות, ומסגרת נפרדת לכל מלון — עם כל הרשומות ממוקמות לפי התאריכים שהזנת.",
     intlFlightsFrameName: "טיסות בינלאומיות", hotelFrameNameFallback: "מלון",
     newTripAction: "צור טיול חדש", editTripDetails: "ערוך פרטי טיול",
+    refreshAllFlights: "רענן את כל הטיסות", flightRefreshRunning: "מרענן טיסות…",
+    flightRefreshSummary: "{updated} עודכנו · {unchanged} ללא שינוי · {skipped} עדיין בהמתנה",
     wizardDestination: "יעד", wizardDestinationHint: "לדוגמה: רומא, איטליה",
     wizardOutboundHint: "פרטי הטיסות קובעים את תאריכי תחילת וסיום הטיול.",
     wizardOutboundShort: "הלוך", wizardReturnShort: "חזור",
@@ -458,6 +460,8 @@ const T_DICT = {
     preWizardSummary: "Ready! Clicking \"Create trip\" will create a main frame, a frame for international flights, and a separate frame for each hotel — with all records placed according to the dates you entered.",
     intlFlightsFrameName: "International Flights", hotelFrameNameFallback: "Hotel",
     newTripAction: "Create new trip", editTripDetails: "Edit trip details",
+    refreshAllFlights: "Refresh all flights", flightRefreshRunning: "Refreshing flights…",
+    flightRefreshSummary: "{updated} updated · {unchanged} unchanged · {skipped} still on cooldown",
     wizardDestination: "Destination", wizardDestinationHint: "e.g. Rome, Italy",
     wizardOutboundHint: "Flight details set the trip's start and end dates.",
     wizardOutboundShort: "outbound", wizardReturnShort: "return",
@@ -731,6 +735,21 @@ function buildGlobalRowOrderPure(rows, frames, fid) {
    to get there), and its endTime is when you leave, i.e. startTime + the type's default dwell time. */
 function isDwellType(typeId) { return typeId === "checkin" || typeId === "checkout"; }
 function isMovementType(typeId) { return !isDwellType(typeId); }
+const FLIGHT_REFRESH_NEAR_DAYS = 3;
+const FLIGHT_REFRESH_NEAR_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+const FLIGHT_REFRESH_FAR_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+/* Whether a flight row is due for a bulk refresh: flights departing soon (within
+   FLIGHT_REFRESH_NEAR_DAYS) get checked daily; flights further out are checked weekly, to avoid
+   burning through the flight-data API's rate limit on schedules that rarely change far in advance. */
+function shouldFetchFlight(row, nowMs) {
+  if (!row.flightNumber || !row.flightNumber.trim()) return false;
+  if (!row.flightLastFetchedAt) return true;
+  const [y, m, d] = (row.date || "").split("-").map(Number);
+  if (!y) return true;
+  const daysUntil = (new Date(y, m - 1, d).getTime() - new Date(nowMs).setHours(0, 0, 0, 0)) / 86400000;
+  const cooldown = daysUntil <= FLIGHT_REFRESH_NEAR_DAYS ? FLIGHT_REFRESH_NEAR_COOLDOWN_MS : FLIGHT_REFRESH_FAR_COOLDOWN_MS;
+  return nowMs - row.flightLastFetchedAt >= cooldown;
+}
 /* Recomputes every auto (non-manually-edited) start/end time in the whole trip, in one continuous
    forward pass over the visual row order. Manually-set fields (Auto === false) are never overwritten,
    but their value is still used as the anchor for computing whatever comes after them — so one manual
@@ -2916,6 +2935,7 @@ export default function MyTripApp() {
     ],
   };
   const [preWizardOpen, setPreWizardOpen] = useState(false);
+  const [flightRefreshStatus, setFlightRefreshStatus] = useState(null);
   const [preWizardEditMode, setPreWizardEditMode] = useState(false);
   const [preWizardScreen, setPreWizardScreen] = useState(0);
   const [preWizardData, setPreWizardData] = useState(PRE_WIZARD_DEFAULTS);
@@ -4139,7 +4159,7 @@ export default function MyTripApp() {
       .then((r) => r.json().then((data) => ({ ok: r.ok, data })))
       .then(({ ok, data }) => {
         if (!ok || !data || data.error) { setFlightLookupMsg((data && data.error) || T.flightLookupError); return; }
-        const patch = { flightLookedUpFor: num };
+        const patch = { flightLookedUpFor: num, flightLastFetchedAt: Date.now() };
         if (data.departureLocation) patch.from = data.departureLocation;
         if (data.arrivalLocation) patch.to = data.arrivalLocation;
         if (data.departureAlias) patch.fromAlias = data.departureAlias;
@@ -4154,7 +4174,48 @@ export default function MyTripApp() {
       .catch(() => setFlightLookupMsg(T.flightLookupError));
   }
 
+  /* Refreshes every flight/domestic-flight row that's due (per shouldFetchFlight's near/far
+     cooldown), sequentially to avoid hammering the flight-data API, updating in place only what
+     actually changed. Manual single-record fetches (fetchFlightData above) are never subject to
+     this cooldown — it only governs this bulk action. */
+  async function refreshAllFlights() {
+    const now = Date.now();
+    const flightRows = rows.filter((r) => isFlightType(r.typeId) && r.flightNumber && r.flightNumber.trim());
+    const eligible = flightRows.filter((r) => shouldFetchFlight(r, now));
+    if (!eligible.length) {
+      setFlightRefreshStatus({ updated: 0, unchanged: 0, failed: 0, skipped: flightRows.length });
+      setTimeout(() => setFlightRefreshStatus(null), 8000);
+      return;
+    }
+    setFlightRefreshStatus({ running: true });
+    let updated = 0, unchanged = 0, failed = 0;
+    for (const row of eligible) {
+      const num = row.flightNumber.trim();
+      try {
+        const params = new URLSearchParams({ flight: num, date: row.date || "" });
+        const res = await fetch(`/api/flight-lookup?${params.toString()}`);
+        const data = await res.json();
+        if (!res.ok || !data || data.error) { failed++; continue; }
+        const patch = { flightLookedUpFor: num, flightLastFetchedAt: Date.now() };
+        if (data.departureLocation) patch.from = data.departureLocation;
+        if (data.arrivalLocation) patch.to = data.arrivalLocation;
+        if (data.departureAlias) patch.fromAlias = data.departureAlias;
+        if (data.arrivalAlias) patch.toAlias = data.arrivalAlias;
+        if (data.departureTime) { patch.startTime = data.departureTime; patch.startTimeAuto = false; patch.startTimeSource = "api"; }
+        if (data.arrivalTime) { patch.endTime = data.arrivalTime; patch.endTimeAuto = false; patch.endTimeSource = "api"; }
+        const extras = [data.status, data.terminal ? `${T.flightTerminal} ${data.terminal}` : null, data.gate ? `${T.flightGate} ${data.gate}` : null].filter(Boolean);
+        if (extras.length) patch.notes = [row.notes, extras.join(" · ")].filter(Boolean).join(" — ");
+        const changed = (patch.startTime !== undefined && patch.startTime !== row.startTime) || (patch.endTime !== undefined && patch.endTime !== row.endTime) || (patch.from !== undefined && patch.from !== row.from) || (patch.to !== undefined && patch.to !== row.to);
+        updateRow(row.id, patch);
+        if (changed) updated++; else unchanged++;
+      } catch { failed++; }
+    }
+    setFlightRefreshStatus({ updated, unchanged, failed, skipped: flightRows.length - eligible.length });
+    setTimeout(() => setFlightRefreshStatus(null), 8000);
+  }
+
   /* ---------- frame modal ---------- */
+
   function openFrameModal(frame, presetParentId) {
     setFrameDraft(frame ? { ...frame } : { id: null, name: "", startDate: "", endDate: "", parentFrameId: presetParentId || null, collapsed: false, frameType: "basic" });
   }
@@ -4823,6 +4884,15 @@ export default function MyTripApp() {
             <button className="mt-share-opt" onClick={() => { openFrameModal(null, null); setActionsMenuOpen(false); }}><FolderPlus size={14} /> {T.newFrame}</button>
             <button className="mt-share-opt" onClick={() => { openPreWizard(); setActionsMenuOpen(false); }}><Wand2 size={14} /> {T.tripWizard}</button>
             <button className="mt-share-opt" onClick={() => { openEditTripDetails(); setActionsMenuOpen(false); }}><Pencil size={14} /> {T.editTripDetails}</button>
+            <button className="mt-share-opt" onClick={refreshAllFlights} disabled={flightRefreshStatus && flightRefreshStatus.running}><RefreshCw size={14} /> {T.refreshAllFlights}</button>
+            {flightRefreshStatus && (
+              <div className="mt-hint" style={{ padding: "2px 10px 6px" }}>
+                {flightRefreshStatus.running ? T.flightRefreshRunning : T.flightRefreshSummary
+                  .replace("{updated}", flightRefreshStatus.updated)
+                  .replace("{unchanged}", flightRefreshStatus.unchanged)
+                  .replace("{skipped}", flightRefreshStatus.skipped)}
+              </div>
+            )}
             <div className="mt-action-cat-label"><span>{T.catSaveExport}</span><HelpButton topic="sharing" lang={lang} T={T} onOpenFull={openHelpTopic} size={13} openTopic={helpPopoverOpen} setOpenTopic={setHelpPopoverOpen} /></div>
             <button className="mt-share-opt" onClick={openSaveTripModal}><Save size={14} /> {T.saveTripByName}</button>
             <button className="mt-share-opt" onClick={openLoadTripModal}><FolderOpen size={14} /> {T.loadSavedTrip}</button>
