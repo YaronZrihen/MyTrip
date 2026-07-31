@@ -80,7 +80,7 @@ function shortAliasWithCode(side) {
   const name = side.airport || "";
   const code = side.iata || "";
   const shortName = name.replace(/\s+International Airport$/i, "").replace(/\s+Airport$/i, "").trim() || name;
-  if (shortName && code) return `${shortName} (${code})`;
+  if (shortName && code) return `(${code}) ${shortName}`;
   return shortName || code || "";
 }
 
