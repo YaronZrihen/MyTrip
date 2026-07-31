@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.13.1";
+const APP_VERSION = "22.14.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -2654,13 +2654,11 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
               ) : (
                 <button className="mt-frame-type-icon mt-frame-type-icon-btn" onClick={(e) => { e.stopPropagation(); if (hotelRowWithPlace) openHotelInfo(hotelRowWithPlace); }} title={hotelRowWithPlace ? T.placeInfo : undefined}><BedDouble size={15} /></button>
               )}
-              <span className="mt-frame-title-group">
-                {effectiveFrameType === "hotel" && hotelCityForFrame(frame, rows) && (
-                  <span className="mt-frame-city">{hotelCityLabel(hotelCityForFrame(frame, rows), lang)}</span>
-                )}
-                <span className="mt-frame-name-full">{frame.name}</span>
-              </span>
+              <span className="mt-frame-name-full">{frame.name}</span>
             </div>
+            {effectiveFrameType === "hotel" && hotelCityForFrame(frame, rows) && (
+              <div className="mt-frame-city">{hotelCityLabel(hotelCityForFrame(frame, rows), lang)}</div>
+            )}
             <div className="mt-frame-header-row2">
               <div className="mt-frame-header-row2-start">
                 {dayCount > 0 && <span className="mt-frame-daycount">{formatDayCount(dayCount, lang)}</span>}
@@ -3331,44 +3329,52 @@ export default function MyTripApp() {
           ? { ...f, name: d.tripName || d.destination || f.name, startDate: allDates[0] || f.startDate, endDate: allDates[allDates.length - 1] || f.endDate }
           : f)));
       }
-      // Only regenerate flights/hotels if this trip's structure was originally created by this
-      // wizard (tracked IDs) — otherwise we have no safe way to reconcile wizard entries with
-      // existing manually-built content, so we leave it untouched rather than duplicate it.
-      if (preWizardCreatedIds && rootFrame) {
-        const frameIdSet = new Set(preWizardCreatedIds.frameIds);
-        const rowIdSet = new Set(preWizardCreatedIds.rowIds);
-        setFrames((prev) => prev.filter((f) => !frameIdSet.has(f.id) || f.id === rootFrame.id));
-        applyRows((prev) => prev.filter((r) => !rowIdSet.has(r.id)));
+      // Sync flights/hotels into whatever already exists, by matching order (sorted by date) —
+      // this works whether the trip was built by this wizard, loaded from a template, or imported,
+      // since we're never blindly deleting-and-recreating: existing rows/frames are updated in
+      // place, and only a count mismatch adds or removes entries.
+      if (rootFrame) {
+        function syncFlightRows(typeId, entries) {
+          const existing = rows.filter((r) => r.frameId === rootFrame.id && r.typeId === typeId).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+          entries.forEach((f, i) => {
+            const patch = { typeId, from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, date: f.depDate, startTime: f.depTime || "", endTime: f.landTime || "", overnight: !!f.overnight, fromLat: f.fromLat, fromLon: f.fromLon, fromPlaceId: f.fromPlaceId, fromVerifiedUrl: f.fromVerifiedUrl, toLat: f.toLat, toLon: f.toLon, toPlaceId: f.toPlaceId, toVerifiedUrl: f.toVerifiedUrl };
+            if (existing[i]) updateRow(existing[i].id, patch);
+            else updateRow(addRow(f.depDate, null, rootFrame.id), patch);
+          });
+          existing.slice(entries.length).forEach((r) => deleteRow(r.id));
+        }
+        syncFlightRows("flight", flights);
+        syncFlightRows("domestic-flight", domesticFlights);
 
-        const hotelFrames = hotels.map((h) => ({
-          id: uid(), name: h.alias || h.name || T.hotelFrameNameFallback, startDate: h.checkIn, endDate: h.checkOut, parentFrameId: rootFrame.id, collapsed: false, frameType: "hotel", hotelRef: h,
-        }));
-        setFrames((prev) => [...prev, ...hotelFrames]);
-
-        const createdRowIds = [];
-        flights.forEach((f) => {
-          const id1 = addRow(f.depDate, null, rootFrame.id);
-          updateRow(id1, { typeId: "flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, startTime: f.depTime || "", endTime: f.landTime || "", overnight: !!f.overnight, fromLat: f.fromLat, fromLon: f.fromLon, fromPlaceId: f.fromPlaceId, fromVerifiedUrl: f.fromVerifiedUrl, toLat: f.toLat, toLon: f.toLon, toPlaceId: f.toPlaceId, toVerifiedUrl: f.toVerifiedUrl });
-          createdRowIds.push(id1);
+        const existingHotelFrames = frames.filter((f) => f.parentFrameId === rootFrame.id && f.frameType === "hotel").sort((a, b) => (a.startDate || "").localeCompare(b.startDate || ""));
+        hotels.forEach((h, i) => {
+          const hf = existingHotelFrames[i];
+          if (hf) {
+            setFrames((prev) => prev.map((f) => (f.id === hf.id ? { ...f, name: h.alias || h.name || f.name, startDate: h.checkIn, endDate: h.checkOut, hotelRef: h } : f)));
+            const hotelPatch = { to: h.name, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl };
+            const checkinRow = rows.find((r) => r.frameId === hf.id && r.typeId === "checkin");
+            const checkoutRow = rows.find((r) => r.frameId === hf.id && r.typeId === "checkout");
+            const transferRows = rows.filter((r) => r.frameId === hf.id && r.typeId === "transfer");
+            if (checkinRow) updateRow(checkinRow.id, { ...hotelPatch, date: h.checkIn });
+            if (checkoutRow) updateRow(checkoutRow.id, { ...hotelPatch, date: h.checkOut });
+            transferRows.forEach((tr) => updateRow(tr.id, { date: tr.date === (checkoutRow && checkoutRow.date) ? h.checkOut : h.checkIn }));
+          } else {
+            const newFrame = { id: uid(), name: h.alias || h.name || T.hotelFrameNameFallback, startDate: h.checkIn, endDate: h.checkOut, parentFrameId: rootFrame.id, collapsed: false, frameType: "hotel", hotelRef: h };
+            setFrames((prev) => [...prev, newFrame]);
+            const idTransferIn = addRow(h.checkIn, null, newFrame.id);
+            updateRow(idTransferIn, { typeId: "transfer", arrivalTypeId: "taxi", to: h.name, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
+            const id1 = addRow(h.checkIn, null, newFrame.id);
+            updateRow(id1, { typeId: "checkin", startTime: "15:00", to: h.name, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
+            const id2 = addRow(h.checkOut, null, newFrame.id);
+            updateRow(id2, { typeId: "checkout", endTime: "11:00", to: h.name, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
+            const idTransferOut = addRow(h.checkOut, null, newFrame.id);
+            updateRow(idTransferOut, { typeId: "transfer", arrivalTypeId: "taxi" });
+          }
         });
-        domesticFlights.forEach((f) => {
-          const id1 = addRow(f.depDate, null, rootFrame.id);
-          updateRow(id1, { typeId: "domestic-flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, startTime: f.depTime || "", endTime: f.landTime || "", overnight: !!f.overnight, fromLat: f.fromLat, fromLon: f.fromLon, fromPlaceId: f.fromPlaceId, fromVerifiedUrl: f.fromVerifiedUrl, toLat: f.toLat, toLon: f.toLon, toPlaceId: f.toPlaceId, toVerifiedUrl: f.toVerifiedUrl });
-          createdRowIds.push(id1);
+        existingHotelFrames.slice(hotels.length).forEach((hf) => {
+          applyRows((prev) => prev.filter((r) => r.frameId !== hf.id));
+          setFrames((prev) => prev.filter((f) => f.id !== hf.id));
         });
-        hotelFrames.forEach((hf) => {
-          const h = hf.hotelRef;
-          const idTransferIn = addRow(h.checkIn, null, hf.id);
-          updateRow(idTransferIn, { typeId: "transfer", arrivalTypeId: "taxi", to: h.name, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
-          const id1 = addRow(h.checkIn, null, hf.id);
-          updateRow(id1, { typeId: "checkin", startTime: "15:00", to: h.name, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
-          const id2 = addRow(h.checkOut, null, hf.id);
-          updateRow(id2, { typeId: "checkout", endTime: "11:00", to: h.name, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
-          const idTransferOut = addRow(h.checkOut, null, hf.id);
-          updateRow(idTransferOut, { typeId: "transfer", arrivalTypeId: "taxi" });
-          createdRowIds.push(idTransferIn, id1, id2, idTransferOut);
-        });
-        setPreWizardCreatedIds({ frameIds: [rootFrame.id, ...hotelFrames.map((f) => f.id)], rowIds: createdRowIds });
       }
       setPreWizardLastSubmitted(d);
       closePreWizard();
@@ -4309,8 +4315,7 @@ export default function MyTripApp() {
         .mt-frame-header-special-wrap { display:flex; flex-direction:column; gap:6px; width:100%; }
         .mt-frame-header-row1 { display:flex; align-items:center; gap:9px; }
         .mt-frame-name-full { font-weight:700; font-size:15px; overflow-wrap:break-word; min-width:24px; }
-        .mt-frame-city { font-size:12.5px; font-weight:700; color:var(--frame-color, var(--teal)); }
-        .mt-frame-title-group { display:flex; align-items:center; gap:4px; min-width:24px; overflow:hidden; }
+        .mt-frame-city { font-size:12.5px; font-weight:700; color:var(--frame-color, var(--teal)); margin-top:1px; }
         .mt-frame-header-row2 { display:flex; align-items:center; justify-content:space-between; gap:9px; padding-inline-start:24px; }
         .mt-frame-header-row2-start { display:flex; align-items:center; gap:10px; min-width:0; }
         .mt-frame-header-row2-end { display:flex; align-items:center; gap:9px; flex-shrink:0; }
