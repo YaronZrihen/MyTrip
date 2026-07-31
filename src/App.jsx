@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.7.0";
+const APP_VERSION = "22.8.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -726,7 +726,8 @@ function buildGlobalRowOrderPure(rows, frames, fid) {
    startTime + its own travel duration. A "dwell" record (checkin, checkout, poi, attraction, ...)
    represents being at a place — its startTime is when you arrive (previous departure + travel time
    to get there), and its endTime is when you leave, i.e. startTime + the type's default dwell time. */
-function isMovementType(typeId) { return isFlightType(typeId) || typeId === "transfer"; }
+function isDwellType(typeId) { return typeId === "checkin" || typeId === "checkout"; }
+function isMovementType(typeId) { return !isDwellType(typeId); }
 /* Recomputes every auto (non-manually-edited) start/end time in the whole trip, in one continuous
    forward pass over the visual row order. Manually-set fields (Auto === false) are never overwritten,
    but their value is still used as the anchor for computing whatever comes after them — so one manual
@@ -736,20 +737,21 @@ function isMovementType(typeId) { return isFlightType(typeId) || typeId === "tra
    an overnight leg that lands after midnight is still dated the day it departed, so the next day's
    first record must still be able to inherit its arrival time — resetting at the date boundary would
    silently break exactly that link.
-   Connection buffer: a MOVEMENT row's own endTime, when manually locked (e.g. a real looked-up flight
+   Movement vs. dwell: almost every record represents traveling to a new point — a flight, a transfer,
+   but also a POI, an attraction, a restaurant, and so on. For these, startTime is inherited exactly as
+   the previous stop left off (no travel time added before you can even leave), and endTime is start +
+   this row's own point-to-point route duration (when you actually arrive). Only checkin/checkout are
+   true "dwell" records: there's no real route for the act of checking in, so their endTime is start +
+   the type's default processing time instead of a route duration.
+   Connection buffer: a movement row's own endTime, when manually locked (e.g. a real looked-up flight
    arrival), never had its type's default "stay" applied — so that buffer is added on top of it for
    whatever comes next (deplaning, immigration, baggage). This only applies when the PREVIOUS row is a
-   movement (flight/domestic-flight/transfer): a dwell record's (checkin, poi, ...) default stay is
-   never added as an invisible buffer to the next record, even if its own end time was set manually —
-   a manual dwell time already represents exactly when you're free to go, nothing implicit on top.
-   Movement records start right at that anchor — a transfer departs the moment you're ready, it
-   doesn't need its own travel time added before it can even begin — and then use their own travel
-   duration to compute when they arrive (their endTime). Flight-type rows are the one exception: their
-   own routeDurationMin is a driving-distance estimate between airports (meaningless for actual flight
-   time), so it's never used for them; they fall back to the type's default duration guess instead,
-   pending a real flight-schedule lookup. Dwell records use the opposite order: their own travel
-   duration determines when they're arrived at (startTime), and their type's default dwell time
-   determines when they're left (endTime).
+   movement record: a dwell record's (checkin/checkout) default stay is never added as an invisible
+   buffer to the next record, even if its own end time was set manually — a manual dwell time already
+   represents exactly when you're free to go, nothing implicit on top.
+   Flight-type rows are one exception within movement records: their own routeDurationMin is a driving-
+   distance estimate between airports (meaningless for actual flight time), so it's never used for
+   them; they fall back to the type's default duration guess instead, pending a real flight lookup.
    Every auto-computed field is tagged with its source so the UI can indicate provenance without
    guessing: a start time is always 'inherited' (it's a handoff from whatever came before, whether or
    not travel time was added getting here), and an end time is always 'computed' (it's derived from
@@ -823,6 +825,12 @@ function timeFieldColor(row, field) {
   const source = field === "start" ? row.startTimeSource : row.endTimeSource;
   if (auto === false) return source === "api" ? TIME_FIELD_COLORS.api : null;
   return source === "inherited" ? TIME_FIELD_COLORS.inherited : TIME_FIELD_COLORS.computed;
+}
+/* The duration that actually determines a row's own end time — mirrors the exact rule used in
+   recomputeChainTimesPure so the annotation never shows a number other than what was really used. */
+function endDurationFor(row) {
+  const useRoute = isMovementType(row.typeId) && !isFlightType(row.typeId) && row.routeDurationMin != null;
+  return useRoute ? row.routeDurationMin : (row.stayDurationMin != null ? row.stayDurationMin : getDefaultStayMinutes(row.typeId));
 }
 /* The stay/dwell duration annotation shown next to a row's arrival time, e.g. "(2+)" for 2 hours or
    "(30+)" for 30 minutes — informational only, never baked into the time field's own value. */
@@ -2119,9 +2127,9 @@ function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
         <div className="mt-card-top-end">
           <span className="mt-card-times" dir="ltr">
             <span style={{ ...(r.startTime && Number(r.startTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "start") ? { borderBottom: `2px dashed ${timeFieldColor(r, "start")}` } : {}) }}>{r.startTime || "—"}</span>
-            {arrivalTimeField(r) === "start" && formatStayAnnotation(r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId)) && <span className="mt-stay-note">{formatStayAnnotation(r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId))}</span>}
+            {arrivalTimeField(r) === "start" && formatStayAnnotation(endDurationFor(r)) && <span className="mt-stay-note">{formatStayAnnotation(endDurationFor(r))}</span>}
             {r.endTime ? <> → <span style={{ ...(Number(r.endTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "end") ? { borderBottom: `2px dashed ${timeFieldColor(r, "end")}` } : {}) }}>{r.endTime}</span>
-              {arrivalTimeField(r) === "end" && formatStayAnnotation(r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId)) && <span className="mt-stay-note">{formatStayAnnotation(r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId))}</span>}
+              {arrivalTimeField(r) === "end" && formatStayAnnotation(endDurationFor(r)) && <span className="mt-stay-note">{formatStayAnnotation(endDurationFor(r))}</span>}
             </> : ""}
           </span>
           <span className="mt-card-drag-handle" onClick={(e) => e.stopPropagation()} {...dragListeners} {...dragAttrs}><GripVertical size={15} /></span>
