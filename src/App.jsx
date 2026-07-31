@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.14.0";
+const APP_VERSION = "22.15.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -842,6 +842,7 @@ const TRAVEL_MODE_MAP = {
   bicycle: "bicycling", scooter: "bicycling", walking: "walking",
   train: "transit", "high-speed-train": "transit", bus: "transit",
   "self-tour": "walking", "guided-tour": "walking", "day-tour": "walking",
+  flight: "flying", "domestic-flight": "flying",
 };
 function effectiveTransportType(row) {
   return noOriginNeeded(row.typeId) ? (row.arrivalTypeId || "walking") : row.typeId;
