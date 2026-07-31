@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.8.1";
+const APP_VERSION = "22.9.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -140,6 +140,7 @@ const DEFAULT_TYPES = [
 
   { id: "checkin", name_he: "צ'ק-אין", name_en: "Check-in", icon: "BedDouble", color: CATEGORY_COLORS.accommodation, category: "accommodation", kind: "desc" },
   { id: "checkout", name_he: "צ'ק-אאוט", name_en: "Check-out", icon: "BedDouble", color: CATEGORY_COLORS.accommodation, category: "accommodation", kind: "desc" },
+  { id: "hotel", name_he: "מלון", name_en: "Hotel", icon: "BedDouble", color: CATEGORY_COLORS.accommodation, category: "accommodation", kind: "desc" },
   { id: "hostel", name_he: "אכסנייה", name_en: "Hostel", icon: "Building2", color: CATEGORY_COLORS.accommodation, category: "accommodation", kind: "desc" },
   { id: "apartment", name_he: "דירה", name_en: "Apartment", icon: "Home", color: CATEGORY_COLORS.accommodation, category: "accommodation", kind: "desc" },
   { id: "transfer", name_he: "העברות", name_en: "Transfers", icon: "Car", color: CATEGORY_COLORS.accommodation, category: "accommodation", kind: "desc" },
@@ -318,10 +319,11 @@ const T_DICT = {
     wizardNotes: "הערות נוספות", wizardNotesHint: "מגבלות, בקשות מיוחדות, כל דבר שחשוב שנדע...",
     wizardWillCreate: "מה ייווצר", wizardWillCreateDesc: "מסגרת טיול עם תאריכי הטיסות שהזנת, שתי רשומות טיסה (הלוך וחזור), ושלד מלון מוכן למילוי לכל יום ביניים.",
     wizardAiNote: "תחומי העניין, התקציב והקצב שבחרת נשמרים במסגרת — הצעות פעילויות בפועל שמבוססות עליהם ידרשו חיבור לשרת AI בעתיד.",
-    wizardBack: "הקודם", wizardNext: "הבא", wizardCreate: "צור טיול",
+    wizardBack: "הקודם", wizardNext: "הבא", wizardCreate: "צור טיול", wizardUpdate: "עדכן טיול",
     computedEndTimeHint: "שדה מחושב לפי מסלול Google Maps, בהתאם לאמצעי התחבורה שנבחר בתיאור.", chronoEndWarning: "רצף השעות (כולל שעות סיום) אינו כרונולוגי.",
     afterMidnightHint: "שעה זו היא לאחר חצות",
     computedStartTimeHint: "שדה שנמשך אוטומטית משעת ההגעה של הרשומה הקודמת.",
+    flightLockedHint: "השדה ננעל כי הנתונים נמשכו ממספר טיסה. כדי לערוך ידנית, נקו את שדה מספר הטיסה.",
     noOriginHint: "אין צורך בשדה מוצא עבור סוג רשומה זה.",
     dragDayHint: "גרור להעברת היום למסגרת אחרת", dropDayToRoot: "שחרר כאן כדי להוציא את היום מהמסגרת", showOverallRoute: "הצג מסלול טיול כולל",
     tripSummary: "סיכום הטיול", summaryFlights: "טיסות", summaryHotels: "מלונות", summaryPois: "נק׳ עניין", summaryRestaurants: "מסעדות", summaryAvgRating: "דירוג ממוצע",
@@ -475,10 +477,11 @@ const T_DICT = {
     wizardNotes: "Anything else?", wizardNotesHint: "Constraints, special requests, anything worth knowing...",
     wizardWillCreate: "What will be created", wizardWillCreateDesc: "A trip frame spanning your flight dates, two flight records (outbound and return), and a fill-in-ready hotel skeleton for each day in between.",
     wizardAiNote: "Your interests, budget, and pace are saved on the frame — actual activity suggestions based on them will need a future AI server connection.",
-    wizardBack: "Back", wizardNext: "Next", wizardCreate: "Create trip",
+    wizardBack: "Back", wizardNext: "Next", wizardCreate: "Create trip", wizardUpdate: "Update trip",
     computedEndTimeHint: "Computed from the Google Maps route, based on the transportation mode selected in the description.", chronoEndWarning: "The time sequence (including end times) isn't chronological.",
     afterMidnightHint: "This time is after midnight",
     computedStartTimeHint: "Automatically pulled from the previous record's arrival time.",
+    flightLockedHint: "Locked because this data was pulled from a flight number. Clear the flight number field to edit manually.",
     noOriginHint: "No origin field is needed for this record type.",
     dragDayHint: "Drag to move this day to another frame", dropDayToRoot: "Drop here to take this day out of its frame", showOverallRoute: "Show overall trip route",
     tripSummary: "Trip summary", summaryFlights: "Flights", summaryHotels: "Hotels", summaryPois: "Points of interest", summaryRestaurants: "Restaurants", summaryAvgRating: "Average rating",
@@ -2353,7 +2356,7 @@ function FileManagerRow({ file, T, showCategory }) {
   );
 }
 
-function TimeField({ value, onChange, T, className, title, style }) {
+function TimeField({ value, onChange, T, className, title, style, disabled }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [mode, setMode] = useState("hour");
@@ -2362,6 +2365,7 @@ function TimeField({ value, onChange, T, className, title, style }) {
   const hh = dh || "00", mm = dm || "00";
   const hourNum = Number(hh), minNum = Number(mm);
   function openPicker() {
+    if (disabled) return;
     setDraft(value || "00:00");
     setMode("hour");
     setOpen(true);
@@ -2405,7 +2409,7 @@ function TimeField({ value, onChange, T, className, title, style }) {
   const marks = mode === "hour" ? hourMarks : minMarks;
   return (
     <span style={{ position: "relative", display: "block" }}>
-      <button type="button" className={"mt-type-field-btn" + (className ? " " + className : "")} style={style} title={title} onClick={openPicker}>
+      <button type="button" disabled={disabled} className={"mt-type-field-btn" + (className ? " " + className : "")} style={{ ...style, ...(disabled ? { opacity: 0.6, cursor: "not-allowed" } : {}) }} title={title} onClick={openPicker}>
         <Clock size={14} />
         <span className="mt-type-text" dir="ltr" style={value && Number(value.split(":")[0]) < 6 ? { color: "#C1543A", fontWeight: 700 } : undefined}>{value || "--:--"}</span>
         {value && Number(value.split(":")[0]) < 6 && <span className="mt-hint" style={{ color: "#C1543A", fontSize: 10 }} title={T.afterMidnightHint}>🌙</span>}
@@ -2621,6 +2625,9 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
               )}
               <span className="mt-frame-name-full">{frame.name}</span>
             </div>
+            {effectiveFrameType === "hotel" && frame.name.includes(",") && (
+              <div className="mt-frame-city">{frame.name.split(",")[0].trim()}</div>
+            )}
             <div className="mt-frame-header-row2">
               <div className="mt-frame-header-row2-start">
                 {dayCount > 0 && <span className="mt-frame-daycount">{formatDayCount(dayCount, lang)}</span>}
@@ -2868,6 +2875,7 @@ export default function MyTripApp() {
     ],
   };
   const [preWizardOpen, setPreWizardOpen] = useState(false);
+  const [preWizardEditMode, setPreWizardEditMode] = useState(false);
   const [preWizardScreen, setPreWizardScreen] = useState(0);
   const [preWizardData, setPreWizardData] = useState(PRE_WIZARD_DEFAULTS);
   const [preWizardLastSubmitted, setPreWizardLastSubmitted] = useState(null);
@@ -3174,6 +3182,7 @@ export default function MyTripApp() {
     setPreWizardData(PRE_WIZARD_DEFAULTS);
     setPreWizardScreen(0);
     setPreWizardRefDate(PRE_WIZARD_DEFAULTS.planStartDate || "");
+    setPreWizardEditMode(false);
     setPreWizardOpen(true);
   }
   function buildWizardDataFromLive() {
@@ -3211,12 +3220,14 @@ export default function MyTripApp() {
     setPreWizardData(restored);
     setPreWizardScreen(0);
     setPreWizardRefDate(restored.planStartDate || "");
+    setPreWizardEditMode(true);
     setPreWizardOpen(true);
   }
   function closePreWizard() {
     setPreWizardOpen(false);
     setPreWizardScreen(0);
     setPreWizardRefDate("");
+    setPreWizardEditMode(false);
   }
   function updatePreWizardArrayItem(field, idx, patch) {
     setPreWizardData((d) => {
@@ -3265,12 +3276,6 @@ export default function MyTripApp() {
   }
   function confirmPreWizard() {
     const d = preWizardData;
-    if (preWizardCreatedIds) {
-      const frameIdSet = new Set(preWizardCreatedIds.frameIds);
-      const rowIdSet = new Set(preWizardCreatedIds.rowIds);
-      setFrames((prev) => prev.filter((f) => !frameIdSet.has(f.id)));
-      applyRows((prev) => prev.filter((r) => !rowIdSet.has(r.id)));
-    }
     const flights = d.hasFlights === "yes" ? d.flights.filter((f) => f.depDate) : [];
     const domesticFlights = d.hasDomestic === "yes" ? d.domesticFlights.filter((f) => f.depDate) : [];
     const hotels = d.hasHotels === "yes" ? d.hotels.filter((h) => h.checkIn && h.checkOut) : [];
@@ -3282,6 +3287,65 @@ export default function MyTripApp() {
     ].filter(Boolean).sort();
     const startDate = allDates[0] || toLocalISODate(new Date());
     const endDate = allDates[allDates.length - 1] || startDate;
+
+    if (preWizardEditMode) {
+      // Editing an existing trip must only ever update that trip — never spawn a second one.
+      const rootFrame = frames.find((f) => !f.parentFrameId);
+      if (rootFrame) {
+        setFrames((prev) => prev.map((f) => (f.id === rootFrame.id
+          ? { ...f, name: d.tripName || d.destination || f.name, startDate: allDates[0] || f.startDate, endDate: allDates[allDates.length - 1] || f.endDate }
+          : f)));
+      }
+      // Only regenerate flights/hotels if this trip's structure was originally created by this
+      // wizard (tracked IDs) — otherwise we have no safe way to reconcile wizard entries with
+      // existing manually-built content, so we leave it untouched rather than duplicate it.
+      if (preWizardCreatedIds && rootFrame) {
+        const frameIdSet = new Set(preWizardCreatedIds.frameIds);
+        const rowIdSet = new Set(preWizardCreatedIds.rowIds);
+        setFrames((prev) => prev.filter((f) => !frameIdSet.has(f.id) || f.id === rootFrame.id));
+        applyRows((prev) => prev.filter((r) => !rowIdSet.has(r.id)));
+
+        const hotelFrames = hotels.map((h) => ({
+          id: uid(), name: h.alias || h.name || T.hotelFrameNameFallback, startDate: h.checkIn, endDate: h.checkOut, parentFrameId: rootFrame.id, collapsed: false, frameType: "hotel", hotelRef: h,
+        }));
+        setFrames((prev) => [...prev, ...hotelFrames]);
+
+        const createdRowIds = [];
+        flights.forEach((f) => {
+          const id1 = addRow(f.depDate, null, rootFrame.id);
+          updateRow(id1, { typeId: "flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, startTime: f.depTime || "", endTime: f.landTime || "", overnight: !!f.overnight, fromLat: f.fromLat, fromLon: f.fromLon, fromPlaceId: f.fromPlaceId, fromVerifiedUrl: f.fromVerifiedUrl, toLat: f.toLat, toLon: f.toLon, toPlaceId: f.toPlaceId, toVerifiedUrl: f.toVerifiedUrl });
+          createdRowIds.push(id1);
+        });
+        domesticFlights.forEach((f) => {
+          const id1 = addRow(f.depDate, null, rootFrame.id);
+          updateRow(id1, { typeId: "domestic-flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, startTime: f.depTime || "", endTime: f.landTime || "", overnight: !!f.overnight, fromLat: f.fromLat, fromLon: f.fromLon, fromPlaceId: f.fromPlaceId, fromVerifiedUrl: f.fromVerifiedUrl, toLat: f.toLat, toLon: f.toLon, toPlaceId: f.toPlaceId, toVerifiedUrl: f.toVerifiedUrl });
+          createdRowIds.push(id1);
+        });
+        hotelFrames.forEach((hf) => {
+          const h = hf.hotelRef;
+          const idTransferIn = addRow(h.checkIn, null, hf.id);
+          updateRow(idTransferIn, { typeId: "transfer", arrivalTypeId: "taxi", to: h.name, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
+          const id1 = addRow(h.checkIn, null, hf.id);
+          updateRow(id1, { typeId: "checkin", startTime: "15:00", to: h.name, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
+          const id2 = addRow(h.checkOut, null, hf.id);
+          updateRow(id2, { typeId: "checkout", endTime: "11:00", to: h.name, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
+          const idTransferOut = addRow(h.checkOut, null, hf.id);
+          updateRow(idTransferOut, { typeId: "transfer", arrivalTypeId: "taxi" });
+          createdRowIds.push(idTransferIn, id1, id2, idTransferOut);
+        });
+        setPreWizardCreatedIds({ frameIds: [rootFrame.id, ...hotelFrames.map((f) => f.id)], rowIds: createdRowIds });
+      }
+      setPreWizardLastSubmitted(d);
+      closePreWizard();
+      return;
+    }
+
+    if (preWizardCreatedIds) {
+      const frameIdSet = new Set(preWizardCreatedIds.frameIds);
+      const rowIdSet = new Set(preWizardCreatedIds.rowIds);
+      setFrames((prev) => prev.filter((f) => !frameIdSet.has(f.id)));
+      applyRows((prev) => prev.filter((r) => !rowIdSet.has(r.id)));
+    }
     const mainFrame = { id: uid(), name: d.tripName || d.destination || (lang === "he" ? "טיול חדש" : "New trip"), startDate, endDate, parentFrameId: null, collapsed: false, frameType: "flight" };
     const newFrames = [mainFrame];
 
@@ -3307,13 +3371,13 @@ export default function MyTripApp() {
     hotelFrames.forEach((hf) => {
       const h = hf.hotelRef;
       const idTransferIn = addRow(h.checkIn, null, hf.id);
-      updateRow(idTransferIn, { typeId: "transfer", to: h.name, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
+      updateRow(idTransferIn, { typeId: "transfer", arrivalTypeId: "taxi", to: h.name, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
       const id1 = addRow(h.checkIn, null, hf.id);
       updateRow(id1, { typeId: "checkin", startTime: "15:00", to: h.name, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
       const id2 = addRow(h.checkOut, null, hf.id);
       updateRow(id2, { typeId: "checkout", endTime: "11:00", to: h.name, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
       const idTransferOut = addRow(h.checkOut, null, hf.id);
-      updateRow(idTransferOut, { typeId: "transfer" });
+      updateRow(idTransferOut, { typeId: "transfer", arrivalTypeId: "taxi" });
       createdRowIds.push(idTransferIn, id1, id2, idTransferOut);
     });
 
@@ -4064,13 +4128,13 @@ export default function MyTripApp() {
         const name = frameDraft.name.trim();
         const checkIn = frameDraft.startDate, checkOut = frameDraft.endDate;
         const idTransferIn = addRow(checkIn, null, newFrameId);
-        updateRow(idTransferIn, { typeId: "transfer", to: name });
+        updateRow(idTransferIn, { typeId: "transfer", arrivalTypeId: "taxi", to: name });
         const id1 = addRow(checkIn, null, newFrameId);
         updateRow(id1, { typeId: "checkin", startTime: "15:00", to: name });
         const id2 = addRow(checkOut, null, newFrameId);
         updateRow(id2, { typeId: "checkout", endTime: "11:00", to: name });
         const idTransferOut = addRow(checkOut, null, newFrameId);
-        updateRow(idTransferOut, { typeId: "transfer" });
+        updateRow(idTransferOut, { typeId: "transfer", arrivalTypeId: "taxi" });
       }
     }
     closeFrameModal();
@@ -4137,6 +4201,10 @@ export default function MyTripApp() {
   const showTzHint = cardDraft && TZ_HINT_TYPES.includes(cardDraft.typeId);
   const fromVerifiedCard = cardDraft && cardDraft.fromVerifiedUrl && cardDraft.fromVerifiedText === cardDraft.from;
   const toVerifiedCard = cardDraft && cardDraft.toVerifiedUrl && cardDraft.toVerifiedText === cardDraft.to;
+  /* Once a flight number has been successfully looked up, the fields it filled in are locked — editing
+     them by hand would silently diverge from the real flight data. Clearing the flight number field
+     unlocks everything again for manual entry. */
+  const flightLocked = !!(cardDraft && showFlightHint && cardDraft.flightLookedUpFor && cardDraft.flightNumber && cardDraft.flightLookedUpFor === cardDraft.flightNumber.trim());
 
   /* ---------- render ---------- */
   return (
@@ -4205,11 +4273,12 @@ export default function MyTripApp() {
         .mt-frame-header-special-wrap { display:flex; flex-direction:column; gap:6px; width:100%; }
         .mt-frame-header-row1 { display:flex; align-items:center; gap:9px; }
         .mt-frame-name-full { font-weight:700; font-size:15px; overflow-wrap:break-word; min-width:24px; }
+        .mt-frame-city { font-size:11.5px; color:var(--muted); margin-inline-start:23px; margin-top:-2px; }
         .mt-frame-header-row2 { display:flex; align-items:center; justify-content:space-between; gap:9px; padding-inline-start:24px; }
         .mt-frame-header-row2-start { display:flex; align-items:center; gap:10px; min-width:0; }
         .mt-frame-header-row2-end { display:flex; align-items:center; gap:9px; flex-shrink:0; }
         .mt-frame-header-dates { margin-top:5px; padding-inline-start:24px; }
-        .mt-frame-header-special { background:color-mix(in srgb, var(--frame-color) 14%, white); border-radius:10px; padding:8px 10px; }
+        .mt-frame-header-special { background:color-mix(in srgb, var(--frame-color) 14%, white); border-radius:10px 10px 0 0; padding:8px 10px; }
         .mt-frame-type-icon { width:28px; height:28px; border-radius:8px; background:var(--frame-color); color:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
         .mt-frame-type-icon-btn { border:none; cursor:pointer; }
         .mt-frame-date-cluster { display:flex; align-items:center; gap:6px; flex-shrink:0; margin-inline-start:auto; }
@@ -5034,7 +5103,7 @@ export default function MyTripApp() {
               {preWizardScreen < 3 ? (
                 <button className="mt-btn primary" onClick={preWizardNext}>{T.wizardNext}</button>
               ) : (
-                <button className="mt-btn primary" onClick={confirmPreWizard}><Check size={13} /> {T.wizardCreate}</button>
+                <button className="mt-btn primary" onClick={confirmPreWizard}><Check size={13} /> {preWizardEditMode ? T.wizardUpdate : T.wizardCreate}</button>
               )}
             </div>
           </div>
@@ -5283,7 +5352,7 @@ export default function MyTripApp() {
                 <div className="mt-field">
                   <label>{T.from}</label>
                   <div className="mt-loc-icons" style={{ marginBottom: 4 }}>
-                    <input className="mt-loc-grid-input" dir="auto" value={cardDraft.from} placeholder={getTypeHint(cardDraft.typeId, "from", lang)} onChange={(e) => setCardDraft({ ...cardDraft, from: e.target.value })} />
+                    <input className="mt-loc-grid-input" dir="auto" value={cardDraft.from} disabled={flightLocked} placeholder={getTypeHint(cardDraft.typeId, "from", lang)} onChange={(e) => setCardDraft({ ...cardDraft, from: e.target.value })} />
                     <button className="mt-btn ghost mt-btn-icon" title={T.copyPrevDest} disabled={!prevRowForCard || !prevRowForCard.to} onClick={copyPrevDestinationToFrom}><Copy size={13} /></button>
                     <button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openLocationPicker("from")}><MapPin size={13} /></button>
                     {fromVerifiedCard && (
@@ -5294,7 +5363,7 @@ export default function MyTripApp() {
                     )}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <input dir="auto" style={{ flex: 1 }} value={cardDraft.fromAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "fromAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, fromAlias: e.target.value })} />
+                    <input dir="auto" style={{ flex: 1 }} value={cardDraft.fromAlias || ""} disabled={flightLocked} placeholder={getTypeHint(cardDraft.typeId, "fromAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, fromAlias: e.target.value })} />
                     <PopoverInfoIcon icon={Info} trigger="hover">{T.aliasHint}</PopoverInfoIcon>
                   </div>
                 </div>
@@ -5326,7 +5395,7 @@ export default function MyTripApp() {
               <div className="mt-field">
                 <label>{T.to}</label>
                 <div className="mt-loc-icons" style={{ marginBottom: 4 }}>
-                  <input className="mt-loc-grid-input" dir="auto" value={cardDraft.to} placeholder={getTypeHint(cardDraft.typeId, "to", lang)} onChange={(e) => setCardDraft({ ...cardDraft, to: e.target.value })} />
+                  <input className="mt-loc-grid-input" dir="auto" value={cardDraft.to} disabled={flightLocked} placeholder={getTypeHint(cardDraft.typeId, "to", lang)} onChange={(e) => setCardDraft({ ...cardDraft, to: e.target.value })} />
                   <button className="mt-btn ghost mt-btn-icon" title={T.copyFromOrigin} disabled={!cardDraft.from} onClick={() => setCardDraft({ ...cardDraft, to: cardDraft.from })}><Copy size={13} /></button>
                   <button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openLocationPicker("to")}><MapPin size={13} /></button>
                   {toVerifiedCard && (
@@ -5337,7 +5406,7 @@ export default function MyTripApp() {
                   )}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <input dir="auto" style={{ flex: 1 }} value={cardDraft.toAlias || ""} placeholder={getTypeHint(cardDraft.typeId, "toAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, toAlias: e.target.value })} />
+                  <input dir="auto" style={{ flex: 1 }} value={cardDraft.toAlias || ""} disabled={flightLocked} placeholder={getTypeHint(cardDraft.typeId, "toAlias", lang)} onChange={(e) => setCardDraft({ ...cardDraft, toAlias: e.target.value })} />
                   <PopoverInfoIcon icon={Info} trigger="hover">{T.aliasHint}</PopoverInfoIcon>
                 </div>
               </div>
@@ -5379,8 +5448,8 @@ export default function MyTripApp() {
               </div>
 
               <div className="mt-field-row">
-                <div className="mt-field"><label>{T.start}</label><TimeField value={cardDraft.startTime} onChange={(e) => setCardDraft({ ...cardDraft, startTime: e.target.value, startTimeAuto: !e.target.value, startTimeSource: undefined })} T={T} style={timeFieldColor(cardDraft, "start") ? { borderBottom: `2px dashed ${timeFieldColor(cardDraft, "start")}` } : undefined} title={timeFieldColor(cardDraft, "start") ? T.computedStartTimeHint : undefined} /></div>
-                <div className="mt-field"><label>{T.end}</label><TimeField value={cardDraft.endTime} onChange={(e) => setCardDraft({ ...cardDraft, endTime: e.target.value, endTimeAuto: !e.target.value, endTimeSource: undefined })} T={T} style={timeFieldColor(cardDraft, "end") ? { borderBottom: `2px dashed ${timeFieldColor(cardDraft, "end")}` } : undefined} title={timeFieldColor(cardDraft, "end") ? T.computedEndTimeHint : undefined} /></div>
+                <div className="mt-field"><label>{T.start}</label><TimeField value={cardDraft.startTime} onChange={(e) => setCardDraft({ ...cardDraft, startTime: e.target.value, startTimeAuto: !e.target.value, startTimeSource: undefined })} T={T} disabled={flightLocked} style={timeFieldColor(cardDraft, "start") ? { borderBottom: `2px dashed ${timeFieldColor(cardDraft, "start")}` } : undefined} title={flightLocked ? T.flightLockedHint : (timeFieldColor(cardDraft, "start") ? T.computedStartTimeHint : undefined)} /></div>
+                <div className="mt-field"><label>{T.end}</label><TimeField value={cardDraft.endTime} onChange={(e) => setCardDraft({ ...cardDraft, endTime: e.target.value, endTimeAuto: !e.target.value, endTimeSource: undefined })} T={T} disabled={flightLocked} style={timeFieldColor(cardDraft, "end") ? { borderBottom: `2px dashed ${timeFieldColor(cardDraft, "end")}` } : undefined} title={flightLocked ? T.flightLockedHint : (timeFieldColor(cardDraft, "end") ? T.computedEndTimeHint : undefined)} /></div>
                 <div className="mt-field" style={{ maxWidth: 110 }}>
                   <label>{T.stayDuration}</label>
                   <StayDurationField value={cardDraft.stayDurationMin != null ? cardDraft.stayDurationMin : getDefaultStayMinutes(cardDraft.typeId)} onChange={(m) => setCardDraft({ ...cardDraft, stayDurationMin: m })} T={T} />
