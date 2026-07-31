@@ -57,8 +57,10 @@ function normalize(entry) {
   const dep = entry.departure || {};
   const arr = entry.arrival || {};
   return {
-    departureAirport: combineAirportNameAndCode(dep),
-    arrivalAirport: combineAirportNameAndCode(arr),
+    departureLocation: preciseLocation(dep),
+    arrivalLocation: preciseLocation(arr),
+    departureAlias: shortAliasWithCode(dep),
+    arrivalAlias: shortAliasWithCode(arr),
     departureTime: toHHMM(dep.scheduled || dep.estimated),
     arrivalTime: toHHMM(arr.scheduled || arr.estimated),
     terminal: dep.terminal || "",
@@ -67,11 +69,19 @@ function normalize(entry) {
   };
 }
 
-function combineAirportNameAndCode(side) {
+// The precise, geocodable value for the from/to fields: the full airport name with no code or
+// parentheses attached (which can confuse geocoding and route calculation between the two points).
+function preciseLocation(side) {
+  return side.airport || side.iata || "";
+}
+
+// The short display label for the alias fields: shortened name + IATA code, e.g. "Suvarnabhumi (BKK)".
+function shortAliasWithCode(side) {
   const name = side.airport || "";
   const code = side.iata || "";
-  if (name && code) return `${name} (${code})`;
-  return name || code || "";
+  const shortName = name.replace(/\s+International Airport$/i, "").replace(/\s+Airport$/i, "").trim() || name;
+  if (shortName && code) return `${shortName} (${code})`;
+  return shortName || code || "";
 }
 
 function toHHMM(iso) {
