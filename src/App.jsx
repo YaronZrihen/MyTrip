@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.15.0";
+const APP_VERSION = "22.15.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -3235,6 +3235,7 @@ export default function MyTripApp() {
         name: hf.name || "", alias: (checkinRow && checkinRow.toAlias) || "", checkIn: hf.startDate || "", checkOut: hf.endDate || "",
         nameLat: (checkinRow && checkinRow.toLat) || null, nameLon: (checkinRow && checkinRow.toLon) || null,
         namePlaceId: (checkinRow && checkinRow.toPlaceId) || null, nameVerifiedUrl: (checkinRow && checkinRow.toVerifiedUrl) || "",
+        city: hotelCityForFrame(hf, rows) || "",
       };
     });
     return {
@@ -3351,7 +3352,7 @@ export default function MyTripApp() {
         hotels.forEach((h, i) => {
           const hf = existingHotelFrames[i];
           if (hf) {
-            setFrames((prev) => prev.map((f) => (f.id === hf.id ? { ...f, name: h.alias || h.name || f.name, startDate: h.checkIn, endDate: h.checkOut, hotelRef: h } : f)));
+            setFrames((prev) => prev.map((f) => (f.id === hf.id ? { ...f, name: h.alias || h.name || f.name, startDate: h.checkIn, endDate: h.checkOut, hotelRef: { ...h, city: h.city || (hf.hotelRef && hf.hotelRef.city) || "" } } : f)));
             const hotelPatch = { to: h.name, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl };
             const checkinRow = rows.find((r) => r.frameId === hf.id && r.typeId === "checkin");
             const checkoutRow = rows.find((r) => r.frameId === hf.id && r.typeId === "checkout");
@@ -4316,7 +4317,7 @@ export default function MyTripApp() {
         .mt-frame-header-special-wrap { display:flex; flex-direction:column; gap:6px; width:100%; }
         .mt-frame-header-row1 { display:flex; align-items:center; gap:9px; }
         .mt-frame-name-full { font-weight:700; font-size:15px; overflow-wrap:break-word; min-width:24px; }
-        .mt-frame-city { font-size:12.5px; font-weight:700; color:var(--frame-color, var(--teal)); margin-top:1px; }
+        .mt-frame-city { font-size:12.5px; font-weight:700; color:var(--frame-color, var(--teal)); margin-top:1px; text-align:end; width:100%; }
         .mt-frame-header-row2 { display:flex; align-items:center; justify-content:space-between; gap:9px; padding-inline-start:24px; }
         .mt-frame-header-row2-start { display:flex; align-items:center; gap:10px; min-width:0; }
         .mt-frame-header-row2-end { display:flex; align-items:center; gap:9px; flex-shrink:0; }
