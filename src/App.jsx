@@ -14,6 +14,7 @@ import {
   Bus, Motorbike, Bike, Scooter, Sailboat, ShipWheel, Anchor, Kayak, Helicopter, Caravan, Building2, Landmark, Home,
   CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, BellRing, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2, MoreVertical, Menu, Calendar as CalendarIcon, Undo2, Redo2, Info, ExternalLink, Phone, Save, FolderOpen, ImagePlus, BookOpen, RefreshCw, Workflow, ArrowLeft, ArrowRight, CheckSquare, Paperclip, Briefcase, Compass, FolderTree, LayoutGrid, HelpCircle, Wine, Beer, PartyPopper, Mic2
 } from "lucide-react";
+import { supabase, supabaseEnabled } from "./supabaseClient";
 
 /* ---------------------------------------------------------------------- */
 /*  MyTrip — trip-planning table prototype                                 */
@@ -21,7 +22,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.31.0";
+const APP_VERSION = "22.33.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -199,6 +200,12 @@ const T_DICT = {
     columns: "עמודות", addColumn: "הוסף עמודה", addType: "הוסף תיאור", resetColumnWidths: "איפוס רוחב עמודות (גרור את קצה כותרת העמודה לשינוי ידני)", actions: "פעולות", on: "פעיל", settings: "הגדרות", manageColumns: "ניהול עמודות", undo: "בטל פעולה אחרונה", redo: "חזור על פעולה", disableIntro: "בטל הצגת אנימציית פתיחה",
     exportFile: "שמור לקובץ", importFile: "ייבוא מקובץ", importSuccess: "הייבוא הצליח", importError: "הקובץ אינו תקין",
     login: "התחברות עם Google", logout: "יציאה",
+    cloudSyncTitle: "סנכרון בענן", cloudNotConfigured: "סנכרון בענן עדיין לא הוגדר באפליקציה הזו.",
+    cloudLoading: "טוען…", cloudSignInHint: "התחבר עם Google כדי לשמור ולסנכרן טיולים בין מכשירים.",
+    cloudSignInGoogle: "התחבר עם Google", cloudTripNamePlaceholder: "שם הטיול",
+    cloudSaving: "שומר…", cloudSaveCurrentTrip: "שמור טיול נוכחי בענן", cloudSaveSuccess: "נשמר בהצלחה בענן.",
+    cloudSaveError: "השמירה נכשלה, נסה שוב.", cloudYourTrips: "הטיולים שלך בענן", cloudNoTrips: "אין עדיין טיולים שמורים בענן.",
+    cloudUntitledTrip: "טיול ללא שם",
     desktop: "מחשב", mobile: "סלולר", flowView: "תצוגת זרימה", lang: "English", editRecord: "כרטיס רשומה",
     save: "שמירה", cancel: "ביטול", delete: "מחיקה", addSub: "תת רשומה", selectTime: "בחר שעה", done: "אישור", clearTime: "נקה",
     amLabel: "לפנה״צ", pmLabel: "אחה״צ",
@@ -373,6 +380,12 @@ const T_DICT = {
     columns: "Columns", addColumn: "Add column", addType: "Add description", resetColumnWidths: "Reset column widths (drag a header's edge to resize manually)", actions: "Actions", on: "On", settings: "Settings", manageColumns: "Manage columns", undo: "Undo last action", redo: "Redo action", disableIntro: "Disable the opening animation",
     exportFile: "Save to file", importFile: "Import from file", importSuccess: "Import successful", importError: "This file isn't valid",
     login: "Sign in with Google", logout: "Sign out",
+    cloudSyncTitle: "Cloud Sync", cloudNotConfigured: "Cloud sync isn't configured in this app yet.",
+    cloudLoading: "Loading…", cloudSignInHint: "Sign in with Google to save and sync trips across devices.",
+    cloudSignInGoogle: "Sign in with Google", cloudTripNamePlaceholder: "Trip name",
+    cloudSaving: "Saving…", cloudSaveCurrentTrip: "Save current trip to cloud", cloudSaveSuccess: "Saved to the cloud.",
+    cloudSaveError: "Save failed, try again.", cloudYourTrips: "Your cloud trips", cloudNoTrips: "No trips saved to the cloud yet.",
+    cloudUntitledTrip: "Untitled trip",
     desktop: "Desktop", mobile: "Mobile", flowView: "Flow view", lang: "עברית", editRecord: "Record card",
     save: "Save", cancel: "Cancel", delete: "Delete", addSub: "Sub-record", selectTime: "Select time", done: "Done", clearTime: "Clear",
     amLabel: "AM", pmLabel: "PM",
@@ -2964,7 +2977,24 @@ export default function MyTripApp() {
   const [viewMode, setViewMode] = useState("auto");
   const [headerCollapsed, setHeaderCollapsed] = useState(false);
   const [narrowScreen, setNarrowScreen] = useState(false);
-  const [loggedIn, setLoggedIn] = useState(false);
+  const [cloudUser, setCloudUser] = useState(null);
+  const [cloudAuthLoading, setCloudAuthLoading] = useState(supabaseEnabled);
+  const [cloudSyncOpen, setCloudSyncOpen] = useState(false);
+  const [cloudTrips, setCloudTrips] = useState([]);
+  const [cloudTripsLoading, setCloudTripsLoading] = useState(false);
+  const [cloudSaveStatus, setCloudSaveStatus] = useState(null);
+  const [cloudSaveName, setCloudSaveName] = useState("");
+  useEffect(() => {
+    if (!supabaseEnabled) { setCloudAuthLoading(false); return; }
+    supabase.auth.getSession().then(({ data }) => {
+      setCloudUser((data.session && data.session.user) || null);
+      setCloudAuthLoading(false);
+    });
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setCloudUser((session && session.user) || null);
+    });
+    return () => listener.subscription.unsubscribe();
+  }, []);
   const [collapsedGroups, setCollapsedGroups] = useState(() => {
     const todayStr = toLocalISODate(new Date());
     const initial = {};
@@ -3273,6 +3303,58 @@ export default function MyTripApp() {
     delete all[name];
     try { localStorage.setItem(SAVED_TRIPS_KEY, JSON.stringify(all)); } catch (e) {}
   }
+
+  /* ---------- cloud sync (Supabase) ---------- */
+  function signInWithGoogle() {
+    if (!supabaseEnabled) return;
+    supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.href } });
+  }
+  function signOutCloud() {
+    if (!supabaseEnabled) return;
+    supabase.auth.signOut();
+    setCloudTrips([]);
+  }
+  function openCloudSync() {
+    setCloudSyncOpen(true);
+    setCloudSaveName(frames.find((f) => !f.parentFrameId)?.name || "");
+    if (cloudUser) refreshCloudTrips();
+  }
+  async function refreshCloudTrips() {
+    if (!cloudUser) return;
+    setCloudTripsLoading(true);
+    const { data, error } = await supabase
+      .from("trips")
+      .select("id, name, updated_at")
+      .order("updated_at", { ascending: false });
+    setCloudTripsLoading(false);
+    if (!error) setCloudTrips(data || []);
+  }
+  async function saveTripToCloud() {
+    if (!cloudUser) return;
+    const name = cloudSaveName.trim() || T.cloudUntitledTrip;
+    setCloudSaveStatus("saving");
+    const { error } = await supabase.from("trips").insert({
+      owner_id: cloudUser.id, name, rows, frames, display_currency: displayCurrency,
+    });
+    setCloudSaveStatus(error ? "error" : "saved");
+    setTimeout(() => setCloudSaveStatus(null), 4000);
+    if (!error) refreshCloudTrips();
+  }
+  async function loadTripFromCloud(id) {
+    setCloudTripsLoading(true);
+    const { data, error } = await supabase.from("trips").select("*").eq("id", id).single();
+    setCloudTripsLoading(false);
+    if (error || !data) return;
+    setRows(recomputeChainTimesPure(data.rows || [], data.frames || []));
+    setFrames(data.frames || []);
+    if (data.display_currency) setDisplayCurrency(data.display_currency);
+    setCloudSyncOpen(false);
+  }
+  async function deleteCloudTrip(id) {
+    await supabase.from("trips").delete().eq("id", id);
+    refreshCloudTrips();
+  }
+
   function preWizardNext() {
     setPreWizardScreen((s) => Math.min(3, s + 1));
   }
@@ -3502,12 +3584,18 @@ export default function MyTripApp() {
           const hf = existingHotelFrames[i];
           if (hf) {
             setFrames((prev) => prev.map((f) => (f.id === hf.id ? { ...f, name: h.alias || h.name || f.name, startDate: h.checkIn, endDate: h.checkOut, hotelRef: { ...h, city: h.city || (hf.hotelRef && hf.hotelRef.city) || "" } } : f)));
-            const hotelPatch = { to: h.name, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl };
             const checkinRow = rows.find((r) => r.frameId === hf.id && r.typeId === "checkin");
             const checkoutRow = rows.find((r) => r.frameId === hf.id && r.typeId === "checkout");
             const transferRows = rows.filter((r) => r.frameId === hf.id && r.typeId === "transfer");
-            if (checkinRow) updateRow(checkinRow.id, { ...hotelPatch, date: h.checkIn });
-            if (checkoutRow) updateRow(checkoutRow.id, { ...hotelPatch, date: h.checkOut });
+            // Only fill in location fields from the wizard when the row isn't already verified, or
+            // the hotel's name was actually changed in the wizard (a rename should invalidate the
+            // old verification) — otherwise a verified row's `to` (which may be a fuller/different
+            // resolved address than the plain display name) would be silently overwritten every save.
+            const isRowVerified = (r) => r && r.toVerifiedText === r.to && (r.toPlaceId || r.toVerifiedUrl);
+            const nameChanged = h.name !== hf.name;
+            const locationPatch = { to: h.name, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl };
+            if (checkinRow) updateRow(checkinRow.id, { ...((nameChanged || !isRowVerified(checkinRow)) ? locationPatch : {}), toAlias: h.alias, date: h.checkIn });
+            if (checkoutRow) updateRow(checkoutRow.id, { ...((nameChanged || !isRowVerified(checkoutRow)) ? locationPatch : {}), toAlias: h.alias, date: h.checkOut });
             transferRows.forEach((tr) => updateRow(tr.id, { date: tr.date === (checkoutRow && checkoutRow.date) ? h.checkOut : h.checkIn }));
           } else {
             const newFrame = { id: uid(), name: h.alias || h.name || T.hotelFrameNameFallback, startDate: h.checkIn, endDate: h.checkOut, parentFrameId: rootFrame.id, collapsed: false, frameType: "hotel", hotelRef: h };
@@ -5034,12 +5122,65 @@ export default function MyTripApp() {
         <div className="mt-header-actions-group">
           <button className="mt-icon-btn" onClick={() => setLang(lang === "he" ? "en" : "he")}><Globe /> {T.lang}</button>
         </div>
-        {!loggedIn ? (
-          <button className="mt-icon-btn" onClick={() => setLoggedIn(true)}><LogIn /> {T.login}</button>
+        {!cloudUser ? (
+          <button className="mt-icon-btn" onClick={openCloudSync}><LogIn /> {T.login}</button>
         ) : (
-          <button className="mt-icon-btn" onClick={() => setLoggedIn(false)} title={T.mockNote}><span className="mt-avatar"><User size={14} /></span> {T.logout}</button>
+          <button className="mt-icon-btn" onClick={openCloudSync} title={cloudUser.email}><span className="mt-avatar"><User size={14} /></span> {cloudUser.email ? cloudUser.email.split("@")[0] : T.logout}</button>
         )}
       </div>
+      {cloudSyncOpen && (
+        <div className="mt-modal-backdrop" onClick={() => setCloudSyncOpen(false)}>
+          <div className="mt-modal" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
+            <div className="mt-modal-header"><span className="mt-modal-title">{T.cloudSyncTitle}</span><button className="mt-btn ghost" onClick={() => setCloudSyncOpen(false)}><X size={16} /></button></div>
+            <div className="mt-modal-body">
+              {!supabaseEnabled ? (
+                <p className="mt-hint">{T.cloudNotConfigured}</p>
+              ) : cloudAuthLoading ? (
+                <p className="mt-hint">{T.cloudLoading}</p>
+              ) : !cloudUser ? (
+                <>
+                  <p className="mt-hint" style={{ marginBottom: 10 }}>{T.cloudSignInHint}</p>
+                  <button className="mt-btn primary" style={{ width: "100%" }} onClick={signInWithGoogle}><LogIn size={14} /> {T.cloudSignInGoogle}</button>
+                </>
+              ) : (
+                <>
+                  <div className="mt-flight-manager-row-top" style={{ marginBottom: 10 }}>
+                    <span className="mt-hint">{cloudUser.email}</span>
+                    <button className="mt-btn ghost" style={{ padding: "3px 8px" }} onClick={signOutCloud}>{T.logout}</button>
+                  </div>
+                  <div className="mt-field-inline" style={{ marginBottom: 8 }}>
+                    <input value={cloudSaveName} onChange={(e) => setCloudSaveName(e.target.value)} placeholder={T.cloudTripNamePlaceholder} />
+                    <button className="mt-btn primary" onClick={saveTripToCloud} disabled={cloudSaveStatus === "saving"}>
+                      <Save size={13} /> {cloudSaveStatus === "saving" ? T.cloudSaving : T.cloudSaveCurrentTrip}
+                    </button>
+                  </div>
+                  {cloudSaveStatus === "saved" && <p className="mt-hint" style={{ color: "var(--teal)" }}>{T.cloudSaveSuccess}</p>}
+                  {cloudSaveStatus === "error" && <p className="mt-hint" style={{ color: "var(--danger)" }}>{T.cloudSaveError}</p>}
+                  <p className="mt-hint" style={{ margin: "10px 0 6px", fontWeight: 700 }}>{T.cloudYourTrips}</p>
+                  {cloudTripsLoading ? (
+                    <p className="mt-hint">{T.cloudLoading}</p>
+                  ) : !cloudTrips.length ? (
+                    <p className="mt-hint">{T.cloudNoTrips}</p>
+                  ) : cloudTrips.map((t) => (
+                    <div className="mt-flight-manager-row" key={t.id} style={{ padding: "7px 9px" }}>
+                      <div className="mt-flight-manager-row-top">
+                        <span className="mt-flight-manager-route" dir="auto">{t.name}</span>
+                      </div>
+                      <div className="mt-flight-manager-row-bottom">
+                        <span className="mt-hint">{fmtDate(toLocalISODate(new Date(t.updated_at)), lang)}</span>
+                        <span style={{ display: "flex", gap: 6 }}>
+                          <button className="mt-btn ghost" style={{ padding: "3px 8px" }} onClick={() => loadTripFromCloud(t.id)}>{T.load}</button>
+                          <button className="mt-btn ghost" style={{ padding: "3px 8px" }} onClick={() => deleteCloudTrip(t.id)}><Trash2 size={12} /></button>
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       <div className="mt-toolbar">
         <div className="mt-toolbar-group">
           {(() => {
@@ -5565,7 +5706,7 @@ export default function MyTripApp() {
 
         {renderContext(null, 0)}
 
-        <div className="mt-note">{loggedIn ? T.mockNote : ""}</div>
+        <div className="mt-note"></div>
       </div>
       </DndContext>
 
