@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.35.0";
+const APP_VERSION = "22.35.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -741,7 +741,13 @@ function typeMeta(typeId, types, T, lang) {
   const name = typeDisplayName(t, lang);
   return { ...t, name };
 }
-function childFramesPure(frames, pid) { return frames.filter((f) => f.parentFrameId === pid).sort((a, b) => (a.startDate || "").localeCompare(b.startDate || "")); }
+function childFramesPure(frames, pid) {
+  return frames.filter((f) => f.parentFrameId === pid).sort((a, b) => {
+    const startCmp = (a.startDate || "").localeCompare(b.startDate || "");
+    if (startCmp !== 0) return startCmp;
+    return (a.endDate || "").localeCompare(b.endDate || "");
+  });
+}
 function effectiveFrameTypeOf(frame, rows) {
   if (!frame) return null;
   if (frame.frameType === "basic") return null;
