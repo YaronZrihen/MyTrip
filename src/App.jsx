@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.35.1";
+const APP_VERSION = "22.36.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -213,6 +213,8 @@ const T_DICT = {
     preFlightChecklist: "צ'ק ליסט קדם טיסה", checklistReservations: "הזמנות", checklistDocuments: "מסמכי נסיעה", checklistOther: "נוספים",
     helpCenterTitle: "מרכז עזרה",
     fileManagerTitle: "ניהול קבצים", fileManagerFilter_all: "הכל", fileManagerFilter_byCategory: "לפי שייכות", fileManagerFilter_images: "תמונות", fileManagerFilter_documents: "מסמכים",
+    fileUploading: "מעלה קובץ…", fileUploadSuccess: "הקובץ הועלה ונשמר בענן.", fileUploadError: "העלאת הקובץ נכשלה, נסה שוב.",
+    fileUploadNeedsSignIn: "הקובץ נשמר רק באופן זמני — התחבר עם Google כדי שהוא יישמר בענן ויישאר גם אחרי רענון.",
     fileManagerEmpty: "עדיין לא הועלו קבצים. קבצים שתעלה בכל מקום באפליקציה (כמו צ'ק ליסט) יופיעו כאן.",
     checklistShopping: "רשימת קניות", checklistPacking: "ארגון ציוד לטיסה", checklistUpload: "העלה מסמך", checklistAddItem: "הוסף פריט...",
     checklistPackingSub: "{n} מתוך {total} הושלמו", checklistShoppingSub: "{n} פריטים", checklistShoppingEmpty: "הרשימה ריקה — הוסף פריט למטה",
@@ -393,6 +395,8 @@ const T_DICT = {
     preFlightChecklist: "Pre-Flight Checklist", checklistReservations: "Reservations", checklistDocuments: "Travel Documents", checklistOther: "Additional",
     helpCenterTitle: "Help Center",
     fileManagerTitle: "File Manager", fileManagerFilter_all: "All", fileManagerFilter_byCategory: "By Category", fileManagerFilter_images: "Images", fileManagerFilter_documents: "Documents",
+    fileUploading: "Uploading file…", fileUploadSuccess: "File uploaded and saved to the cloud.", fileUploadError: "File upload failed, try again.",
+    fileUploadNeedsSignIn: "The file is only stored temporarily — sign in with Google so it's saved to the cloud and survives a refresh.",
     fileManagerEmpty: "No files uploaded yet. Files you upload anywhere in the app (like the checklist) will appear here.",
     checklistShopping: "Shopping List", checklistPacking: "Flight Packing", checklistUpload: "Upload document", checklistAddItem: "Add item...",
     checklistPackingSub: "{n} of {total} done", checklistShoppingSub: "{n} items", checklistShoppingEmpty: "List is empty — add an item below",
@@ -2474,7 +2478,11 @@ function ChecklistRow({ item, cat, lang, T, onToggle, onUpload, onRemoveDoc, onR
       </label>
       {cat !== "packing" && (item.doc ? (
         <span className="mt-checklist-doc-chip">
-          <Paperclip size={12} /> {item.doc}
+          {item.docUrl ? (
+            <a href={item.docUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}><Paperclip size={12} /> {item.doc}</a>
+          ) : (
+            <><Paperclip size={12} /> {item.doc}</>
+          )}
           <button className="mt-checklist-doc-x" onClick={() => onRemoveDoc(cat, item.id)}><X size={11} /></button>
         </span>
       ) : (
@@ -2506,14 +2514,19 @@ function CHECKLIST_CAT_LABEL(cat, T) {
 }
 function FileManagerRow({ file, T, showCategory }) {
   const Icon = file.type === "image" ? ImagePlus : FileUp;
-  return (
-    <div className="mt-checklist-row">
+  const content = (
+    <>
       <span className="mt-file-manager-icon"><Icon size={15} /></span>
       <span className="mt-file-manager-info">
         <strong>{file.name}</strong>
         <span>{file.sourceLabel}{showCategory ? ` · ${CHECKLIST_CAT_LABEL(file.sourceCat, T)}` : ""}</span>
       </span>
-    </div>
+    </>
+  );
+  return file.url ? (
+    <a className="mt-checklist-row" href={file.url} target="_blank" rel="noreferrer">{content}</a>
+  ) : (
+    <div className="mt-checklist-row">{content}</div>
   );
 }
 
@@ -3141,6 +3154,7 @@ export default function MyTripApp() {
   const [checklist, setChecklist] = useState(CHECKLIST_DEFAULTS);
   const checklistFileInputRef = useRef(null);
   const [checklistUploadTarget, setChecklistUploadTarget] = useState(null);
+  const [fileUploadMsg, setFileUploadMsg] = useState(null);
   const [managedFiles, setManagedFiles] = useState([]);
   const [fileManagerOpen, setFileManagerOpen] = useState(false);
   const [fileManagerFilter, setFileManagerFilter] = useState("all");
@@ -3295,7 +3309,7 @@ export default function MyTripApp() {
     if (!saveTripName.trim()) return;
     try {
       const all = listSavedTrips();
-      all[saveTripName.trim()] = { rows, frames, displayCurrency, savedAt: new Date().toISOString() };
+      all[saveTripName.trim()] = { rows, frames, displayCurrency, checklist, managedFiles, savedAt: new Date().toISOString() };
       localStorage.setItem(SAVED_TRIPS_KEY, JSON.stringify(all));
       setSaveTripMsg({ ok: true });
       setTimeout(() => setSaveTripOpen(false), 900);
@@ -3309,6 +3323,8 @@ export default function MyTripApp() {
     setRows(recomputeChainTimesPure(trip.rows || [], trip.frames || []));
     setFrames(trip.frames || []);
     if (trip.displayCurrency) setDisplayCurrency(trip.displayCurrency);
+    setChecklist(trip.checklist || CHECKLIST_DEFAULTS);
+    setManagedFiles(trip.managedFiles || []);
     setLoadTripOpen(false);
   }
   function deleteSavedTrip(name) {
@@ -3349,7 +3365,7 @@ export default function MyTripApp() {
     if (!silent) setCloudSaveStatus("saving");
     const { data: existing } = await supabase
       .from("trips").select("id").eq("owner_id", cloudUser.id).eq("name", name).limit(1).maybeSingle();
-    const payload = { owner_id: cloudUser.id, name, rows, frames, display_currency: displayCurrency };
+    const payload = { owner_id: cloudUser.id, name, rows, frames, display_currency: displayCurrency, checklist, managed_files: managedFiles };
     const { error } = existing
       ? await supabase.from("trips").update(payload).eq("id", existing.id)
       : await supabase.from("trips").insert(payload);
@@ -3368,6 +3384,8 @@ export default function MyTripApp() {
     setRows(recomputeChainTimesPure(data.rows || [], data.frames || []));
     setFrames(data.frames || []);
     if (data.display_currency) setDisplayCurrency(data.display_currency);
+    setChecklist(data.checklist && Object.keys(data.checklist).length ? data.checklist : CHECKLIST_DEFAULTS);
+    setManagedFiles(data.managed_files || []);
     setCloudSyncOpen(false);
   }
   async function deleteCloudTrip(id) {
@@ -3380,6 +3398,21 @@ export default function MyTripApp() {
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, frames, displayCurrency, cloudUser]);
+
+  /* ---------- cloud file storage (Supabase Storage) ---------- */
+  const STORAGE_BUCKET = "trip-files";
+  async function uploadFileToStorage(file) {
+    if (!supabaseEnabled || !cloudUser) return null;
+    const path = `${cloudUser.id}/${uid()}-${file.name}`;
+    const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file);
+    if (error) return null;
+    const { data: signed } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(path, 60 * 60 * 24 * 365);
+    return { path, url: (signed && signed.signedUrl) || null };
+  }
+  async function deleteFileFromStorage(path) {
+    if (!supabaseEnabled || !path) return;
+    await supabase.storage.from(STORAGE_BUCKET).remove([path]);
+  }
 
   function preWizardNext() {
     setPreWizardScreen((s) => Math.min(3, s + 1));
@@ -3408,21 +3441,38 @@ export default function MyTripApp() {
     setChecklistUploadTarget({ cat, id });
     if (checklistFileInputRef.current) { checklistFileInputRef.current.value = ""; checklistFileInputRef.current.click(); }
   }
-  function handleChecklistFileSelected(e) {
+  async function handleChecklistFileSelected(e) {
     const file = e.target.files && e.target.files[0];
     if (!file || !checklistUploadTarget) return;
     const { cat, id } = checklistUploadTarget;
     const item = checklist[cat].find((it) => it.id === id);
     const label = item ? (lang === "he" ? item.label_he : item.label_en) : "";
-    setChecklist((c) => ({ ...c, [cat]: c[cat].map((it) => (it.id === id ? { ...it, doc: file.name } : it)) }));
+    setChecklistUploadTarget(null);
+    if (!cloudUser) {
+      setChecklist((c) => ({ ...c, [cat]: c[cat].map((it) => (it.id === id ? { ...it, doc: file.name, docUrl: null, docPath: null } : it)) }));
+      setManagedFiles((prev) => [
+        ...prev.filter((f) => !(f.sourceCat === cat && f.sourceId === id)),
+        { id: uid(), name: file.name, url: null, path: null, type: inferFileType(file.name), sourceCat: cat, sourceId: id, sourceLabel: label, uploadedAt: Date.now() },
+      ]);
+      setFileUploadMsg({ ok: false, reason: "not-signed-in" });
+      setTimeout(() => setFileUploadMsg(null), 6000);
+      return;
+    }
+    setFileUploadMsg({ uploading: true });
+    const uploaded = await uploadFileToStorage(file);
+    setFileUploadMsg(uploaded ? { ok: true } : { ok: false, reason: "error" });
+    setTimeout(() => setFileUploadMsg(null), 4000);
+    if (!uploaded) return;
+    setChecklist((c) => ({ ...c, [cat]: c[cat].map((it) => (it.id === id ? { ...it, doc: file.name, docUrl: uploaded.url, docPath: uploaded.path } : it)) }));
     setManagedFiles((prev) => [
       ...prev.filter((f) => !(f.sourceCat === cat && f.sourceId === id)),
-      { id: uid(), name: file.name, type: inferFileType(file.name), sourceCat: cat, sourceId: id, sourceLabel: label, uploadedAt: Date.now() },
+      { id: uid(), name: file.name, url: uploaded.url, path: uploaded.path, type: inferFileType(file.name), sourceCat: cat, sourceId: id, sourceLabel: label, uploadedAt: Date.now() },
     ]);
-    setChecklistUploadTarget(null);
   }
   function removeChecklistDoc(cat, id) {
-    setChecklist((c) => ({ ...c, [cat]: c[cat].map((it) => (it.id === id ? { ...it, doc: null } : it)) }));
+    const item = checklist[cat].find((it) => it.id === id);
+    if (item && item.docPath) deleteFileFromStorage(item.docPath);
+    setChecklist((c) => ({ ...c, [cat]: c[cat].map((it) => (it.id === id ? { ...it, doc: null, docUrl: null, docPath: null } : it)) }));
     setManagedFiles((prev) => prev.filter((f) => !(f.sourceCat === cat && f.sourceId === id)));
   }
   function openHelpTopic(topic) {
@@ -4969,6 +5019,8 @@ export default function MyTripApp() {
         .mt-field-inline > div:first-child { flex:1; }
         .mt-checkbox-row { display:flex; align-items:center; gap:7px; font-size:12.5px; }
         .mt-checklist-row { display:flex; align-items:center; gap:8px; padding:8px 4px; border-bottom:1px solid var(--border); }
+        a.mt-checklist-row { text-decoration:none; color:inherit; cursor:pointer; }
+        .mt-checklist-doc-chip a { display:flex; align-items:center; gap:4px; text-decoration:none; color:inherit; }
         .mt-checklist-done { text-decoration:line-through; color:var(--muted); }
         .mt-checklist-doc-chip { display:flex; align-items:center; gap:4px; background:var(--teal-tint); color:var(--teal-dark); font-size:11px; font-weight:600; padding:4px 8px; border-radius:20px; white-space:nowrap; }
         .mt-checklist-doc-x { border:none; background:none; color:var(--teal-dark); padding:0; display:flex; }
@@ -6252,6 +6304,11 @@ export default function MyTripApp() {
             </div>
             <div className="mt-modal-body">
               <input ref={checklistFileInputRef} type="file" style={{ display: "none" }} onChange={handleChecklistFileSelected} />
+              {fileUploadMsg && (
+                <p className="mt-hint" style={{ color: fileUploadMsg.ok ? "var(--teal)" : "var(--danger)", margin: "0 0 8px" }}>
+                  {fileUploadMsg.uploading ? T.fileUploading : fileUploadMsg.ok ? T.fileUploadSuccess : fileUploadMsg.reason === "not-signed-in" ? T.fileUploadNeedsSignIn : T.fileUploadError}
+                </p>
+              )}
               <div className="mt-section-label">{T.checklistReservations}</div>
               {checklist.reservations.map((it) => (
                 <ChecklistRow key={it.id} item={it} cat="reservations" lang={lang} T={T}
