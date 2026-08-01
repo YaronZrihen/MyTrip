@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.22.0";
+const APP_VERSION = "22.23.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -2178,7 +2178,7 @@ function MobileCardMeta({ row, prevRow, ctx }) {
       )}
       {row.link && <a className="mt-link-icon" href={row.link} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} title={row.link}><Link2 size={15} /></a>}
       {row.notes && <button className="mt-link-icon has-note" title={row.notes} onClick={(e) => { e.stopPropagation(); openCard(row); }}><StickyNote size={15} /></button>}
-      <button className="mt-link-icon" title={T.placeInfo} onClick={(e) => { e.stopPropagation(); openHotelInfo(row); }}><Info size={15} /></button>
+      <button className="mt-link-icon" title={T.placeInfo} onClick={(e) => { e.stopPropagation(); openHotelInfo(row); }}><Info size={13} /></button>
     </span>
   );
 }
@@ -2211,6 +2211,20 @@ function FlowView({ rows, types, lang, T, ctx }) {
   );
 }
 
+/* Flight duration label ("2h 30m") shown under the arrival-mode icon on flight-type cards — the
+   flight's own start-to-end span, matching the reference card's duration badge. */
+function computeFlightDurationLabel(row, T) {
+  if (!row.startTime || !row.endTime) return null;
+  const [sh, sm] = row.startTime.split(":").map(Number);
+  const [eh, em] = row.endTime.split(":").map(Number);
+  let diff = (eh * 60 + em) - (sh * 60 + sm);
+  if (diff < 0) diff += 1440;
+  if (diff <= 0) return null;
+  const h = Math.floor(diff / 60), m = diff % 60;
+  if (h > 0 && m > 0) return `${h}${T.hoursShort} ${m}${T.minutesShort}`;
+  if (h > 0) return `${h}${T.hoursShort}`;
+  return `${m}${T.minutesShort}`;
+}
 function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
   const { openCard, openHotelInfo, dragId } = ctx;
   const tm = typeMeta(r.typeId, types, T, lang); const Icon = ICONS[tm.icon] || Tag;
@@ -2219,13 +2233,17 @@ function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
   const am = noOriginNeeded(r.typeId) ? typeMeta(r.arrivalTypeId, types, T, lang) : null;
   const AmIcon = am ? (ICONS[am.icon] || Footprints) : null;
   const cardWarnings = getRowWarning(r, T);
+  const isFlightRow = isFlightType(r.typeId);
+  const flightTitle = isFlightRow && r.flightNumber ? [r.flightNumber, r.airline].filter(Boolean).join(" · ") : null;
+  const flightDuration = isFlightRow ? computeFlightDurationLabel(r, T) : null;
+  const stayLabel = formatStayAnnotation(r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId));
   const { attributes: dragAttrs, listeners: dragListeners, setNodeRef: setDragNodeRef } = useDraggable({ id: r.id, data: { type: "row" } });
   const { setNodeRef: setDropNodeRef, isOver: isRowOver } = useDroppable({ id: r.id, data: { type: "row" } });
   return (
     <div ref={(el) => { setDragNodeRef(el); setDropNodeRef(el); }} className={"mt-card" + (isRowOver ? " mt-drop-hover" : "")} style={{ opacity: dragId === r.id ? 0.4 : 1 }} onClick={() => openCard(r)}>
       <div className="mt-card-header">
         <PlaceIconWithPreview row={r} tm={tm} Icon={Icon} onOpenFull={() => openHotelInfo(r)} />
-        <strong className={"mt-card-title" + (warningClass(cardWarnings) ? " " + warningClass(cardWarnings) : "")} title={cardWarnings.length ? warningText(cardWarnings) : undefined}>{tm.name}</strong>
+        <strong className={"mt-card-title" + (warningClass(cardWarnings) ? " " + warningClass(cardWarnings) : "")} title={cardWarnings.length ? warningText(cardWarnings) : undefined}>{flightTitle || tm.name}</strong>
         <span className="mt-card-drag-handle" onClick={(e) => e.stopPropagation()} {...dragListeners} {...dragAttrs}><GripVertical size={15} /></span>
       </div>
       <div className="mt-card-divider" />
@@ -2235,10 +2253,8 @@ function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
           {fromLabel && <div className="mt-card-time-sub" dir="auto" title={fromLabel}>{truncateChars(fromLabel, 16)}</div>}
         </div>
         <div className="mt-card-connector">
-          <span className="mt-card-connector-icon">{AmIcon ? <AmIcon size={12} /> : <Icon size={12} />}</span>
-          {formatStayAnnotation(r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId)) && (
-            <span className="mt-card-duration-pill">{formatStayAnnotation(r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId))}</span>
-          )}
+          <span className="mt-card-connector-icon">{AmIcon ? <AmIcon size={18} /> : <Icon size={18} />}</span>
+          {flightDuration && <span className="mt-card-duration-pill">{flightDuration}</span>}
         </div>
         <div className="mt-card-time-block end">
           <div className="mt-card-time-big" style={{ ...(r.endTime && Number(r.endTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "end") ? { borderBottom: `2px dashed ${timeFieldColor(r, "end")}` } : {}) }}>{r.endTime || "—"}</div>
@@ -2247,6 +2263,7 @@ function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
       </div>
       <div className="mt-card-bottom">
         <MobileCardMeta row={r} prevRow={prevRow} ctx={ctx} />
+        {stayLabel && <span className="mt-stay-note">{stayLabel}</span>}
       </div>
     </div>
   );
@@ -3418,6 +3435,7 @@ export default function MyTripApp() {
         if (data.arrivalLocation) patch.to = data.arrivalLocation;
         if (data.departureAlias) patch.fromAlias = data.departureAlias;
         if (data.arrivalAlias) patch.toAlias = data.arrivalAlias;
+        if (data.airline) patch.airline = data.airline;
         if (data.departureDate) patch.depDate = data.departureDate;
         if (data.departureTime) patch.depTime = data.departureTime;
         if (data.arrivalTime) patch.landTime = data.arrivalTime;
@@ -3518,12 +3536,12 @@ export default function MyTripApp() {
     const createdRowIds = [];
     flights.forEach((f) => {
       const id1 = addRow(f.depDate, null, mainFrame.id);
-      updateRow(id1, { typeId: "flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, startTime: f.depTime || "", endTime: f.landTime || "", overnight: !!f.overnight, fromLat: f.fromLat, fromLon: f.fromLon, fromPlaceId: f.fromPlaceId, fromVerifiedUrl: f.fromVerifiedUrl, toLat: f.toLat, toLon: f.toLon, toPlaceId: f.toPlaceId, toVerifiedUrl: f.toVerifiedUrl });
+      updateRow(id1, { typeId: "flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, airline: f.airline, startTime: f.depTime || "", endTime: f.landTime || "", overnight: !!f.overnight, fromLat: f.fromLat, fromLon: f.fromLon, fromPlaceId: f.fromPlaceId, fromVerifiedUrl: f.fromVerifiedUrl, toLat: f.toLat, toLon: f.toLon, toPlaceId: f.toPlaceId, toVerifiedUrl: f.toVerifiedUrl });
       createdRowIds.push(id1);
     });
     domesticFlights.forEach((f) => {
       const id1 = addRow(f.depDate, null, mainFrame.id);
-      updateRow(id1, { typeId: "domestic-flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, startTime: f.depTime || "", endTime: f.landTime || "", overnight: !!f.overnight, fromLat: f.fromLat, fromLon: f.fromLon, fromPlaceId: f.fromPlaceId, fromVerifiedUrl: f.fromVerifiedUrl, toLat: f.toLat, toLon: f.toLon, toPlaceId: f.toPlaceId, toVerifiedUrl: f.toVerifiedUrl });
+      updateRow(id1, { typeId: "domestic-flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, airline: f.airline, startTime: f.depTime || "", endTime: f.landTime || "", overnight: !!f.overnight, fromLat: f.fromLat, fromLon: f.fromLon, fromPlaceId: f.fromPlaceId, fromVerifiedUrl: f.fromVerifiedUrl, toLat: f.toLat, toLon: f.toLon, toPlaceId: f.toPlaceId, toVerifiedUrl: f.toVerifiedUrl });
       createdRowIds.push(id1);
     });
 
@@ -4258,6 +4276,7 @@ export default function MyTripApp() {
         if (data.arrivalLocation) patch.to = data.arrivalLocation;
         if (data.departureAlias) patch.fromAlias = data.departureAlias;
         if (data.arrivalAlias) patch.toAlias = data.arrivalAlias;
+        if (data.airline) patch.airline = data.airline;
         if (data.departureTime) { patch.startTime = data.departureTime; patch.startTimeAuto = false; patch.startTimeSource = "api"; }
         if (data.arrivalTime) { patch.endTime = data.arrivalTime; patch.endTimeAuto = false; patch.endTimeSource = "api"; }
         const extras = [data.status, data.terminal ? `${T.flightTerminal} ${data.terminal}` : null, data.gate ? `${T.flightGate} ${data.gate}` : null].filter(Boolean);
@@ -4284,6 +4303,7 @@ export default function MyTripApp() {
       if (data.arrivalLocation) patch.to = data.arrivalLocation;
       if (data.departureAlias) patch.fromAlias = data.departureAlias;
       if (data.arrivalAlias) patch.toAlias = data.arrivalAlias;
+      if (data.airline) patch.airline = data.airline;
       if (data.departureTime) { patch.startTime = data.departureTime; patch.startTimeAuto = false; patch.startTimeSource = "api"; }
       if (data.arrivalTime) { patch.endTime = data.arrivalTime; patch.endTimeAuto = false; patch.endTimeSource = "api"; }
       const extras = [data.status, data.terminal ? `${T.flightTerminal} ${data.terminal}` : null, data.gate ? `${T.flightGate} ${data.gate}` : null].filter(Boolean);
@@ -4659,7 +4679,7 @@ export default function MyTripApp() {
         .mt-row-actions svg { width:13px; height:13px; }
         .mt-drag-handle { cursor:grab; color:#9FB0AA; }
         .mt-day-drag-handle { cursor:grab; color:#9FB0AA; display:flex; align-items:center; margin-inline-end:2px; touch-action:none; }
-        .mt-card-drag-handle { cursor:grab; color:#9FB0AA; display:flex; align-items:center; margin-inline-start:6px; touch-action:none; }
+        .mt-card-drag-handle { cursor:grab; color:#9FB0AA; display:flex; align-items:center; margin-inline-start:auto; touch-action:none; }
         body.mt-dragging-active { cursor:grabbing; user-select:none; -webkit-user-select:none; }
         body.mt-dragging-active * { cursor:grabbing !important; }
         .mt-group-header.dragging { opacity:.4; }
@@ -4853,20 +4873,20 @@ export default function MyTripApp() {
         .mt-loc-result { text-align:start; border:1px solid var(--border); border-radius:8px; padding:7px 9px; font-size:12px; background:#fff; }
         .mt-loc-result:hover { background:var(--teal-tint); border-color:var(--teal); }
         .mt-cards { display:flex; flex-direction:column; gap:9px; position:relative; }
-        .mt-card { background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:14px 16px; display:flex; flex-direction:column; gap:10px; position:relative; z-index:1; box-shadow:0 1px 2px rgba(30,42,40,0.04), 0 2px 8px rgba(30,42,40,0.05); }
+        .mt-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:14px 16px; display:flex; flex-direction:column; gap:10px; position:relative; z-index:1; box-shadow:0 1px 2px rgba(30,42,40,0.04), 0 2px 8px rgba(30,42,40,0.05); }
         .mt-card-header { display:flex; align-items:center; gap:9px; }
-        .mt-card-title { font-size:13.5px; font-weight:700; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .mt-card-title { font-size:13.5px; font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:right; }
         .mt-card-divider { height:1px; background:var(--border); margin:0 -16px; }
         .mt-card-times-row { display:flex; align-items:flex-start; gap:8px; }
         .mt-card-time-block { display:flex; flex-direction:column; align-items:flex-start; gap:2px; min-width:0; flex-shrink:0; }
         .mt-card-time-block.end { align-items:flex-end; }
-        .mt-card-time-big { font-size:19px; font-weight:800; color:var(--ink); font-variant-numeric:tabular-nums; line-height:1.1; }
-        .mt-card-time-sub { font-size:10.5px; font-weight:600; color:var(--muted); max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .mt-card-time-big { font-size:16px; font-weight:800; color:var(--ink); font-variant-numeric:tabular-nums; line-height:1.1; }
+        .mt-card-time-sub { font-size:16px; font-weight:600; color:var(--muted); max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .mt-card-connector { position:relative; flex:1; min-width:20px; display:flex; align-items:center; justify-content:center; align-self:center; margin-top:-8px; }
         .mt-card-connector::before { content:""; position:absolute; inset-inline:0; top:50%; border-top:1.5px dashed var(--border); }
-        .mt-card-connector-icon { position:relative; z-index:1; background:var(--surface); color:var(--muted); display:flex; align-items:center; justify-content:center; padding:0 3px; }
+        .mt-card-connector-icon { position:relative; z-index:1; background:var(--surface); color:var(--muted); display:flex; align-items:center; justify-content:center; padding:0 4px; }
         .mt-card-duration-pill { position:absolute; top:-15px; left:50%; transform:translateX(-50%); z-index:1; background:var(--bg); border:1px solid var(--border); border-radius:20px; padding:1px 7px; font-size:10px; font-weight:600; color:var(--muted); white-space:nowrap; }
-        .mt-card-bottom { display:flex; align-items:center; justify-content:space-between; }
+        .mt-card-bottom { display:flex; align-items:center; justify-content:space-between; padding-top:9px; border-top:1px solid var(--border); }
         .mt-card-icons { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
         .mt-card-icons .mt-link-icon { padding:4px; }
         .mt-route-mini { display:flex; align-items:center; gap:2px; }
