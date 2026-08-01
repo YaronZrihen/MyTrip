@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.33.1";
+const APP_VERSION = "22.34.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1258,11 +1258,17 @@ function computeGoogleRoute(a, b, travelMode) {
     })
     .catch(() => null);
 }
+const __routeCache = new Map();
 function fetchRouteInfo(a, b, typeId) {
-  if (hasGooglePlaces()) {
-    return computeGoogleRoute(a, b, googleTravelModeForType(typeId)).then((info) => info || fetchDrivingRoute(a, b, osrmProfileForType(typeId)));
-  }
-  return fetchDrivingRoute(a, b, osrmProfileForType(typeId));
+  const key = `${a.lat.toFixed(5)},${a.lon.toFixed(5)}|${b.lat.toFixed(5)},${b.lon.toFixed(5)}|${typeId}`;
+  if (__routeCache.has(key)) return __routeCache.get(key);
+  const p = (hasGooglePlaces()
+    ? computeGoogleRoute(a, b, googleTravelModeForType(typeId)).then((info) => info || fetchDrivingRoute(a, b, osrmProfileForType(typeId)))
+    : fetchDrivingRoute(a, b, osrmProfileForType(typeId))
+  ).then((info) => { if (!info) __routeCache.delete(key); return info; })
+   .catch((err) => { __routeCache.delete(key); throw err; });
+  __routeCache.set(key, p);
+  return p;
 }
 
 /* Weather — Open-Meteo (free, no API key). Forecast only covers ~16 days ahead. */
@@ -1467,7 +1473,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
     const originLat = originSource === "own" ? row.fromLat : (prevRow && prevRow.toLat);
     const originLon = originSource === "own" ? row.fromLon : (prevRow && prevRow.toLon);
     const hasCoords = (originLat != null && originLon != null) ? "c" : "t";
-    const sig = origin + "|" + dest + "|" + (row.startTime || "") + "|" + row.typeId + "|" + hasCoords;
+    const sig = origin + "|" + dest + "|" + row.typeId + "|" + hasCoords;
     if (lastRouteCalcSig.current === sig || distLoading) return;
     lastRouteCalcSig.current = sig;
     setDistLoading(true);
@@ -2129,7 +2135,7 @@ function MobileCardMeta({ row, prevRow, ctx }) {
     const originLat = originSource === "own" ? row.fromLat : (prevRow && prevRow.toLat);
     const originLon = originSource === "own" ? row.fromLon : (prevRow && prevRow.toLon);
     const hasCoords = (originLat != null && originLon != null) ? "c" : "t";
-    const sig = origin + "|" + dest + "|" + (row.startTime || "") + "|" + row.typeId + "|" + hasCoords;
+    const sig = origin + "|" + dest + "|" + row.typeId + "|" + hasCoords;
     if (lastRouteCalcSig.current === sig || distLoading) return;
     lastRouteCalcSig.current = sig;
     setDistLoading(true);
@@ -2276,17 +2282,17 @@ function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
       <div className="mt-card-times-row" dir="ltr">
         <div className="mt-card-time-block">
           <div className="mt-card-time-big" style={{ ...(r.startTime && Number(r.startTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "start") ? { borderBottom: `2px dashed ${timeFieldColor(r, "start")}` } : {}) }}>{r.startTime || "—"}</div>
-          {fromLabel && <div className="mt-card-time-sub" dir="auto" title={fromLabel}>{truncateChars(fromLabel, 16)}</div>}
+          {fromLabel && <div className="mt-card-time-sub" dir="auto" title={fromLabel}>{truncateChars(fromLabel, 13)}</div>}
         </div>
         <div className="mt-card-connector">
           <div className="mt-card-connector-line">
             <span className="mt-card-connector-icon">{AmIcon ? <AmIcon size={18} /> : <Icon size={18} />}</span>
           </div>
-          {rowDuration && <span className="mt-card-duration-text">{rowDuration}</span>}
+          <div className="mt-card-connector-sub">{rowDuration && <span className="mt-card-duration-text">{rowDuration}</span>}</div>
         </div>
         <div className="mt-card-time-block end">
           <div className="mt-card-time-big" style={{ ...(r.endTime && Number(r.endTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "end") ? { borderBottom: `2px dashed ${timeFieldColor(r, "end")}` } : {}) }}>{r.endTime || "—"}</div>
-          {toLabel && <div className="mt-card-time-sub" dir="auto" title={toLabel}>{truncateChars(toLabel, 16)}</div>}
+          {toLabel && <div className="mt-card-time-sub" dir="auto" title={toLabel}>{truncateChars(toLabel, 13)}</div>}
         </div>
       </div>
       <div className="mt-card-bottom">
@@ -5042,10 +5048,11 @@ export default function MyTripApp() {
         .mt-card-time-block.end { align-items:flex-end; }
         .mt-card-time-big { font-size:16px; font-weight:800; color:var(--ink); font-variant-numeric:tabular-nums; line-height:1.1; }
         .mt-card-time-sub { font-size:16px; font-weight:600; color:var(--muted); max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .mt-card-connector { flex:1 1 34px; min-width:34px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; align-self:center; }
-        .mt-card-connector-line { position:relative; width:100%; display:flex; align-items:center; justify-content:center; }
+        .mt-card-connector { flex:1 1 34px; min-width:34px; display:flex; flex-direction:column; align-items:center; gap:2px; }
+        .mt-card-connector-line { position:relative; width:100%; height:20px; display:flex; align-items:center; justify-content:center; }
         .mt-card-connector-line::before { content:""; position:absolute; inset-inline:0; top:50%; border-top:1.5px dashed var(--border); }
         .mt-card-connector-icon { position:relative; z-index:1; background:var(--surface); color:var(--muted); display:flex; align-items:center; justify-content:center; padding:0 4px; }
+        .mt-card-connector-sub { height:20px; display:flex; align-items:center; justify-content:center; }
         .mt-card-duration-text { font-size:10.5px; font-weight:600; color:var(--muted); white-space:nowrap; }
         .mt-card-bottom { display:flex; align-items:center; justify-content:space-between; padding-top:9px; border-top:1px solid var(--border); }
         .mt-card-icons { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
