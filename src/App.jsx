@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.23.1";
+const APP_VERSION = "22.24.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -2233,7 +2233,7 @@ function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
   const cardWarnings = getRowWarning(r, T);
   const isFlightRow = isFlightType(r.typeId);
   const flightTitle = isFlightRow && r.flightNumber ? [tm.name, r.flightNumber, r.airline].filter(Boolean).join(" · ") : null;
-  const flightDuration = isFlightRow ? computeFlightDurationLabel(r) : null;
+  const rowDuration = computeFlightDurationLabel(r);
   const stayLabel = formatStayAnnotation(r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId));
   const { attributes: dragAttrs, listeners: dragListeners, setNodeRef: setDragNodeRef } = useDraggable({ id: r.id, data: { type: "row" } });
   const { setNodeRef: setDropNodeRef, isOver: isRowOver } = useDroppable({ id: r.id, data: { type: "row" } });
@@ -2254,7 +2254,7 @@ function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
           <div className="mt-card-connector-line">
             <span className="mt-card-connector-icon">{AmIcon ? <AmIcon size={18} /> : <Icon size={18} />}</span>
           </div>
-          {flightDuration && <span className="mt-card-duration-text">{flightDuration}</span>}
+          {rowDuration && <span className="mt-card-duration-text">{rowDuration}</span>}
         </div>
         <div className="mt-card-time-block end">
           <div className="mt-card-time-big" style={{ ...(r.endTime && Number(r.endTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "end") ? { borderBottom: `2px dashed ${timeFieldColor(r, "end")}` } : {}) }}>{r.endTime || "—"}</div>
@@ -2783,15 +2783,16 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
               )}
               <span className="mt-frame-name-full" title={frame.name}>{effectiveFrameType === "hotel" ? truncateFrameName(frame.name, 25) : frame.name}</span>
             </div>
-            {effectiveFrameType === "hotel" && hotelCityForFrame(frame, rows) && (
-              <div className="mt-frame-city">
-                {hotelCityLabel(hotelCityForFrame(frame, rows), lang)}
-                {dayCount > 0 && ` (${formatDayCount(dayCount, lang)})`}
-              </div>
-            )}
             <div className="mt-frame-header-row2">
               <div className="mt-frame-header-row2-start">
-                {effectiveFrameType !== "hotel" && dayCount > 0 && <span className="mt-frame-daycount">{formatDayCount(dayCount, lang)}</span>}
+                {effectiveFrameType === "hotel" && hotelCityForFrame(frame, rows) ? (
+                  <span className="mt-frame-city">
+                    {hotelCityLabel(hotelCityForFrame(frame, rows), lang)}
+                    {dayCount > 0 && ` (${formatDayCount(dayCount, lang)})`}
+                  </span>
+                ) : (
+                  dayCount > 0 && <span className="mt-frame-daycount">{formatDayCount(dayCount, lang)}</span>
+                )}
                 {convertedTotal > 0 && (
                   <span className="mt-frame-cost-inline">{displayCurrency} {convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                 )}
@@ -4521,7 +4522,7 @@ export default function MyTripApp() {
         .mt-frame-header-special-wrap { display:flex; flex-direction:column; gap:6px; width:100%; }
         .mt-frame-header-row1 { display:flex; align-items:center; gap:9px; }
         .mt-frame-name-full { font-weight:700; font-size:15px; overflow-wrap:break-word; min-width:24px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .mt-frame-city { font-size:12.5px; font-weight:700; color:var(--frame-color, var(--teal)); margin-top:1px; text-align:right !important; width:100%; direction:rtl; }
+        .mt-frame-city { font-size:12.5px; font-weight:700; color:var(--frame-color, var(--teal)); white-space:nowrap; }
         .mt-frame-header-row2 { display:flex; align-items:center; justify-content:space-between; gap:9px; padding-inline-start:24px; }
         .mt-frame-header-row2-start { display:flex; align-items:center; gap:10px; min-width:0; }
         .mt-frame-header-row2-end { display:flex; align-items:center; gap:9px; flex-shrink:0; }
@@ -4873,7 +4874,7 @@ export default function MyTripApp() {
         .mt-loc-result { text-align:start; border:1px solid var(--border); border-radius:8px; padding:7px 9px; font-size:12px; background:#fff; }
         .mt-loc-result:hover { background:var(--teal-tint); border-color:var(--teal); }
         .mt-cards { display:flex; flex-direction:column; gap:9px; position:relative; }
-        .mt-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:14px 16px; display:flex; flex-direction:column; gap:10px; position:relative; z-index:1; box-shadow:0 1px 2px rgba(30,42,40,0.04), 0 2px 8px rgba(30,42,40,0.05); }
+        .mt-card { background:var(--surface); border:1px solid #CBD8D2; border-radius:12px; padding:14px 16px; display:flex; flex-direction:column; gap:10px; position:relative; z-index:1; box-shadow:0 1px 3px rgba(30,42,40,0.08), 0 4px 14px rgba(30,42,40,0.09); }
         .mt-card-header { display:flex; align-items:center; gap:9px; }
         .mt-card-title { font-size:13.5px; font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:right; }
         .mt-card-divider { height:1px; background:var(--border); margin:0 -16px; }
