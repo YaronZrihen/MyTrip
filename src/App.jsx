@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.26.0";
+const APP_VERSION = "22.27.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -300,11 +300,15 @@ const T_DICT = {
     preWizardSummary: "מוכן! בלחיצה על \"צור טיול\" ניצור עבורך מסגרת ראשית, מסגרת לטיסות הבינלאומיות, ומסגרת נפרדת לכל מלון — עם כל הרשומות ממוקמות לפי התאריכים שהזנת.",
     intlFlightsFrameName: "טיסות בינלאומיות", hotelFrameNameFallback: "מלון",
     newTripAction: "צור טיול חדש", editTripDetails: "ערוך פרטי טיול",
-    refreshAllFlights: "רענן את כל הטיסות", flightRefreshRunning: "מרענן טיסות…",
+    refreshAllFlights: "ניהול טיסות", flightRefreshRunning: "מרענן טיסות…",
     remindersManagerTitle: "תזכורות והתראות", remindersManagerEmpty: "אין עדיין תזכורות בטיול (מתווספות אוטומטית לרשומות טיסה וצ'ק-אאוט).",
     remindersManagerHint: "כל תזכורת מחושבת אוטומטית מהשעה של הרשומה שלה. אפשר לכבות, או לשנות כמה שעות לפני שהיא תופיע.",
     hoursBeforeShort: "שעות לפני",
     flightManagerTitle: "ניהול טיסות", refreshEligibleNow: "רענן זכאיות עכשיו", refreshNow: "רענן",
+    hotelManagerTitle: "ניהול מלונות", hotelManagerVerifyAll: "אמת הכל", hotelManagerVerifying: "מאמת…",
+    hotelManagerSummary: "{verified} אומתו · {skipped} כבר מאומתים", hotelManagerHint: "אימות מיקום מוצא נתוני מיקום מדויקים (קואורדינטות, קישור מפה) לכל רשומות המלון — צ'ק-אין, צ'ק-אאוט וההעברות.",
+    hotelManagerEmpty: "אין עדיין מסגרות מלון בטיול.", hotelManagerVerified: "מאומת", hotelManagerUnverified: "לא מאומת",
+    hotelManagerVerifyOne: "אמת מיקום", hotelManagerUpdated: "אומת",
     flightManagerCooldownHint: "טיסות עד {near} ימים נבדקות פעם ביום; טיסות רחוקות יותר — פעם בשבוע. אותה מגבלה חלה גם על כפתור הרענון הפרטני לכל שורה.",
     flightManagerOnCooldown: "בהמתנה",
     flightManagerEmpty: "אין עדיין רשומות טיסה בטיול.",
@@ -470,11 +474,15 @@ const T_DICT = {
     preWizardSummary: "Ready! Clicking \"Create trip\" will create a main frame, a frame for international flights, and a separate frame for each hotel — with all records placed according to the dates you entered.",
     intlFlightsFrameName: "International Flights", hotelFrameNameFallback: "Hotel",
     newTripAction: "Create new trip", editTripDetails: "Edit trip details",
-    refreshAllFlights: "Refresh all flights", flightRefreshRunning: "Refreshing flights…",
+    refreshAllFlights: "Flight management", flightRefreshRunning: "Refreshing flights…",
     remindersManagerTitle: "Reminders & Alerts", remindersManagerEmpty: "No reminders yet (added automatically to flight and check-out records).",
     remindersManagerHint: "Each reminder is computed from its record's own time. Turn any off, or change how many hours before it fires.",
     hoursBeforeShort: "hours before",
     flightManagerTitle: "Flight Manager", refreshEligibleNow: "Refresh eligible now", refreshNow: "Refresh",
+    hotelManagerTitle: "Hotel Manager", hotelManagerVerifyAll: "Verify all", hotelManagerVerifying: "Verifying…",
+    hotelManagerSummary: "{verified} verified · {skipped} already verified", hotelManagerHint: "Verifying a location produces accurate location data (coordinates, map link) for every record in that hotel — check-in, check-out, and transfers.",
+    hotelManagerEmpty: "No hotel frames in this trip yet.", hotelManagerVerified: "Verified", hotelManagerUnverified: "Not verified",
+    hotelManagerVerifyOne: "Verify location", hotelManagerUpdated: "Verified",
     flightManagerCooldownHint: "Flights within {near} days are checked daily; farther-out flights weekly. The same limit now applies to each row's individual refresh button too.",
     flightManagerOnCooldown: "On cooldown",
     flightManagerEmpty: "No flight records in this trip yet.",
@@ -3041,6 +3049,9 @@ export default function MyTripApp() {
   const [flightManagerOpen, setFlightManagerOpen] = useState(false);
   const [remindersManagerOpen, setRemindersManagerOpen] = useState(false);
   const [flightManagerRowStatus, setFlightManagerRowStatus] = useState({});
+  const [hotelManagerOpen, setHotelManagerOpen] = useState(false);
+  const [hotelManagerRowStatus, setHotelManagerRowStatus] = useState({});
+  const [hotelVerifyAllStatus, setHotelVerifyAllStatus] = useState(null);
   const [preWizardEditMode, setPreWizardEditMode] = useState(false);
   const [preWizardScreen, setPreWizardScreen] = useState(0);
   const [preWizardData, setPreWizardData] = useState(PRE_WIZARD_DEFAULTS);
@@ -4349,6 +4360,51 @@ export default function MyTripApp() {
     setTimeout(() => setFlightRefreshStatus(null), 8000);
   }
 
+  /* Whether a hotel frame's location is fully verified: some row within it (checkin/checkout/
+     transfer) has a toVerifiedText that exactly matches its own `to` value, plus a place id or
+     verified URL. Mirrors the same verification convention used for regular records. */
+  function isHotelFrameVerified(frame, rowsList) {
+    const hotelRows = rowsList.filter((r) => r.frameId === frame.id && r.to);
+    if (!hotelRows.length) return false;
+    return hotelRows.some((r) => r.toVerifiedText === r.to && (r.toPlaceId || r.toVerifiedUrl));
+  }
+  /* Verifies a hotel frame's location: geocodes the hotel's own name/address (from its checkin
+     row, or any row with a `to` value) and applies the resulting verified fields to every row in
+     that frame sharing the same `to` text, so checkin/checkout/transfers all stay consistent. */
+  async function verifyHotelFrame(frameId) {
+    const hotelRows = rows.filter((r) => r.frameId === frameId && r.to && r.to.trim());
+    if (!hotelRows.length) return { ok: false };
+    const anchor = hotelRows.find((r) => r.typeId === "checkin") || hotelRows[0];
+    setHotelManagerRowStatus((s) => ({ ...s, [frameId]: "running" }));
+    try {
+      const patch = await autoVerifyLocationField(anchor, "to", lang);
+      if (!patch) { setHotelManagerRowStatus((s) => ({ ...s, [frameId]: "failed" })); setTimeout(() => setHotelManagerRowStatus((s) => { const n = { ...s }; delete n[frameId]; return n; }), 5000); return { ok: false }; }
+      const targetText = anchor.to;
+      hotelRows.filter((r) => r.to === targetText).forEach((r) => updateRow(r.id, patch));
+      setHotelManagerRowStatus((s) => ({ ...s, [frameId]: "verified" }));
+      setTimeout(() => setHotelManagerRowStatus((s) => { const n = { ...s }; delete n[frameId]; return n; }), 5000);
+      return { ok: true };
+    } catch {
+      setHotelManagerRowStatus((s) => ({ ...s, [frameId]: "failed" }));
+      setTimeout(() => setHotelManagerRowStatus((s) => { const n = { ...s }; delete n[frameId]; return n; }), 5000);
+      return { ok: false };
+    }
+  }
+  /* Verifies every hotel frame that isn't already verified, one at a time. */
+  async function verifyAllHotels() {
+    const hotelFrames = frames.filter((f) => effectiveFrameTypeOf(f, rows) === "hotel");
+    const unverified = hotelFrames.filter((f) => !isHotelFrameVerified(f, rows));
+    if (!unverified.length) { setHotelVerifyAllStatus({ verified: 0, failed: 0, skipped: hotelFrames.length }); setTimeout(() => setHotelVerifyAllStatus(null), 8000); return; }
+    setHotelVerifyAllStatus({ running: true });
+    let verified = 0, failed = 0;
+    for (const f of unverified) {
+      const result = await verifyHotelFrame(f.id);
+      if (result.ok) verified++; else failed++;
+    }
+    setHotelVerifyAllStatus({ verified, failed, skipped: hotelFrames.length - unverified.length });
+    setTimeout(() => setHotelVerifyAllStatus(null), 8000);
+  }
+
   /* ---------- frame modal ---------- */
 
   function openFrameModal(frame, presetParentId) {
@@ -4828,6 +4884,8 @@ export default function MyTripApp() {
         .mt-reminder-offset { display:flex; align-items:center; gap:4px; flex-shrink:0; }
         .mt-reminder-offset-input { width:44px; padding:3px 4px; border:1px solid var(--border); border-radius:6px; text-align:center; font-size:12.5px; }
         .mt-flight-manager-row { border:1px solid var(--border); border-radius:10px; padding:9px 11px; margin-bottom:8px; display:flex; flex-direction:column; gap:4px; }
+        .mt-hotel-verify-badge { font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:20px; background:#FBEAEA; color:var(--danger); flex-shrink:0; }
+        .mt-hotel-verify-badge.ok { background:var(--teal-tint); color:var(--teal); }
         .mt-flight-manager-row-top { display:flex; align-items:center; justify-content:space-between; gap:8px; font-weight:700; font-size:13.5px; }
         .mt-flight-manager-route { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .mt-flight-manager-num { color:var(--teal); font-size:12.5px; flex-shrink:0; }
@@ -4878,12 +4936,12 @@ export default function MyTripApp() {
         .mt-card-header { display:flex; align-items:center; gap:9px; }
         .mt-card-title { font-size:13.5px; font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:right; }
         .mt-card-divider { height:1px; background:var(--border); margin:0 -16px; }
-        .mt-card-times-row { display:flex; align-items:flex-start; gap:8px; }
-        .mt-card-time-block { display:flex; flex-direction:column; align-items:flex-start; gap:2px; min-width:0; flex-shrink:0; }
+        .mt-card-times-row { display:flex; align-items:flex-start; gap:8px; overflow:hidden; }
+        .mt-card-time-block { display:flex; flex-direction:column; align-items:flex-start; gap:2px; min-width:0; flex:0 1 auto; }
         .mt-card-time-block.end { align-items:flex-end; }
         .mt-card-time-big { font-size:16px; font-weight:800; color:var(--ink); font-variant-numeric:tabular-nums; line-height:1.1; }
         .mt-card-time-sub { font-size:16px; font-weight:600; color:var(--muted); max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .mt-card-connector { flex:1; min-width:20px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; align-self:center; }
+        .mt-card-connector { flex:1 1 34px; min-width:34px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; align-self:center; }
         .mt-card-connector-line { position:relative; width:100%; display:flex; align-items:center; justify-content:center; }
         .mt-card-connector-line::before { content:""; position:absolute; inset-inline:0; top:50%; border-top:1.5px dashed var(--border); }
         .mt-card-connector-icon { position:relative; z-index:1; background:var(--surface); color:var(--muted); display:flex; align-items:center; justify-content:center; padding:0 4px; }
@@ -5051,6 +5109,7 @@ export default function MyTripApp() {
             <button className="mt-share-opt" onClick={() => { openPreWizard(); setActionsMenuOpen(false); }}><Wand2 size={14} /> {T.tripWizard}</button>
             <button className="mt-share-opt" onClick={() => { openEditTripDetails(); setActionsMenuOpen(false); }}><Pencil size={14} /> {T.editTripDetails}</button>
             <button className="mt-share-opt" onClick={() => { setFlightManagerOpen(true); setActionsMenuOpen(false); }}><RefreshCw size={14} /> {T.refreshAllFlights}</button>
+            <button className="mt-share-opt" onClick={() => { setHotelManagerOpen(true); setActionsMenuOpen(false); }}><BedDouble size={14} /> {T.hotelManagerTitle}</button>
             <button className="mt-share-opt" onClick={() => { setRemindersManagerOpen(true); setActionsMenuOpen(false); }}><Bell size={14} /> {T.remindersManagerTitle}</button>
             <div className="mt-action-cat-label"><span>{T.catSaveExport}</span><HelpButton topic="sharing" lang={lang} T={T} onOpenFull={openHelpTopic} size={13} openTopic={helpPopoverOpen} setOpenTopic={setHelpPopoverOpen} /></div>
             <button className="mt-share-opt" onClick={openSaveTripModal}><Save size={14} /> {T.saveTripByName}</button>
@@ -5878,6 +5937,57 @@ export default function MyTripApp() {
                           </button>
                         </div>
                       )}
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {hotelManagerOpen && (
+        <div className="mt-modal-backdrop" onClick={() => setHotelManagerOpen(false)}>
+          <div className="mt-modal" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+            <div className="mt-modal-header"><span className="mt-modal-title">{T.hotelManagerTitle}</span><button className="mt-btn ghost" onClick={() => setHotelManagerOpen(false)}><X size={16} /></button></div>
+            <div className="mt-modal-body">
+              <div className="mt-flight-manager-toolbar">
+                <button className="mt-btn primary" onClick={verifyAllHotels} disabled={hotelVerifyAllStatus && hotelVerifyAllStatus.running}>
+                  <MapPin size={13} /> {hotelVerifyAllStatus && hotelVerifyAllStatus.running ? T.hotelManagerVerifying : T.hotelManagerVerifyAll}
+                </button>
+                {hotelVerifyAllStatus && !hotelVerifyAllStatus.running && (
+                  <span className="mt-hint">
+                    {T.hotelManagerSummary
+                      .replace("{verified}", hotelVerifyAllStatus.verified)
+                      .replace("{skipped}", hotelVerifyAllStatus.skipped)}
+                  </span>
+                )}
+              </div>
+              <p className="mt-hint" style={{ margin: "2px 0 10px" }}>{T.hotelManagerHint}</p>
+              {(() => {
+                const hotelFrames = frames.filter((f) => effectiveFrameTypeOf(f, rows) === "hotel").sort((a, b) => (a.startDate || "").localeCompare(b.startDate || ""));
+                if (!hotelFrames.length) return <p className="mt-hint">{T.hotelManagerEmpty}</p>;
+                return hotelFrames.map((f) => {
+                  const verified = isHotelFrameVerified(f, rows);
+                  const rowStatus = hotelManagerRowStatus[f.id];
+                  const city = hotelCityForFrame(f, rows);
+                  return (
+                    <div className="mt-flight-manager-row" key={f.id}>
+                      <div className="mt-flight-manager-row-top">
+                        <span className="mt-flight-manager-route" dir="auto">{truncateFrameName(f.name, 25)}{city ? ` · ${hotelCityLabel(city, lang)}` : ""}</span>
+                        <span className={"mt-hotel-verify-badge" + (verified ? " ok" : "")}>{verified ? T.hotelManagerVerified : T.hotelManagerUnverified}</span>
+                      </div>
+                      <div className="mt-flight-manager-row-mid">
+                        <span>{fmtDate(f.startDate, lang)} → {fmtDate(f.endDate, lang)}</span>
+                      </div>
+                      <div className="mt-flight-manager-row-bottom">
+                        <span className="mt-hint" />
+                        <button className="mt-btn ghost" style={{ padding: "3px 8px" }} disabled={rowStatus === "running"} onClick={() => verifyHotelFrame(f.id)}>
+                          {rowStatus === "running" ? <RefreshCw size={12} className="mt-spin" /> : <MapPin size={12} />}
+                          {" "}
+                          {rowStatus === "verified" ? T.hotelManagerUpdated : rowStatus === "failed" ? T.flightLookupError : T.hotelManagerVerifyOne}
+                        </button>
+                      </div>
                     </div>
                   );
                 });
