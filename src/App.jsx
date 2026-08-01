@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.25.1";
+const APP_VERSION = "22.26.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -212,7 +212,7 @@ const T_DICT = {
     deleteFrameOnly: "מחק מסגרת בלבד (התוכן יעבור למסגרת האם)", deleteFrameWithContent: "מחק מסגרת ואת כל התוכן שבתוכה",
     type: "תיאור", from: "מוצא", to: "יעד", start: "בשעה", end: "עד שעה", overnight: "חוצה חצות", arrivalMethod: "אמצעי הגעה",
     stayDuration: "משך שהות", stayDurationHint: "כמה זמן נשארים ביעד — קובע את שעת הסיום (שעת הגעה + משך שהות).",
-    stayNone: "ללא שהות", minutesShort: "דק'", hoursShort: "שע'",
+    stayNone: "ללא שהות", minutesShort: "דק'", hoursShort: "שע'", stayAtDestination: "שהות ביעד", hourLetter: "ש",
     typeKindDesc: "תיאור", typeKindArrival: "אמצעי הגעה",
     requiresTicket: "דורש רכישת כרטיס כניסה", calcRoute: "חשב מסלול",
     ticketPurchased: "הכרטיס נרכש", flightCheckedIn: "בוצע צ'ק-אין לטיסה",
@@ -382,7 +382,7 @@ const T_DICT = {
     deleteFrameOnly: "Delete frame only (content moves to parent)", deleteFrameWithContent: "Delete frame and all its content",
     type: "Description", from: "Origin", to: "Destination", start: "At", end: "Until", overnight: "Crosses midnight", arrivalMethod: "Arrival method",
     stayDuration: "Stay duration", stayDurationHint: "How long you stay at the destination — determines the end time (arrival + stay).",
-    stayNone: "No stay", minutesShort: "min", hoursShort: "hr",
+    stayNone: "No stay", minutesShort: "min", hoursShort: "hr", stayAtDestination: "Stay at destination", hourLetter: "h",
     typeKindDesc: "Description", typeKindArrival: "Arrival method",
     requiresTicket: "Requires entrance ticket", calcRoute: "Calculate route",
     ticketPurchased: "Ticket purchased", flightCheckedIn: "Flight check-in done",
@@ -933,13 +933,13 @@ function timeFieldColor(row, field) {
   if (auto === false) return source === "api" ? TIME_FIELD_COLORS.api : null;
   return source === "inherited" ? TIME_FIELD_COLORS.inherited : TIME_FIELD_COLORS.computed;
 }
-/* The stay duration at the row's own location, in decimal hours, e.g. "(1.5+)" for an hour and a
-   half, "(0.5+)" for 30 minutes — informational only, never baked into the time field's own value. */
-function formatStayAnnotation(minutes) {
+/* The stay duration at the row's own location, e.g. "שהות ביעד - 0.5 ש" for 30 minutes —
+   informational only, never baked into the time field's own value. */
+function formatStayAnnotation(minutes, T) {
   const m = minutes != null ? minutes : 0;
   if (m <= 0) return null;
   const hours = Number((m / 60).toFixed(2));
-  return `(${hours}+)`;
+  return `${T.stayAtDestination} - ${hours} ${T.hourLetter}`;
 }
 const TRAVEL_MODE_MAP = {
   taxi: "driving", "car-rental": "driving", caravan: "driving", motorcycle: "driving",
@@ -2234,7 +2234,7 @@ function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
   const isFlightRow = isFlightType(r.typeId);
   const flightTitle = isFlightRow && r.flightNumber ? [tm.name, r.flightNumber, r.airline].filter(Boolean).join(" · ") : null;
   const rowDuration = computeFlightDurationLabel(r);
-  const stayLabel = formatStayAnnotation(r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId));
+  const stayLabel = formatStayAnnotation(r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId), T);
   const { attributes: dragAttrs, listeners: dragListeners, setNodeRef: setDragNodeRef } = useDraggable({ id: r.id, data: { type: "row" } });
   const { setNodeRef: setDropNodeRef, isOver: isRowOver } = useDroppable({ id: r.id, data: { type: "row" } });
   return (
