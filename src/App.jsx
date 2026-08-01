@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.28.0";
+const APP_VERSION = "22.29.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -977,6 +977,11 @@ function throttledCall(fn) {
   return run;
 }
 function mapsSearchUrl(lat, lon) { return `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`; }
+/* True for a bare "lat, lon" string (e.g. "13.12345, 100.45678") — used to stop such a string from
+   ever being stored as a location's actual name when reverse-geocoding can't find a real address. */
+function looksLikeCoordinates(text) {
+  return typeof text === "string" && /^-?\d{1,3}(\.\d+)?,\s*-?\d{1,3}(\.\d+)?$/.test(text.trim());
+}
 const __geocodeCache = new Map();
 const CACHE_MAX_ENTRIES = 300;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -4045,15 +4050,26 @@ export default function MyTripApp() {
   }
   function applyLocationPatch(field, basePatch, smartAlias) {
     const aliasField = field === "from" ? "fromAlias" : field === "to" ? "toAlias" : field === "name" ? "alias" : null;
-    const { wizardTarget } = locPicker;
-    if (wizardTarget) {
+    const patchBase = { ...basePatch };
+    // Defense in depth: never let a coordinate-looking string ("13.123, 100.456") become the
+    // location's actual name, no matter which path produced it.
+    if (looksLikeCoordinates(patchBase[field])) delete patchBase[field];
+    const { wizardTarget, hotelFrameTarget } = locPicker;
+    if (hotelFrameTarget) {
+      const matching = rows.filter((r) => r.frameId === hotelFrameTarget.frameId && r.to === hotelFrameTarget.targetText);
+      matching.forEach((r) => {
+        const patch = { ...patchBase };
+        if (aliasField && !r[aliasField] && smartAlias) patch[aliasField] = smartAlias;
+        updateRow(r.id, patch);
+      });
+    } else if (wizardTarget) {
       const current = preWizardData[wizardTarget.arrayField][wizardTarget.idx];
-      const patch = { ...basePatch };
+      const patch = { ...patchBase };
       if (aliasField && !current[aliasField] && smartAlias) patch[aliasField] = smartAlias;
       updatePreWizardArrayItem(wizardTarget.arrayField, wizardTarget.idx, patch);
     } else {
       setCardDraft((d) => {
-        const patch = { ...basePatch };
+        const patch = { ...patchBase };
         if (aliasField && !d[aliasField] && smartAlias) patch[aliasField] = smartAlias;
         return { ...d, ...patch };
       });
@@ -4061,8 +4077,7 @@ export default function MyTripApp() {
     setLocPicker(null);
   }
   function runLocationSearch(queryOverride) {
-    if (!locPicker) return;
-    const q = (queryOverride !== undefined ? queryOverride : locPicker.query) || "";
+    const q = (queryOverride !== undefined ? queryOverride : (locPicker && locPicker.query)) || "";
     if (!q.trim()) return;
     setLocPicker((p) => ({ ...p, loading: true, error: null }));
     if (!hasGooglePlaces()) {
@@ -4129,8 +4144,10 @@ export default function MyTripApp() {
   }
   function pickLocationCoordsOnly(lat, lon) {
     const mapUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
-    const wizardTarget = locPicker.wizardTarget;
-    const currentText = wizardTarget
+    const { wizardTarget, hotelFrameTarget } = locPicker;
+    const currentText = hotelFrameTarget
+      ? hotelFrameTarget.targetText
+      : wizardTarget
       ? ((preWizardData[wizardTarget.arrayField][wizardTarget.idx] && preWizardData[wizardTarget.arrayField][wizardTarget.idx][locPicker.field]) || "")
       : (cardDraft ? (cardDraft[locPicker.field] || "") : "");
     if (locPicker.field === "from") applyLocationPatch("from", { fromVerifiedUrl: mapUrl, fromVerifiedText: currentText, fromLat: Number(lat), fromLon: Number(lon) }, null);
@@ -4140,8 +4157,8 @@ export default function MyTripApp() {
   function pickLocation(result) {
     const label = result.display_name.split(",").slice(0, 2).join(",").trim();
     const mapUrl = `https://www.google.com/maps/search/?api=1&query=${result.lat},${result.lon}`;
-    const wizardTarget = locPicker.wizardTarget;
-    const isFlightRow = wizardTarget ? (wizardTarget.arrayField === "flights" || wizardTarget.arrayField === "domesticFlights") : (cardDraft && (cardDraft.typeId === "flight" || cardDraft.typeId === "domestic-flight"));
+    const { wizardTarget, hotelFrameTarget } = locPicker;
+    const isFlightRow = hotelFrameTarget ? false : wizardTarget ? (wizardTarget.arrayField === "flights" || wizardTarget.arrayField === "domesticFlights") : (cardDraft && (cardDraft.typeId === "flight" || cardDraft.typeId === "domestic-flight"));
     const addr = result.address || {};
     const cityName = addr.city || addr.town || addr.village || addr.suburb || addr.county || addr.state || label.split(",")[0];
     const iata = result.extratags && (result.extratags.iata || result.extratags["iata"]);
@@ -4377,13 +4394,17 @@ export default function MyTripApp() {
     setTimeout(() => setFlightRefreshStatus(null), 8000);
   }
 
-  /* Whether a hotel frame's location is fully verified: some row within it (checkin/checkout/
-     transfer) has a toVerifiedText that exactly matches its own `to` value, plus a place id or
-     verified URL. Mirrors the same verification convention used for regular records. */
+  /* Whether a hotel frame's location is fully verified: its anchor row (checkin, or the first row
+     with a `to` value) has a toVerifiedText that exactly matches its own `to`, plus a place id or
+     verified URL — and every OTHER row in the frame sharing that same `to` text is verified too, not
+     just one of them. */
   function isHotelFrameVerified(frame, rowsList) {
-    const hotelRows = rowsList.filter((r) => r.frameId === frame.id && r.to);
+    const hotelRows = rowsList.filter((r) => r.frameId === frame.id && r.to && r.to.trim());
     if (!hotelRows.length) return false;
-    return hotelRows.some((r) => r.toVerifiedText === r.to && (r.toPlaceId || r.toVerifiedUrl));
+    const anchor = hotelRows.find((r) => r.typeId === "checkin") || hotelRows[0];
+    const targetText = anchor.to;
+    const matching = hotelRows.filter((r) => r.to === targetText);
+    return matching.every((r) => r.toVerifiedText === r.to && (r.toPlaceId || r.toVerifiedUrl));
   }
   /* Verifies a hotel frame's location: geocodes the hotel's own name/address (from its checkin
      row, or any row with a `to` value) and applies the resulting verified fields to every row in
@@ -4422,15 +4443,16 @@ export default function MyTripApp() {
     setTimeout(() => setHotelVerifyAllStatus(null), 8000);
   }
   /* Opens the same manual search/map-pin location picker used inside a record's own edit modal,
-     for a hotel's anchor row — lets the person search and pick the correct place themselves
-     instead of trusting the first automatic geocoding match. */
+     directly (no record card involved) — targets every row in the hotel frame that shares the same
+     location text, and is pre-filled with the hotel's own name so no retyping is needed. */
   function openHotelLocationPicker(frameId) {
     const hotelRows = rows.filter((r) => r.frameId === frameId && r.to && r.to.trim());
     const anchor = hotelRows.find((r) => r.typeId === "checkin") || hotelRows[0];
     if (!anchor) return;
-    openCard(anchor);
+    const targetText = anchor.to;
     setHotelManagerOpen(false);
-    setTimeout(() => openLocationPicker("to"), 0);
+    setLocPicker({ field: "to", wizardTarget: null, hotelFrameTarget: { frameId, targetText }, mode: "search", query: targetText, results: [], loading: false, error: null, mapMarker: null, mapCenter: DEFAULT_MAP_CENTER });
+    runLocationSearch(targetText);
   }
 
   /* ---------- frame modal ---------- */
