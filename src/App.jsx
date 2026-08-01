@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.33.0";
+const APP_VERSION = "22.33.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1370,11 +1370,13 @@ function isChronological(rowsList) {
       if (lastStart !== null && r.startTime < lastStart) return false;
       lastStart = r.startTime;
     }
-    if (r.endTime) {
+    if (r.endTime && !r.overnight) {
       if (lastEnd !== null && r.endTime < lastEnd) return false;
-      if (r.startTime && !r.overnight && r.endTime < r.startTime) return false;
+      if (r.startTime && r.endTime < r.startTime) return false;
       lastEnd = r.endTime;
     }
+    // An overnight row's endTime belongs to the next calendar day, not this one — it's excluded
+    // from same-day end-time comparisons entirely rather than compared as if it were today.
   }
   return true;
 }
