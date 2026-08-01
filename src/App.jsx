@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.34.1";
+const APP_VERSION = "22.35.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -199,11 +199,11 @@ const T_DICT = {
     showHeader: "הצג את התפריט העליון", hideHeader: "הסתר את התפריט העליון",
     columns: "עמודות", addColumn: "הוסף עמודה", addType: "הוסף תיאור", resetColumnWidths: "איפוס רוחב עמודות (גרור את קצה כותרת העמודה לשינוי ידני)", actions: "פעולות", on: "פעיל", settings: "הגדרות", manageColumns: "ניהול עמודות", undo: "בטל פעולה אחרונה", redo: "חזור על פעולה", disableIntro: "בטל הצגת אנימציית פתיחה",
     exportFile: "שמור לקובץ", importFile: "ייבוא מקובץ", importSuccess: "הייבוא הצליח", importError: "הקובץ אינו תקין",
-    login: "התחברות עם Google", logout: "יציאה",
+    login: "התחברות עם Google", logout: "התנתק", cloudAutoSaveName: "שמירה אוטומטית",
     cloudSyncTitle: "סנכרון בענן", cloudNotConfigured: "סנכרון בענן עדיין לא הוגדר באפליקציה הזו.",
     cloudLoading: "טוען…", cloudSignInHint: "התחבר עם Google כדי לשמור ולסנכרן טיולים בין מכשירים.",
     cloudSignInGoogle: "התחבר עם Google", cloudTripNamePlaceholder: "שם הטיול",
-    cloudSaving: "שומר…", cloudSaveCurrentTrip: "שמור טיול נוכחי בענן", cloudSaveSuccess: "נשמר בהצלחה בענן.",
+    cloudSaving: "שומר…", cloudSaveCurrentTrip: "שמור", cloudSaveSuccess: "נשמר בהצלחה בענן.",
     cloudSaveError: "השמירה נכשלה, נסה שוב.", cloudYourTrips: "הטיולים שלך בענן", cloudNoTrips: "אין עדיין טיולים שמורים בענן.",
     cloudUntitledTrip: "טיול ללא שם",
     desktop: "מחשב", mobile: "סלולר", flowView: "תצוגת זרימה", lang: "English", editRecord: "כרטיס רשומה",
@@ -379,11 +379,11 @@ const T_DICT = {
     showHeader: "Show top menu", hideHeader: "Hide top menu",
     columns: "Columns", addColumn: "Add column", addType: "Add description", resetColumnWidths: "Reset column widths (drag a header's edge to resize manually)", actions: "Actions", on: "On", settings: "Settings", manageColumns: "Manage columns", undo: "Undo last action", redo: "Redo action", disableIntro: "Disable the opening animation",
     exportFile: "Save to file", importFile: "Import from file", importSuccess: "Import successful", importError: "This file isn't valid",
-    login: "Sign in with Google", logout: "Sign out",
+    login: "Sign in with Google", logout: "Disconnect", cloudAutoSaveName: "Auto-save",
     cloudSyncTitle: "Cloud Sync", cloudNotConfigured: "Cloud sync isn't configured in this app yet.",
     cloudLoading: "Loading…", cloudSignInHint: "Sign in with Google to save and sync trips across devices.",
     cloudSignInGoogle: "Sign in with Google", cloudTripNamePlaceholder: "Trip name",
-    cloudSaving: "Saving…", cloudSaveCurrentTrip: "Save current trip to cloud", cloudSaveSuccess: "Saved to the cloud.",
+    cloudSaving: "Saving…", cloudSaveCurrentTrip: "Save", cloudSaveSuccess: "Saved to the cloud.",
     cloudSaveError: "Save failed, try again.", cloudYourTrips: "Your cloud trips", cloudNoTrips: "No trips saved to the cloud yet.",
     cloudUntitledTrip: "Untitled trip",
     desktop: "Desktop", mobile: "Mobile", flowView: "Flow view", lang: "עברית", editRecord: "Record card",
@@ -3337,16 +3337,22 @@ export default function MyTripApp() {
     setCloudTripsLoading(false);
     if (!error) setCloudTrips(data || []);
   }
-  async function saveTripToCloud() {
+  async function saveTripToCloud(nameOverride, silent) {
     if (!cloudUser) return;
-    const name = cloudSaveName.trim() || T.cloudUntitledTrip;
-    setCloudSaveStatus("saving");
-    const { error } = await supabase.from("trips").insert({
-      owner_id: cloudUser.id, name, rows, frames, display_currency: displayCurrency,
-    });
-    setCloudSaveStatus(error ? "error" : "saved");
-    setTimeout(() => setCloudSaveStatus(null), 4000);
+    const name = (nameOverride != null ? nameOverride : cloudSaveName).trim() || T.cloudUntitledTrip;
+    if (!silent) setCloudSaveStatus("saving");
+    const { data: existing } = await supabase
+      .from("trips").select("id").eq("owner_id", cloudUser.id).eq("name", name).limit(1).maybeSingle();
+    const payload = { owner_id: cloudUser.id, name, rows, frames, display_currency: displayCurrency };
+    const { error } = existing
+      ? await supabase.from("trips").update(payload).eq("id", existing.id)
+      : await supabase.from("trips").insert(payload);
+    if (!silent) {
+      setCloudSaveStatus(error ? "error" : "saved");
+      setTimeout(() => setCloudSaveStatus(null), 4000);
+    }
     if (!error) refreshCloudTrips();
+    return !error;
   }
   async function loadTripFromCloud(id) {
     setCloudTripsLoading(true);
@@ -3362,6 +3368,12 @@ export default function MyTripApp() {
     await supabase.from("trips").delete().eq("id", id);
     refreshCloudTrips();
   }
+  useEffect(() => {
+    if (!cloudUser) return;
+    const timer = setTimeout(() => { saveTripToCloud(T.cloudAutoSaveName, true); }, 4000);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, frames, displayCurrency, cloudUser]);
 
   function preWizardNext() {
     setPreWizardScreen((s) => Math.min(3, s + 1));
@@ -5158,8 +5170,8 @@ export default function MyTripApp() {
                     <button className="mt-btn ghost" style={{ padding: "3px 8px" }} onClick={signOutCloud}>{T.logout}</button>
                   </div>
                   <div className="mt-field-inline" style={{ marginBottom: 8 }}>
-                    <input value={cloudSaveName} onChange={(e) => setCloudSaveName(e.target.value)} placeholder={T.cloudTripNamePlaceholder} />
-                    <button className="mt-btn primary" onClick={saveTripToCloud} disabled={cloudSaveStatus === "saving"}>
+                    <input style={{ fontSize: 15, padding: "8px 10px", maxWidth: "none" }} value={cloudSaveName} onChange={(e) => setCloudSaveName(e.target.value)} placeholder={T.cloudTripNamePlaceholder} />
+                    <button className="mt-btn primary" onClick={() => saveTripToCloud()} disabled={cloudSaveStatus === "saving"}>
                       <Save size={13} /> {cloudSaveStatus === "saving" ? T.cloudSaving : T.cloudSaveCurrentTrip}
                     </button>
                   </div>
@@ -5170,20 +5182,25 @@ export default function MyTripApp() {
                     <p className="mt-hint">{T.cloudLoading}</p>
                   ) : !cloudTrips.length ? (
                     <p className="mt-hint">{T.cloudNoTrips}</p>
-                  ) : cloudTrips.map((t) => (
-                    <div className="mt-flight-manager-row" key={t.id} style={{ padding: "7px 9px" }}>
-                      <div className="mt-flight-manager-row-top">
-                        <span className="mt-flight-manager-route" dir="auto">{t.name}</span>
+                  ) : cloudTrips.map((t) => {
+                    const updatedAt = new Date(t.updated_at);
+                    const hh = String(updatedAt.getHours()).padStart(2, "0");
+                    const mm = String(updatedAt.getMinutes()).padStart(2, "0");
+                    return (
+                      <div className="mt-flight-manager-row" key={t.id} style={{ padding: "7px 9px" }}>
+                        <div className="mt-flight-manager-row-top">
+                          <span className="mt-flight-manager-route" dir="auto">{t.name}</span>
+                        </div>
+                        <div className="mt-flight-manager-row-bottom">
+                          <span className="mt-hint">{fmtDate(toLocalISODate(updatedAt), lang)} <span dir="ltr">{hh}:{mm}</span></span>
+                          <span style={{ display: "flex", gap: 6 }}>
+                            <button className="mt-btn ghost" style={{ padding: "3px 8px" }} onClick={() => loadTripFromCloud(t.id)}>{T.load}</button>
+                            <button className="mt-btn ghost" style={{ padding: "3px 8px", color: "var(--danger)", borderColor: "var(--danger)" }} onClick={() => deleteCloudTrip(t.id)}><Trash2 size={12} /></button>
+                          </span>
+                        </div>
                       </div>
-                      <div className="mt-flight-manager-row-bottom">
-                        <span className="mt-hint">{fmtDate(toLocalISODate(new Date(t.updated_at)), lang)}</span>
-                        <span style={{ display: "flex", gap: 6 }}>
-                          <button className="mt-btn ghost" style={{ padding: "3px 8px" }} onClick={() => loadTripFromCloud(t.id)}>{T.load}</button>
-                          <button className="mt-btn ghost" style={{ padding: "3px 8px" }} onClick={() => deleteCloudTrip(t.id)}><Trash2 size={12} /></button>
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </>
               )}
             </div>
