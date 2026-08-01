@@ -66,6 +66,7 @@ function normalize(entry) {
     terminal: dep.terminal || "",
     gate: dep.gate || "",
     status: entry.flight_status || "",
+    airline: (entry.airline && entry.airline.name) || "",
   };
 }
 
