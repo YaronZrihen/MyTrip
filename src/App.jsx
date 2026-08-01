@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.21.0";
+const APP_VERSION = "22.21.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -4454,7 +4454,7 @@ export default function MyTripApp() {
         .mytrip-app input[type=date], .mytrip-app input[type=time] { appearance:auto; -webkit-appearance:auto; color-scheme:light; }
         .mytrip-app input[type=date]::-webkit-calendar-picker-indicator, .mytrip-app input[type=time]::-webkit-calendar-picker-indicator { opacity:1; cursor:pointer; }
         .mt-sticky-top { position:sticky; top:0; z-index:30; background:var(--surface); border-bottom:1px solid var(--border); }
-        .mt-header-row1 { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 14px 4px; }
+        .mt-header-row1 { display:flex; align-items:center; justify-content:space-between; gap:8px; padding-block:8px 4px; padding-inline-start:10px; padding-inline-end:3px; }
         .mt-header-row1-start { display:flex; align-items:center; gap:8px; }
         .mt-header-brand-group { display:flex; align-items:center; gap:6px; }
         .mt-brand-mark { width:30px; height:30px; border-radius:8px; background:var(--teal); display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; }
@@ -4491,7 +4491,7 @@ export default function MyTripApp() {
         .mt-columns-menu label:hover { background:var(--bg); }
         .mt-columns-menu .divider { height:1px; background:var(--border); margin:6px 0; }
         .mt-columns-menu input[type=text] { width:100%; border:1px solid var(--border); border-radius:6px; padding:5px 7px; font-size:12.5px; margin-bottom:6px; color:var(--ink); background:#fff; }
-        .mt-content { padding:0 20px 40px; }
+        .mt-content { padding-inline-start:10px; padding-inline-end:3px; padding-block-end:40px; }
         .mt-suggest { display:flex; align-items:center; gap:10px; background:var(--amber-tint); border:1px solid #EAC896; color:#7A4E17; padding:9px 14px; border-radius:10px; margin:14px 0; font-size:12.5px; flex-wrap:wrap; }
         .mt-suggest svg { width:15px; height:15px; flex-shrink:0; }
         .mt-suggest .mt-btn { margin-inline-start:auto; }
@@ -4868,10 +4868,10 @@ export default function MyTripApp() {
         @media (max-width: 640px) {
           .mt-group-footer-actions { flex-wrap:nowrap; gap:8px; justify-content:flex-start; }
           .mt-group-footer-actions .mt-group-add { font-size:11px; white-space:nowrap; }
-          .mt-header-row1 { padding:8px 10px 4px; }
+          .mt-header-row1 { padding-block:8px 4px; padding-inline-start:8px; padding-inline-end:2px; }
           .mt-header-actions { padding:4px 10px; }
           .mt-toolbar { padding:4px 10px 8px; gap:5px; }
-          .mt-content { padding:0 12px 32px; }
+          .mt-content { padding-inline-start:8px; padding-inline-end:2px; padding-block-end:32px; }
           .mt-frame-header { padding:12px 10px; gap:7px; }
           .mt-frame-actions button, .mt-row-actions button { min-width:32px; min-height:32px; justify-content:center; }
           .mt-group-header { padding:5px 6px; }
