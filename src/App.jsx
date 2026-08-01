@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.27.0";
+const APP_VERSION = "22.28.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -308,7 +308,7 @@ const T_DICT = {
     hotelManagerTitle: "ניהול מלונות", hotelManagerVerifyAll: "אמת הכל", hotelManagerVerifying: "מאמת…",
     hotelManagerSummary: "{verified} אומתו · {skipped} כבר מאומתים", hotelManagerHint: "אימות מיקום מוצא נתוני מיקום מדויקים (קואורדינטות, קישור מפה) לכל רשומות המלון — צ'ק-אין, צ'ק-אאוט וההעברות.",
     hotelManagerEmpty: "אין עדיין מסגרות מלון בטיול.", hotelManagerVerified: "מאומת", hotelManagerUnverified: "לא מאומת",
-    hotelManagerVerifyOne: "אמת מיקום", hotelManagerUpdated: "אומת",
+    hotelManagerVerifyOne: "אמת מיקום", hotelManagerUpdated: "אומת", hotelManagerSearchManually: "חיפוש ידני",
     flightManagerCooldownHint: "טיסות עד {near} ימים נבדקות פעם ביום; טיסות רחוקות יותר — פעם בשבוע. אותה מגבלה חלה גם על כפתור הרענון הפרטני לכל שורה.",
     flightManagerOnCooldown: "בהמתנה",
     flightManagerEmpty: "אין עדיין רשומות טיסה בטיול.",
@@ -482,7 +482,7 @@ const T_DICT = {
     hotelManagerTitle: "Hotel Manager", hotelManagerVerifyAll: "Verify all", hotelManagerVerifying: "Verifying…",
     hotelManagerSummary: "{verified} verified · {skipped} already verified", hotelManagerHint: "Verifying a location produces accurate location data (coordinates, map link) for every record in that hotel — check-in, check-out, and transfers.",
     hotelManagerEmpty: "No hotel frames in this trip yet.", hotelManagerVerified: "Verified", hotelManagerUnverified: "Not verified",
-    hotelManagerVerifyOne: "Verify location", hotelManagerUpdated: "Verified",
+    hotelManagerVerifyOne: "Verify location", hotelManagerUpdated: "Verified", hotelManagerSearchManually: "Search manually",
     flightManagerCooldownHint: "Flights within {near} days are checked daily; farther-out flights weekly. The same limit now applies to each row's individual refresh button too.",
     flightManagerOnCooldown: "On cooldown",
     flightManagerEmpty: "No flight records in this trip yet.",
@@ -4118,7 +4118,24 @@ export default function MyTripApp() {
   function confirmMapPick() {
     if (!locPicker || !locPicker.mapMarker) return;
     const m = locPicker.mapMarker;
-    pickLocation({ display_name: m.label || `${m.lat.toFixed(5)}, ${m.lng.toFixed(5)}`, lat: m.lat, lon: m.lng, address: m.address, extratags: m.extratags });
+    if (m.label) {
+      pickLocation({ display_name: m.label, lat: m.lat, lon: m.lng, address: m.address, extratags: m.extratags });
+    } else {
+      // No reverse-geocoded name available for this pin — keep whatever name text is already
+      // there (e.g. a guesthouse Nominatim doesn't know) and just attach real coordinates + a map
+      // link, instead of overwriting the name with a raw "lat, lon" string.
+      pickLocationCoordsOnly(m.lat, m.lng);
+    }
+  }
+  function pickLocationCoordsOnly(lat, lon) {
+    const mapUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+    const wizardTarget = locPicker.wizardTarget;
+    const currentText = wizardTarget
+      ? ((preWizardData[wizardTarget.arrayField][wizardTarget.idx] && preWizardData[wizardTarget.arrayField][wizardTarget.idx][locPicker.field]) || "")
+      : (cardDraft ? (cardDraft[locPicker.field] || "") : "");
+    if (locPicker.field === "from") applyLocationPatch("from", { fromVerifiedUrl: mapUrl, fromVerifiedText: currentText, fromLat: Number(lat), fromLon: Number(lon) }, null);
+    else if (locPicker.field === "to") applyLocationPatch("to", { toVerifiedUrl: mapUrl, toVerifiedText: currentText, toLat: Number(lat), toLon: Number(lon) }, null);
+    else if (locPicker.field === "name") applyLocationPatch("name", { nameVerifiedUrl: mapUrl, nameVerifiedText: currentText, nameLat: Number(lat), nameLon: Number(lon) }, null);
   }
   function pickLocation(result) {
     const label = result.display_name.split(",").slice(0, 2).join(",").trim();
@@ -4403,6 +4420,17 @@ export default function MyTripApp() {
     }
     setHotelVerifyAllStatus({ verified, failed, skipped: hotelFrames.length - unverified.length });
     setTimeout(() => setHotelVerifyAllStatus(null), 8000);
+  }
+  /* Opens the same manual search/map-pin location picker used inside a record's own edit modal,
+     for a hotel's anchor row — lets the person search and pick the correct place themselves
+     instead of trusting the first automatic geocoding match. */
+  function openHotelLocationPicker(frameId) {
+    const hotelRows = rows.filter((r) => r.frameId === frameId && r.to && r.to.trim());
+    const anchor = hotelRows.find((r) => r.typeId === "checkin") || hotelRows[0];
+    if (!anchor) return;
+    openCard(anchor);
+    setHotelManagerOpen(false);
+    setTimeout(() => openLocationPicker("to"), 0);
   }
 
   /* ---------- frame modal ---------- */
@@ -5981,7 +6009,9 @@ export default function MyTripApp() {
                         <span>{fmtDate(f.startDate, lang)} → {fmtDate(f.endDate, lang)}</span>
                       </div>
                       <div className="mt-flight-manager-row-bottom">
-                        <span className="mt-hint" />
+                        <button className="mt-btn ghost" style={{ padding: "3px 8px" }} onClick={() => openHotelLocationPicker(f.id)}>
+                          <Search size={12} /> {T.hotelManagerSearchManually}
+                        </button>
                         <button className="mt-btn ghost" style={{ padding: "3px 8px" }} disabled={rowStatus === "running"} onClick={() => verifyHotelFrame(f.id)}>
                           {rowStatus === "running" ? <RefreshCw size={12} className="mt-spin" /> : <MapPin size={12} />}
                           {" "}
