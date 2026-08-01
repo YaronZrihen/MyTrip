@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.23.0";
+const APP_VERSION = "22.23.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -2155,9 +2155,9 @@ function MobileCardMeta({ row, prevRow, ctx }) {
   }, [row.id, row.to, row.toLat, row.toLon, row.toPlaceId]);
 
   function weatherIconEl() {
-    if (weatherLoading) return <Cloud size={15} className="mt-weather-spin" />;
-    if (hasWeather) { const meta = weatherMeta(row.weatherCode); const WI = WEATHER_ICONS[meta.icon] || Cloud; return <WI size={15} />; }
-    return <Cloud size={15} style={{ opacity: 0.35 }} />;
+    if (weatherLoading) return <Cloud size={13} className="mt-weather-spin" />;
+    if (hasWeather) { const meta = weatherMeta(row.weatherCode); const WI = WEATHER_ICONS[meta.icon] || Cloud; return <WI size={13} />; }
+    return <Cloud size={13} style={{ opacity: 0.35 }} />;
   }
 
   return (
@@ -2168,7 +2168,7 @@ function MobileCardMeta({ row, prevRow, ctx }) {
       </span>
       {routeUrl && (
         <span className="mt-route-mini">
-          <a className="mt-link-icon" href={routeUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} title={T.routeTooltip}><Route size={15} /></a>
+          <a className="mt-link-icon" href={routeUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} title={T.routeTooltip}><Route size={13} /></a>
           {row.routeDistanceKm != null ? (
             <span className="mt-route-km">{row.routeDistanceKm.toFixed(1)} {T.km}</span>
           ) : distLoading ? (
@@ -2176,8 +2176,8 @@ function MobileCardMeta({ row, prevRow, ctx }) {
           ) : null}
         </span>
       )}
-      {row.link && <a className="mt-link-icon" href={row.link} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} title={row.link}><Link2 size={15} /></a>}
-      {row.notes && <button className="mt-link-icon has-note" title={row.notes} onClick={(e) => { e.stopPropagation(); openCard(row); }}><StickyNote size={15} /></button>}
+      {row.link && <a className="mt-link-icon" href={row.link} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} title={row.link}><Link2 size={13} /></a>}
+      {row.notes && <button className="mt-link-icon has-note" title={row.notes} onClick={(e) => { e.stopPropagation(); openCard(row); }}><StickyNote size={13} /></button>}
       <button className="mt-link-icon" title={T.placeInfo} onClick={(e) => { e.stopPropagation(); openHotelInfo(row); }}><Info size={13} /></button>
     </span>
   );
@@ -2213,7 +2213,7 @@ function FlowView({ rows, types, lang, T, ctx }) {
 
 /* Flight duration label ("2h 30m") shown under the arrival-mode icon on flight-type cards — the
    flight's own start-to-end span, matching the reference card's duration badge. */
-function computeFlightDurationLabel(row, T) {
+function computeFlightDurationLabel(row) {
   if (!row.startTime || !row.endTime) return null;
   const [sh, sm] = row.startTime.split(":").map(Number);
   const [eh, em] = row.endTime.split(":").map(Number);
@@ -2221,9 +2221,7 @@ function computeFlightDurationLabel(row, T) {
   if (diff < 0) diff += 1440;
   if (diff <= 0) return null;
   const h = Math.floor(diff / 60), m = diff % 60;
-  if (h > 0 && m > 0) return `${h}${T.hoursShort} ${m}${T.minutesShort}`;
-  if (h > 0) return `${h}${T.hoursShort}`;
-  return `${m}${T.minutesShort}`;
+  return `${h}:${String(m).padStart(2, "0")}`;
 }
 function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
   const { openCard, openHotelInfo, dragId } = ctx;
@@ -2234,8 +2232,8 @@ function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
   const AmIcon = am ? (ICONS[am.icon] || Footprints) : null;
   const cardWarnings = getRowWarning(r, T);
   const isFlightRow = isFlightType(r.typeId);
-  const flightTitle = isFlightRow && r.flightNumber ? [r.flightNumber, r.airline].filter(Boolean).join(" · ") : null;
-  const flightDuration = isFlightRow ? computeFlightDurationLabel(r, T) : null;
+  const flightTitle = isFlightRow && r.flightNumber ? [tm.name, r.flightNumber, r.airline].filter(Boolean).join(" · ") : null;
+  const flightDuration = isFlightRow ? computeFlightDurationLabel(r) : null;
   const stayLabel = formatStayAnnotation(r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId));
   const { attributes: dragAttrs, listeners: dragListeners, setNodeRef: setDragNodeRef } = useDraggable({ id: r.id, data: { type: "row" } });
   const { setNodeRef: setDropNodeRef, isOver: isRowOver } = useDroppable({ id: r.id, data: { type: "row" } });
@@ -2253,8 +2251,10 @@ function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
           {fromLabel && <div className="mt-card-time-sub" dir="auto" title={fromLabel}>{truncateChars(fromLabel, 16)}</div>}
         </div>
         <div className="mt-card-connector">
-          <span className="mt-card-connector-icon">{AmIcon ? <AmIcon size={18} /> : <Icon size={18} />}</span>
-          {flightDuration && <span className="mt-card-duration-pill">{flightDuration}</span>}
+          <div className="mt-card-connector-line">
+            <span className="mt-card-connector-icon">{AmIcon ? <AmIcon size={18} /> : <Icon size={18} />}</span>
+          </div>
+          {flightDuration && <span className="mt-card-duration-text">{flightDuration}</span>}
         </div>
         <div className="mt-card-time-block end">
           <div className="mt-card-time-big" style={{ ...(r.endTime && Number(r.endTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "end") ? { borderBottom: `2px dashed ${timeFieldColor(r, "end")}` } : {}) }}>{r.endTime || "—"}</div>
@@ -4882,10 +4882,11 @@ export default function MyTripApp() {
         .mt-card-time-block.end { align-items:flex-end; }
         .mt-card-time-big { font-size:16px; font-weight:800; color:var(--ink); font-variant-numeric:tabular-nums; line-height:1.1; }
         .mt-card-time-sub { font-size:16px; font-weight:600; color:var(--muted); max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .mt-card-connector { position:relative; flex:1; min-width:20px; display:flex; align-items:center; justify-content:center; align-self:center; margin-top:-8px; }
-        .mt-card-connector::before { content:""; position:absolute; inset-inline:0; top:50%; border-top:1.5px dashed var(--border); }
+        .mt-card-connector { flex:1; min-width:20px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; align-self:center; }
+        .mt-card-connector-line { position:relative; width:100%; display:flex; align-items:center; justify-content:center; }
+        .mt-card-connector-line::before { content:""; position:absolute; inset-inline:0; top:50%; border-top:1.5px dashed var(--border); }
         .mt-card-connector-icon { position:relative; z-index:1; background:var(--surface); color:var(--muted); display:flex; align-items:center; justify-content:center; padding:0 4px; }
-        .mt-card-duration-pill { position:absolute; top:-15px; left:50%; transform:translateX(-50%); z-index:1; background:var(--bg); border:1px solid var(--border); border-radius:20px; padding:1px 7px; font-size:10px; font-weight:600; color:var(--muted); white-space:nowrap; }
+        .mt-card-duration-text { font-size:10.5px; font-weight:600; color:var(--muted); white-space:nowrap; }
         .mt-card-bottom { display:flex; align-items:center; justify-content:space-between; padding-top:9px; border-top:1px solid var(--border); }
         .mt-card-icons { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
         .mt-card-icons .mt-link-icon { padding:4px; }
