@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.24.1";
+const APP_VERSION = "22.25.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -4611,8 +4611,8 @@ export default function MyTripApp() {
         .mt-type-wrap { position:relative; }
         .mt-type-chip { display:flex; align-items:center; gap:6px; }
         .mt-type-icon { width:22px; height:22px; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-        .mt-card-header .mt-type-icon { width:32px; height:32px; border-radius:10px; }
-        .mt-card-header .mt-type-icon svg { width:16px; height:16px; }
+        .mt-card-header .mt-type-icon { width:27px; height:27px; border-radius:9px; }
+        .mt-card-header .mt-type-icon svg { width:14px; height:14px; }
         .mt-type-icon-btn { border:none; cursor:pointer; }
         .has-warning-closed { color:var(--danger) !important; text-decoration:underline; text-decoration-style:wavy; text-underline-offset:2px; }
         .has-warning-fee { color:#B5651D !important; text-decoration:underline; text-decoration-style:wavy; text-underline-offset:2px; }
@@ -4873,7 +4873,7 @@ export default function MyTripApp() {
         .mt-loc-results { display:flex; flex-direction:column; gap:5px; max-height:220px; overflow-y:auto; }
         .mt-loc-result { text-align:start; border:1px solid var(--border); border-radius:8px; padding:7px 9px; font-size:12px; background:#fff; }
         .mt-loc-result:hover { background:var(--teal-tint); border-color:var(--teal); }
-        .mt-cards { display:flex; flex-direction:column; gap:9px; position:relative; }
+        .mt-cards { display:flex; flex-direction:column; gap:0; position:relative; }
         .mt-card { background:var(--surface); border:1px solid #CBD8D2; border-radius:12px; padding:14px 16px; display:flex; flex-direction:column; gap:10px; position:relative; z-index:1; box-shadow:0 1px 3px rgba(30,42,40,0.08), 0 4px 14px rgba(30,42,40,0.09); }
         .mt-card-header { display:flex; align-items:center; gap:9px; }
         .mt-card-title { font-size:13.5px; font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:right; }
@@ -4882,7 +4882,7 @@ export default function MyTripApp() {
         .mt-card-time-block { display:flex; flex-direction:column; align-items:flex-start; gap:2px; min-width:0; flex-shrink:0; }
         .mt-card-time-block.end { align-items:flex-end; }
         .mt-card-time-big { font-size:16px; font-weight:800; color:var(--ink); font-variant-numeric:tabular-nums; line-height:1.1; }
-        .mt-card-time-sub { font-size:16px; font-weight:600; color:var(--muted); max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .mt-card-time-sub { font-size:16px; font-weight:600; color:var(--muted); max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .mt-card-connector { flex:1; min-width:20px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; align-self:center; }
         .mt-card-connector-line { position:relative; width:100%; display:flex; align-items:center; justify-content:center; }
         .mt-card-connector-line::before { content:""; position:absolute; inset-inline:0; top:50%; border-top:1.5px dashed var(--border); }
