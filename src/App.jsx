@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.21.1";
+const APP_VERSION = "22.22.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -2223,28 +2223,28 @@ function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
   const { setNodeRef: setDropNodeRef, isOver: isRowOver } = useDroppable({ id: r.id, data: { type: "row" } });
   return (
     <div ref={(el) => { setDragNodeRef(el); setDropNodeRef(el); }} className={"mt-card" + (isRowOver ? " mt-drop-hover" : "")} style={{ opacity: dragId === r.id ? 0.4 : 1 }} onClick={() => openCard(r)}>
-      <div className="mt-card-top">
-        <div className="mt-type-chip">
-          <PlaceIconWithPreview row={r} tm={tm} Icon={Icon} onOpenFull={() => openHotelInfo(r)} />
-          <strong className={warningClass(cardWarnings)} style={{ fontSize: 13.5 }} title={cardWarnings.length ? warningText(cardWarnings) : undefined}>{tm.name}</strong>
+      <div className="mt-card-header">
+        <PlaceIconWithPreview row={r} tm={tm} Icon={Icon} onOpenFull={() => openHotelInfo(r)} />
+        <strong className={"mt-card-title" + (warningClass(cardWarnings) ? " " + warningClass(cardWarnings) : "")} title={cardWarnings.length ? warningText(cardWarnings) : undefined}>{tm.name}</strong>
+        <span className="mt-card-drag-handle" onClick={(e) => e.stopPropagation()} {...dragListeners} {...dragAttrs}><GripVertical size={15} /></span>
+      </div>
+      <div className="mt-card-divider" />
+      <div className="mt-card-times-row" dir="ltr">
+        <div className="mt-card-time-block">
+          <div className="mt-card-time-big" style={{ ...(r.startTime && Number(r.startTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "start") ? { borderBottom: `2px dashed ${timeFieldColor(r, "start")}` } : {}) }}>{r.startTime || "—"}</div>
+          {fromLabel && <div className="mt-card-time-sub" dir="auto" title={fromLabel}>{truncateChars(fromLabel, 16)}</div>}
         </div>
-        <div className="mt-card-top-end">
-          <span className="mt-card-times" dir="ltr">
-            <span style={{ ...(r.startTime && Number(r.startTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "start") ? { borderBottom: `2px dashed ${timeFieldColor(r, "start")}` } : {}) }}>{r.startTime || "—"}</span>
-            {r.endTime ? <> → <span style={{ ...(Number(r.endTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "end") ? { borderBottom: `2px dashed ${timeFieldColor(r, "end")}` } : {}) }}>{r.endTime}</span>
-              {formatStayAnnotation(r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId)) && <span className="mt-stay-note">{formatStayAnnotation(r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId))}</span>}
-            </> : ""}
-          </span>
-          <span className="mt-card-drag-handle" onClick={(e) => e.stopPropagation()} {...dragListeners} {...dragAttrs}><GripVertical size={15} /></span>
+        <div className="mt-card-connector">
+          <span className="mt-card-connector-icon">{AmIcon ? <AmIcon size={12} /> : <Icon size={12} />}</span>
+          {formatStayAnnotation(r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId)) && (
+            <span className="mt-card-duration-pill">{formatStayAnnotation(r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId))}</span>
+          )}
+        </div>
+        <div className="mt-card-time-block end">
+          <div className="mt-card-time-big" style={{ ...(r.endTime && Number(r.endTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "end") ? { borderBottom: `2px dashed ${timeFieldColor(r, "end")}` } : {}) }}>{r.endTime || "—"}</div>
+          {toLabel && <div className="mt-card-time-sub" dir="auto" title={toLabel}>{truncateChars(toLabel, 16)}</div>}
         </div>
       </div>
-      {(fromLabel || toLabel) && (
-        <div className="mt-card-route">
-          <span dir="auto" title={fromLabel || ""}>{truncateChars(fromLabel, 18) || "—"}</span>
-          {fromLabel && toLabel && <span className="mt-card-arrow">{AmIcon ? <AmIcon size={12} /> : "←"}</span>}
-          {toLabel && <span dir="auto" title={toLabel}>{truncateChars(toLabel, 18)}</span>}
-        </div>
-      )}
       <div className="mt-card-bottom">
         <MobileCardMeta row={r} prevRow={prevRow} ctx={ctx} />
       </div>
@@ -4454,7 +4454,7 @@ export default function MyTripApp() {
         .mytrip-app input[type=date], .mytrip-app input[type=time] { appearance:auto; -webkit-appearance:auto; color-scheme:light; }
         .mytrip-app input[type=date]::-webkit-calendar-picker-indicator, .mytrip-app input[type=time]::-webkit-calendar-picker-indicator { opacity:1; cursor:pointer; }
         .mt-sticky-top { position:sticky; top:0; z-index:30; background:var(--surface); border-bottom:1px solid var(--border); }
-        .mt-header-row1 { display:flex; align-items:center; justify-content:space-between; gap:8px; padding-block:8px 4px; padding-inline-start:10px; padding-inline-end:3px; }
+        .mt-header-row1 { display:flex; align-items:center; justify-content:space-between; gap:8px; padding-block:8px 4px; padding-inline-start:10px; padding-inline-end:0; }
         .mt-header-row1-start { display:flex; align-items:center; gap:8px; }
         .mt-header-brand-group { display:flex; align-items:center; gap:6px; }
         .mt-brand-mark { width:30px; height:30px; border-radius:8px; background:var(--teal); display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; }
@@ -4491,7 +4491,7 @@ export default function MyTripApp() {
         .mt-columns-menu label:hover { background:var(--bg); }
         .mt-columns-menu .divider { height:1px; background:var(--border); margin:6px 0; }
         .mt-columns-menu input[type=text] { width:100%; border:1px solid var(--border); border-radius:6px; padding:5px 7px; font-size:12.5px; margin-bottom:6px; color:var(--ink); background:#fff; }
-        .mt-content { padding-inline-start:10px; padding-inline-end:3px; padding-block-end:40px; }
+        .mt-content { padding-inline-start:10px; padding-inline-end:0; padding-block-end:40px; }
         .mt-suggest { display:flex; align-items:center; gap:10px; background:var(--amber-tint); border:1px solid #EAC896; color:#7A4E17; padding:9px 14px; border-radius:10px; margin:14px 0; font-size:12.5px; flex-wrap:wrap; }
         .mt-suggest svg { width:15px; height:15px; flex-shrink:0; }
         .mt-suggest .mt-btn { margin-inline-start:auto; }
@@ -4590,6 +4590,8 @@ export default function MyTripApp() {
         .mt-type-wrap { position:relative; }
         .mt-type-chip { display:flex; align-items:center; gap:6px; }
         .mt-type-icon { width:22px; height:22px; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .mt-card-header .mt-type-icon { width:32px; height:32px; border-radius:10px; }
+        .mt-card-header .mt-type-icon svg { width:16px; height:16px; }
         .mt-type-icon-btn { border:none; cursor:pointer; }
         .has-warning-closed { color:var(--danger) !important; text-decoration:underline; text-decoration-style:wavy; text-underline-offset:2px; }
         .has-warning-fee { color:#B5651D !important; text-decoration:underline; text-decoration-style:wavy; text-underline-offset:2px; }
@@ -4851,13 +4853,20 @@ export default function MyTripApp() {
         .mt-loc-result { text-align:start; border:1px solid var(--border); border-radius:8px; padding:7px 9px; font-size:12px; background:#fff; }
         .mt-loc-result:hover { background:var(--teal-tint); border-color:var(--teal); }
         .mt-cards { display:flex; flex-direction:column; gap:9px; position:relative; }
-        .mt-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:11px 13px; display:flex; flex-direction:column; gap:6px; position:relative; z-index:1; }
-        .mt-card-top { display:flex; align-items:center; justify-content:space-between; }
-        .mt-card-top-end { display:flex; align-items:center; gap:8px; }
-        .mt-card-times { font-size:13px; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums; margin-inline-start:auto; }
-        .mt-card-route { display:flex; align-items:center; gap:6px; font-size:13px; font-weight:600; flex-wrap:wrap; }
-        .mt-card-arrow { color:var(--muted); font-weight:400; }
-        .mt-card-bottom { display:flex; align-items:center; justify-content:space-between; margin-top:2px; }
+        .mt-card { background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:14px 16px; display:flex; flex-direction:column; gap:10px; position:relative; z-index:1; box-shadow:0 1px 2px rgba(30,42,40,0.04), 0 2px 8px rgba(30,42,40,0.05); }
+        .mt-card-header { display:flex; align-items:center; gap:9px; }
+        .mt-card-title { font-size:13.5px; font-weight:700; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .mt-card-divider { height:1px; background:var(--border); margin:0 -16px; }
+        .mt-card-times-row { display:flex; align-items:flex-start; gap:8px; }
+        .mt-card-time-block { display:flex; flex-direction:column; align-items:flex-start; gap:2px; min-width:0; flex-shrink:0; }
+        .mt-card-time-block.end { align-items:flex-end; }
+        .mt-card-time-big { font-size:19px; font-weight:800; color:var(--ink); font-variant-numeric:tabular-nums; line-height:1.1; }
+        .mt-card-time-sub { font-size:10.5px; font-weight:600; color:var(--muted); max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .mt-card-connector { position:relative; flex:1; min-width:20px; display:flex; align-items:center; justify-content:center; align-self:center; margin-top:-8px; }
+        .mt-card-connector::before { content:""; position:absolute; inset-inline:0; top:50%; border-top:1.5px dashed var(--border); }
+        .mt-card-connector-icon { position:relative; z-index:1; background:var(--surface); color:var(--muted); display:flex; align-items:center; justify-content:center; padding:0 3px; }
+        .mt-card-duration-pill { position:absolute; top:-15px; left:50%; transform:translateX(-50%); z-index:1; background:var(--bg); border:1px solid var(--border); border-radius:20px; padding:1px 7px; font-size:10px; font-weight:600; color:var(--muted); white-space:nowrap; }
+        .mt-card-bottom { display:flex; align-items:center; justify-content:space-between; }
         .mt-card-icons { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
         .mt-card-icons .mt-link-icon { padding:4px; }
         .mt-route-mini { display:flex; align-items:center; gap:2px; }
@@ -4868,10 +4877,10 @@ export default function MyTripApp() {
         @media (max-width: 640px) {
           .mt-group-footer-actions { flex-wrap:nowrap; gap:8px; justify-content:flex-start; }
           .mt-group-footer-actions .mt-group-add { font-size:11px; white-space:nowrap; }
-          .mt-header-row1 { padding-block:8px 4px; padding-inline-start:8px; padding-inline-end:2px; }
+          .mt-header-row1 { padding-block:8px 4px; padding-inline-start:8px; padding-inline-end:0; }
           .mt-header-actions { padding:4px 10px; }
           .mt-toolbar { padding:4px 10px 8px; gap:5px; }
-          .mt-content { padding-inline-start:8px; padding-inline-end:2px; padding-block-end:32px; }
+          .mt-content { padding-inline-start:8px; padding-inline-end:0; padding-block-end:32px; }
           .mt-frame-header { padding:12px 10px; gap:7px; }
           .mt-frame-actions button, .mt-row-actions button { min-width:32px; min-height:32px; justify-content:center; }
           .mt-group-header { padding:5px 6px; }
