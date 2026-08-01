@@ -21,7 +21,7 @@ import {
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.25.0";
+const APP_VERSION = "22.25.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -4873,7 +4873,7 @@ export default function MyTripApp() {
         .mt-loc-results { display:flex; flex-direction:column; gap:5px; max-height:220px; overflow-y:auto; }
         .mt-loc-result { text-align:start; border:1px solid var(--border); border-radius:8px; padding:7px 9px; font-size:12px; background:#fff; }
         .mt-loc-result:hover { background:var(--teal-tint); border-color:var(--teal); }
-        .mt-cards { display:flex; flex-direction:column; gap:0; position:relative; }
+        .mt-cards { display:flex; flex-direction:column; gap:5px; position:relative; }
         .mt-card { background:var(--surface); border:1px solid #CBD8D2; border-radius:12px; padding:14px 16px; display:flex; flex-direction:column; gap:10px; position:relative; z-index:1; box-shadow:0 1px 3px rgba(30,42,40,0.08), 0 4px 14px rgba(30,42,40,0.09); }
         .mt-card-header { display:flex; align-items:center; gap:9px; }
         .mt-card-title { font-size:13.5px; font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:right; }
