@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.38.0";
+const APP_VERSION = "22.39.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -218,6 +218,7 @@ const T_DICT = {
     fileUploadNeedsSignIn: "הקובץ נשמר רק באופן זמני — התחבר עם Google כדי שהוא יישמר בענן ויישאר גם אחרי רענון.",
     fileManagerEmpty: "עדיין לא הועלו קבצים. קבצים שתעלה בכל מקום באפליקציה (כמו צ'ק ליסט) יופיעו כאן.",
     checklistShopping: "רשימת קניות", checklistPacking: "ארגון ציוד לטיסה", checklistUpload: "העלה מסמך", checklistAddItem: "הוסף פריט...",
+    checklistDocTitlePrompt: "כותרת קצרה לקובץ (יוצג כרמז בעת ריחוף על הסמל):",
     checklistPackingSub: "{n} מתוך {total} הושלמו", checklistShoppingSub: "{n} פריטים", checklistShoppingEmpty: "הרשימה ריקה — הוסף פריט למטה",
     deleteFrameOnly: "מחק מסגרת בלבד (התוכן יעבור למסגרת האם)", deleteFrameWithContent: "מחק מסגרת ואת כל התוכן שבתוכה",
     type: "תיאור", from: "מוצא", to: "יעד", start: "בשעה", end: "עד שעה", overnight: "חוצה חצות", arrivalMethod: "אמצעי הגעה",
@@ -401,6 +402,7 @@ const T_DICT = {
     fileUploadNeedsSignIn: "The file is only stored temporarily — sign in with Google so it's saved to the cloud and survives a refresh.",
     fileManagerEmpty: "No files uploaded yet. Files you upload anywhere in the app (like the checklist) will appear here.",
     checklistShopping: "Shopping List", checklistPacking: "Flight Packing", checklistUpload: "Upload document", checklistAddItem: "Add item...",
+    checklistDocTitlePrompt: "Short title for this file (shown as a tooltip when hovering the icon):",
     checklistPackingSub: "{n} of {total} done", checklistShoppingSub: "{n} items", checklistShoppingEmpty: "List is empty — add an item below",
     deleteFrameOnly: "Delete frame only (content moves to parent)", deleteFrameWithContent: "Delete frame and all its content",
     type: "Description", from: "Origin", to: "Destination", start: "At", end: "Until", overnight: "Crosses midnight", arrivalMethod: "Arrival method",
@@ -2478,18 +2480,21 @@ function ChecklistRow({ item, cat, lang, T, onToggle, onUpload, onRemoveDoc, onR
         <input type="checkbox" checked={!!item.checked} onChange={() => onToggle(cat, item.id)} />
         <span className={item.checked ? "mt-checklist-done" : ""}>{label}</span>
       </label>
-      {cat !== "packing" && (item.doc ? (
-        <span className="mt-checklist-doc-chip">
-          {item.docUrl ? (
-            <a href={item.docUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}><Paperclip size={12} /> {item.doc}</a>
-          ) : (
-            <><Paperclip size={12} /> {item.doc}</>
-          )}
-          <button className="mt-checklist-doc-x" onClick={() => onRemoveDoc(cat, item.id)}><X size={11} /></button>
+      {cat !== "packing" && (
+        <span className="mt-checklist-docs-row">
+          {(item.docs || []).map((doc) => (
+            <span key={doc.id} className="mt-checklist-doc-icon-wrap">
+              {doc.url ? (
+                <a href={doc.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="mt-checklist-doc-icon" title={doc.title}><Paperclip size={14} /></a>
+              ) : (
+                <span className="mt-checklist-doc-icon" title={doc.title}><Paperclip size={14} /></span>
+              )}
+              <button className="mt-checklist-doc-x" onClick={() => onRemoveDoc(cat, item.id, doc.id)}><X size={9} /></button>
+            </span>
+          ))}
+          <button className="mt-btn ghost mt-checklist-upload-btn" onClick={() => onUpload(cat, item.id)} title={T.checklistUpload}><Paperclip size={14} /></button>
         </span>
-      ) : (
-        <button className="mt-btn ghost mt-checklist-upload-btn" onClick={() => onUpload(cat, item.id)} title={T.checklistUpload}><Paperclip size={14} /></button>
-      ))}
+      )}
       {onRemove && <button className="mt-btn ghost" style={{ padding: "2px 6px" }} onClick={() => onRemove(cat, item.id)}><X size={12} /></button>}
     </div>
   );
@@ -3488,12 +3493,12 @@ export default function MyTripApp() {
     const item = checklist[cat].find((it) => it.id === id);
     const label = item ? (lang === "he" ? item.label_he : item.label_en) : "";
     setChecklistUploadTarget(null);
+    const defaultTitle = file.name.replace(/\.[^.]+$/, "");
+    const title = (window.prompt(T.checklistDocTitlePrompt, defaultTitle) || defaultTitle).trim();
     if (!cloudUser) {
-      setChecklist((c) => ({ ...c, [cat]: c[cat].map((it) => (it.id === id ? { ...it, doc: file.name, docUrl: null, docPath: null } : it)) }));
-      setManagedFiles((prev) => [
-        ...prev.filter((f) => !(f.sourceCat === cat && f.sourceId === id)),
-        { id: uid(), name: file.name, url: null, path: null, size: file.size, type: inferFileType(file.name), sourceCat: cat, sourceId: id, sourceLabel: label, uploadedAt: Date.now() },
-      ]);
+      const doc = { id: uid(), name: file.name, title, url: null, path: null };
+      setChecklist((c) => ({ ...c, [cat]: c[cat].map((it) => (it.id === id ? { ...it, docs: [...(it.docs || []), doc] } : it)) }));
+      setManagedFiles((prev) => [...prev, { id: doc.id, name: file.name, url: null, path: null, size: file.size, type: inferFileType(file.name), sourceCat: cat, sourceId: id, sourceLabel: label, uploadedAt: Date.now() }]);
       setFileUploadMsg({ ok: false, reason: "not-signed-in" });
       setTimeout(() => setFileUploadMsg(null), 6000);
       return;
@@ -3503,17 +3508,16 @@ export default function MyTripApp() {
     setFileUploadMsg(uploaded ? { ok: true } : { ok: false, reason: "error" });
     setTimeout(() => setFileUploadMsg(null), 4000);
     if (!uploaded) return;
-    setChecklist((c) => ({ ...c, [cat]: c[cat].map((it) => (it.id === id ? { ...it, doc: file.name, docUrl: uploaded.url, docPath: uploaded.path } : it)) }));
-    setManagedFiles((prev) => [
-      ...prev.filter((f) => !(f.sourceCat === cat && f.sourceId === id)),
-      { id: uid(), name: file.name, url: uploaded.url, path: uploaded.path, size: file.size, type: inferFileType(file.name), sourceCat: cat, sourceId: id, sourceLabel: label, uploadedAt: Date.now() },
-    ]);
+    const doc = { id: uid(), name: file.name, title, url: uploaded.url, path: uploaded.path };
+    setChecklist((c) => ({ ...c, [cat]: c[cat].map((it) => (it.id === id ? { ...it, docs: [...(it.docs || []), doc] } : it)) }));
+    setManagedFiles((prev) => [...prev, { id: doc.id, name: file.name, url: uploaded.url, path: uploaded.path, size: file.size, type: inferFileType(file.name), sourceCat: cat, sourceId: id, sourceLabel: label, uploadedAt: Date.now() }]);
   }
-  function removeChecklistDoc(cat, id) {
+  function removeChecklistDoc(cat, id, docId) {
     const item = checklist[cat].find((it) => it.id === id);
-    if (item && item.docPath) deleteFileFromStorage(item.docPath);
-    setChecklist((c) => ({ ...c, [cat]: c[cat].map((it) => (it.id === id ? { ...it, doc: null, docUrl: null, docPath: null } : it)) }));
-    setManagedFiles((prev) => prev.filter((f) => !(f.sourceCat === cat && f.sourceId === id)));
+    const doc = item && (item.docs || []).find((d) => d.id === docId);
+    if (doc && doc.path) deleteFileFromStorage(doc.path);
+    setChecklist((c) => ({ ...c, [cat]: c[cat].map((it) => (it.id === id ? { ...it, docs: (it.docs || []).filter((d) => d.id !== docId) } : it)) }));
+    setManagedFiles((prev) => prev.filter((f) => f.id !== docId));
   }
   function openRowUpload(kind) {
     setRowUploadKind(kind);
@@ -5092,10 +5096,12 @@ export default function MyTripApp() {
         .mt-checkbox-row { display:flex; align-items:center; gap:7px; font-size:12.5px; }
         .mt-checklist-row { display:flex; align-items:center; gap:8px; padding:8px 4px; border-bottom:1px solid var(--border); }
         a.mt-checklist-row { text-decoration:none; color:inherit; cursor:pointer; }
-        .mt-checklist-doc-chip a { display:flex; align-items:center; gap:4px; text-decoration:none; color:inherit; }
+        a.mt-checklist-doc-icon { text-decoration:none; }
         .mt-checklist-done { text-decoration:line-through; color:var(--muted); }
-        .mt-checklist-doc-chip { display:flex; align-items:center; gap:4px; background:var(--teal-tint); color:var(--teal-dark); font-size:11px; font-weight:600; padding:4px 8px; border-radius:20px; white-space:nowrap; }
-        .mt-checklist-doc-x { border:none; background:none; color:var(--teal-dark); padding:0; display:flex; }
+        .mt-checklist-docs-row { display:flex; align-items:center; gap:5px; }
+        .mt-checklist-doc-icon-wrap { position:relative; display:flex; }
+        .mt-checklist-doc-icon { display:flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:8px; background:var(--teal-tint); color:var(--teal-dark); }
+        .mt-checklist-doc-x { position:absolute; top:-4px; inset-inline-end:-4px; border:1px solid var(--surface); background:var(--danger); color:#fff; border-radius:50%; width:13px; height:13px; padding:0; display:flex; align-items:center; justify-content:center; }
         .mt-checklist-upload-btn { padding:6px; display:flex; align-items:center; justify-content:center; }
         .mt-checklist-progress-wrap { display:flex; align-items:center; gap:10px; padding:12px 20px 10px; position:sticky; top:0; z-index:5; background:var(--surface); border-bottom:1px solid var(--border); }
         .mt-checklist-progress-track { flex:1; height:8px; border-radius:4px; background:var(--border); overflow:hidden; }
