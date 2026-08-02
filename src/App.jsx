@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.36.0";
+const APP_VERSION = "22.37.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -275,7 +275,7 @@ const T_DICT = {
     tryGooglePlacesReal: "חפש עם Google Places", usingGooglePlaces: "✓ מחפש עם Google Places",
     noGoogleKeyConfigured: "חיפוש מיקום דורש מפתח Google Places API מוגדר (VITE_GOOGLE_PLACES_KEY). פנה למפתח האפליקציה.",
     locFallbackNoResults: "Google Places אינו זמין כרגע. נעשה ניסיון חיפוש גיבוי (OpenStreetMap), אך לא נמצאו תוצאות. נסה ניסוח מדויק יותר.",
-    uploadFile: "העלה קובץ לרשומה זו — הדגמה", demoNeedsStorage: "העלאת קבצים דורשת שירות אחסון (כמו Supabase Storage או S3), עדיין לא מחובר בפרוטוטייפ. זו הצגה בלבד.",
+    uploadFile: "העלה קובץ לרשומה זו", demoNeedsStorage: "העלאת קבצים דורשת שירות אחסון (כמו Supabase Storage או S3), עדיין לא מחובר בפרוטוטייפ. זו הצגה בלבד.",
     aiDemoNotice: "זו הדגמת ממשק בלבד. חיבור אמיתי ל-Claude דורש שרת/פונקציה בצד השרת (לא ניתן לחשוף מפתח API בצד הלקוח).",
     aiSuggestItinerary: "הצע מסלול יומי אוטומטי", aiInputPlaceholder: "שאל שאלה על הטיול...",
     aiSuggestDemoText: "דוגמה להצעה (הדגמה): יום 2 — בוקר: ביקור בקולוסיאום (09:00), צהריים: ארוחה בטרסטבר, אחה״צ: מזרקת טרווי ופנתיאון. לחיבור אמיתי נדרש שרת שמפעיל את Claude API.",
@@ -457,7 +457,7 @@ const T_DICT = {
     tryGooglePlacesReal: "Search with Google Places", usingGooglePlaces: "✓ Searching with Google Places",
     noGoogleKeyConfigured: "Location search requires a configured Google Places API key (VITE_GOOGLE_PLACES_KEY). Contact the app developer.",
     locFallbackNoResults: "Google Places is currently unavailable. A backup search (OpenStreetMap) was attempted but found no results. Try a more precise search term.",
-    uploadFile: "Upload a file for this record — preview", demoNeedsStorage: "File uploads need a storage service (like Supabase Storage or S3), not yet connected in the prototype. This is a preview only.",
+    uploadFile: "Upload a file for this record", demoNeedsStorage: "File uploads need a storage service (like Supabase Storage or S3), not yet connected in the prototype. This is a preview only.",
     aiDemoNotice: "This is a UI preview only. A real Claude connection needs a server-side function (an API key can't be exposed client-side).",
     aiSuggestItinerary: "Suggest an automatic day plan", aiInputPlaceholder: "Ask a question about the trip...",
     aiSuggestDemoText: "Example suggestion (demo): Day 2 — Morning: visit the Colosseum (9:00), Lunch in Trastevere, Afternoon: Trevi Fountain and the Pantheon. A real connection needs a server running the Claude API.",
@@ -3153,6 +3153,9 @@ export default function MyTripApp() {
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [checklist, setChecklist] = useState(CHECKLIST_DEFAULTS);
   const checklistFileInputRef = useRef(null);
+  const rowFileInputRef = useRef(null);
+  const rowPhotoInputRef = useRef(null);
+  const [rowUploadKind, setRowUploadKind] = useState(null);
   const [checklistUploadTarget, setChecklistUploadTarget] = useState(null);
   const [fileUploadMsg, setFileUploadMsg] = useState(null);
   const [managedFiles, setManagedFiles] = useState([]);
@@ -3474,6 +3477,38 @@ export default function MyTripApp() {
     if (item && item.docPath) deleteFileFromStorage(item.docPath);
     setChecklist((c) => ({ ...c, [cat]: c[cat].map((it) => (it.id === id ? { ...it, doc: null, docUrl: null, docPath: null } : it)) }));
     setManagedFiles((prev) => prev.filter((f) => !(f.sourceCat === cat && f.sourceId === id)));
+  }
+  function openRowUpload(kind) {
+    setRowUploadKind(kind);
+    const ref = kind === "photo" ? rowPhotoInputRef : rowFileInputRef;
+    if (ref.current) { ref.current.value = ""; ref.current.click(); }
+  }
+  async function handleRowFileSelected(e) {
+    const file = e.target.files && e.target.files[0];
+    const kind = rowUploadKind;
+    setRowUploadKind(null);
+    if (!file || !cardDraft) return;
+    const tm = typeMeta(cardDraft.typeId, types, T, lang);
+    const label = cardDraft.toAlias || cardDraft.to || tm.name;
+    if (!cloudUser) {
+      setFileUploadMsg({ ok: false, reason: "not-signed-in" });
+      setTimeout(() => setFileUploadMsg(null), 6000);
+      return;
+    }
+    setFileUploadMsg({ uploading: true });
+    const uploaded = await uploadFileToStorage(file);
+    setFileUploadMsg(uploaded ? { ok: true } : { ok: false, reason: "error" });
+    setTimeout(() => setFileUploadMsg(null), 4000);
+    if (!uploaded) return;
+    const attachment = { id: uid(), name: file.name, url: uploaded.url, path: uploaded.path, type: kind === "photo" ? "image" : inferFileType(file.name) };
+    setCardDraft((d) => ({ ...d, attachments: [...(d.attachments || []), attachment] }));
+    setManagedFiles((prev) => [...prev, { id: attachment.id, name: attachment.name, url: attachment.url, path: attachment.path, type: attachment.type, sourceCat: "record", sourceId: cardDraft.id, sourceLabel: label, uploadedAt: Date.now() }]);
+  }
+  function removeRowAttachment(attId) {
+    const att = (cardDraft.attachments || []).find((a) => a.id === attId);
+    if (att && att.path) deleteFileFromStorage(att.path);
+    setCardDraft((d) => ({ ...d, attachments: (d.attachments || []).filter((a) => a.id !== attId) }));
+    setManagedFiles((prev) => prev.filter((f) => f.id !== attId));
   }
   function openHelpTopic(topic) {
     setActionsMenuOpen(false);
@@ -6061,10 +6096,24 @@ export default function MyTripApp() {
                   ))}
                 </div>
               </div>
-              <button className="mt-file-demo" onClick={() => showDemoNotice(T.demoNeedsStorage)}>
+              <input ref={rowFileInputRef} type="file" style={{ display: "none" }} onChange={handleRowFileSelected} />
+              <input ref={rowPhotoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleRowFileSelected} />
+              {fileUploadMsg && (
+                <p className="mt-hint" style={{ color: fileUploadMsg.ok ? "var(--teal)" : "var(--danger)", margin: "0 0 8px" }}>
+                  {fileUploadMsg.uploading ? T.fileUploading : fileUploadMsg.ok ? T.fileUploadSuccess : fileUploadMsg.reason === "not-signed-in" ? T.fileUploadNeedsSignIn : T.fileUploadError}
+                </p>
+              )}
+              {(cardDraft.attachments || []).map((att) => (
+                <div className="mt-checklist-row" key={att.id}>
+                  <span className="mt-file-manager-icon">{att.type === "image" ? <ImagePlus size={15} /> : <FileUp size={15} />}</span>
+                  {att.url ? <a className="mt-file-manager-info" href={att.url} target="_blank" rel="noreferrer"><strong>{att.name}</strong></a> : <span className="mt-file-manager-info"><strong>{att.name}</strong></span>}
+                  <button className="mt-btn ghost" style={{ padding: "2px 6px" }} onClick={() => removeRowAttachment(att.id)}><X size={12} /></button>
+                </div>
+              ))}
+              <button className="mt-file-demo" onClick={() => openRowUpload("file")}>
                 <FileUp size={16} /> <span>{T.uploadFile}</span>
               </button>
-              <button className="mt-file-demo" onClick={() => showDemoNotice(T.demoNeedsStorage)}>
+              <button className="mt-file-demo" onClick={() => openRowUpload("photo")}>
                 <ImagePlus size={16} /> <span>{T.uploadPhotos}</span>
               </button>
               {columns.filter((c) => c.custom).map((c) => (
