@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.40.0";
+const APP_VERSION = "22.41.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -279,6 +279,7 @@ const T_DICT = {
     noGoogleKeyConfigured: "חיפוש מיקום דורש מפתח Google Places API מוגדר (VITE_GOOGLE_PLACES_KEY). פנה למפתח האפליקציה.",
     locFallbackNoResults: "Google Places אינו זמין כרגע. נעשה ניסיון חיפוש גיבוי (OpenStreetMap), אך לא נמצאו תוצאות. נסה ניסוח מדויק יותר.",
     uploadFile: "העלה קובץ לרשומה זו", demoNeedsStorage: "העלאת קבצים דורשת שירות אחסון (כמו Supabase Storage או S3), עדיין לא מחובר בפרוטוטייפ. זו הצגה בלבד.",
+    attachedFilesCount: "{n} קבצים מצורפים",
     aiDemoNotice: "זו הדגמת ממשק בלבד. חיבור אמיתי ל-Claude דורש שרת/פונקציה בצד השרת (לא ניתן לחשוף מפתח API בצד הלקוח).",
     aiSuggestItinerary: "הצע מסלול יומי אוטומטי", aiInputPlaceholder: "שאל שאלה על הטיול...",
     aiSuggestDemoText: "דוגמה להצעה (הדגמה): יום 2 — בוקר: ביקור בקולוסיאום (09:00), צהריים: ארוחה בטרסטבר, אחה״צ: מזרקת טרווי ופנתיאון. לחיבור אמיתי נדרש שרת שמפעיל את Claude API.",
@@ -463,6 +464,7 @@ const T_DICT = {
     noGoogleKeyConfigured: "Location search requires a configured Google Places API key (VITE_GOOGLE_PLACES_KEY). Contact the app developer.",
     locFallbackNoResults: "Google Places is currently unavailable. A backup search (OpenStreetMap) was attempted but found no results. Try a more precise search term.",
     uploadFile: "Upload a file for this record", demoNeedsStorage: "File uploads need a storage service (like Supabase Storage or S3), not yet connected in the prototype. This is a preview only.",
+    attachedFilesCount: "{n} attached files",
     aiDemoNotice: "This is a UI preview only. A real Claude connection needs a server-side function (an API key can't be exposed client-side).",
     aiSuggestItinerary: "Suggest an automatic day plan", aiInputPlaceholder: "Ask a question about the trip...",
     aiSuggestDemoText: "Example suggestion (demo): Day 2 — Morning: visit the Colosseum (9:00), Lunch in Trastevere, Afternoon: Trevi Fountain and the Pantheon. A real connection needs a server running the Claude API.",
@@ -3193,6 +3195,7 @@ export default function MyTripApp() {
   const rowFileInputRef = useRef(null);
   const rowPhotoInputRef = useRef(null);
   const [rowUploadKind, setRowUploadKind] = useState(null);
+  const [attachmentsExpanded, setAttachmentsExpanded] = useState(false);
   const [checklistUploadTarget, setChecklistUploadTarget] = useState(null);
   const [fileUploadMsg, setFileUploadMsg] = useState(null);
   const [managedFiles, setManagedFiles] = useState([]);
@@ -4416,7 +4419,7 @@ export default function MyTripApp() {
 
   /* ---------- record card ---------- */
   function openCard(row) {
-    setCardRowId(row.id); setCardDraft({ ...row }); setFlightLookupMsg(""); setWeatherData(null);
+    setCardRowId(row.id); setCardDraft({ ...row }); setFlightLookupMsg(""); setWeatherData(null); setAttachmentsExpanded(false);
     if (row.date) {
       const dest = row.to || row.toAlias || "";
       if (dest) {
@@ -4815,6 +4818,10 @@ export default function MyTripApp() {
         .mt-share-opt:hover { background:var(--bg); }
         .mt-share-opt.disabled { color:var(--muted); }
         .mt-file-demo { width:100%; display:flex; align-items:center; justify-content:center; gap:8px; border:1.5px dashed var(--border); border-radius:10px; padding:12px; background:var(--bg); color:var(--muted); font-size:12px; }
+        .mt-attachments-dropdown { border:1px solid var(--border); border-radius:10px; overflow:hidden; margin-bottom:8px; }
+        .mt-attachments-summary { width:100%; display:flex; align-items:center; gap:8px; border:none; background:var(--bg); padding:10px 12px; font-size:13px; font-weight:600; color:var(--ink); cursor:pointer; }
+        .mt-attachments-summary span { flex:1; text-align:start; }
+        .mt-attachments-grid { border-top:1px solid var(--border); display:flex; flex-wrap:wrap; gap:8px; padding:10px 12px; max-height:180px; overflow-y:auto; }
         .mt-file-demo:hover { border-color:var(--teal); color:var(--teal-dark); }
         .mt-ai-chat { display:flex; flex-direction:column; gap:6px; max-height:200px; overflow-y:auto; }
         .mt-ai-msg { font-size:12.5px; padding:8px 10px; border-radius:10px; max-width:85%; line-height:1.4; }
@@ -6159,13 +6166,29 @@ export default function MyTripApp() {
                   {fileUploadMsg.uploading ? T.fileUploading : fileUploadMsg.ok ? T.fileUploadSuccess : fileUploadMsg.reason === "not-signed-in" ? T.fileUploadNeedsSignIn : T.fileUploadError}
                 </p>
               )}
-              {(cardDraft.attachments || []).map((att) => (
-                <div className="mt-checklist-row" key={att.id}>
-                  <span className="mt-file-manager-icon">{att.type === "image" ? <ImagePlus size={15} /> : <FileUp size={15} />}</span>
-                  {att.url ? <a className="mt-file-manager-info" href={att.url} target="_blank" rel="noreferrer"><strong>{att.name}</strong></a> : <span className="mt-file-manager-info"><strong>{att.name}</strong></span>}
-                  <button className="mt-btn ghost" style={{ padding: "2px 6px" }} onClick={() => removeRowAttachment(att.id)}><X size={12} /></button>
+              {(cardDraft.attachments || []).length > 0 && (
+                <div className="mt-attachments-dropdown">
+                  <button type="button" className="mt-attachments-summary" onClick={() => setAttachmentsExpanded((v) => !v)}>
+                    <Paperclip size={14} />
+                    <span>{T.attachedFilesCount.replace("{n}", cardDraft.attachments.length)}</span>
+                    {attachmentsExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  </button>
+                  {attachmentsExpanded && (
+                    <div className="mt-attachments-grid">
+                      {cardDraft.attachments.map((att) => (
+                        <span key={att.id} className="mt-checklist-doc-icon-wrap">
+                          {att.url ? (
+                            <a href={att.url} target="_blank" rel="noreferrer" className="mt-checklist-doc-icon" title={att.name}>{att.type === "image" ? <ImagePlus size={14} /> : <FileUp size={14} />}</a>
+                          ) : (
+                            <span className="mt-checklist-doc-icon" title={att.name}>{att.type === "image" ? <ImagePlus size={14} /> : <FileUp size={14} />}</span>
+                          )}
+                          <button className="mt-checklist-doc-x" onClick={() => removeRowAttachment(att.id)}><X size={9} /></button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              ))}
+              )}
               <button className="mt-file-demo" onClick={() => openRowUpload("file")}>
                 <FileUp size={16} /> <span>{T.uploadFile}</span>
               </button>
