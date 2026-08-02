@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.45.1";
+const APP_VERSION = "22.46.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -298,6 +298,8 @@ const T_DICT = {
     wizardTitle: "שאלון תכנון טיול", wizardStepOf: "שלב {n} מתוך {total}",
     wizardTripName: "שם הטיול", wizardTripNameHint: "לדוגמה: הטיול המשפחתי לאיטליה",
     hotelName: "שם המלון", aliasLabel: "כינוי", date: "תאריך", checkIn: "צ'ק-אין", checkOut: "צ'ק-אאוט",
+    wizardHotelNameHint: "לדוגמה: מלון הילטון", wizardAliasHint: "לדוגמה: המלון בעיר הבירה",
+    wizardFromHint: "לדוגמה: שדה התעופה בן גוריון", wizardToHint: "לדוגמה: שדה התעופה סוברנבהומי",
     yes: "כן", no: "לא", skip: "דלג", wizardStartBtn: "התחל",
     preWizardTitle: "ארגן את הטיול הבא", preWizardIntro: "כמה שאלות קצרות יעזרו לנו להקים עבורך את שלד הטיול. אפשר לדלג בכל שלב.",
     preWizardQ1: "מהם יעדי הטיול?", preWizardQ2: "כמה טיסות בינלאומיות מתוכננות?",
@@ -484,6 +486,8 @@ const T_DICT = {
     wizardTitle: "Trip planning questionnaire", wizardStepOf: "Step {n} of {total}",
     wizardTripName: "Trip name", wizardTripNameHint: "e.g. Our family trip to Italy",
     hotelName: "Hotel name", aliasLabel: "Nickname", date: "Date", checkIn: "Check-in", checkOut: "Check-out",
+    wizardHotelNameHint: "e.g. Hilton Hotel", wizardAliasHint: "e.g. The downtown hotel",
+    wizardFromHint: "e.g. Ben Gurion Airport", wizardToHint: "e.g. Suvarnabhumi Airport",
     yes: "Yes", no: "No", skip: "Skip", wizardStartBtn: "Start",
     preWizardTitle: "Organize your next trip", preWizardIntro: "A few quick questions will help us set up the trip skeleton for you. You can skip at any step.",
     preWizardQ1: "What are the trip's destinations?", preWizardQ2: "How many international flights are planned?",
@@ -1934,7 +1938,7 @@ function DateField({ value, onChange, lang, T, initialViewMonth }) {
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
   const monthLabel = viewMonth.toLocaleDateString(lang === "he" ? "he-IL" : "en-US", { month: "long", year: "numeric" });
   return (
-    <div style={{ position: "relative" }}>
+    <div className="mt-datefield-wrap" style={{ position: "relative" }}>
       <button ref={refs.setReference} type="button" className="mt-daterange-btn" onClick={toggleOpen}>
         <CalendarIcon size={14} />
         <span>{value ? fmtDate(value, lang) : "—"}</span>
@@ -2008,7 +2012,7 @@ function DateRangeField({ startDate, endDate, onChange, lang, T, initialViewMont
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
   const monthLabel = viewMonth.toLocaleDateString(lang === "he" ? "he-IL" : "en-US", { month: "long", year: "numeric" });
   return (
-    <div style={{ position: "relative" }}>
+    <div className="mt-datefield-wrap" style={{ position: "relative" }}>
       <button ref={refs.setReference} type="button" className="mt-daterange-btn" onClick={toggleOpen}>
         <CalendarIcon size={14} />
         <span>{startDate ? fmtDate(startDate, lang) : "—"} – {endDate ? fmtDate(endDate, lang) : "—"}</span>
@@ -3141,7 +3145,7 @@ export default function MyTripApp() {
   const PRE_WIZARD_DEFAULTS = {
     hasTripPlan: "",
     // "yes" branch
-    tripName: "טיול מקיף תאילנד", travelerCount: "couple", destination: "תאילנד",
+    tripName: "", travelerCount: "couple", destination: "",
     planStartDate: "2026-08-01", planEndDate: "2026-08-31",
     // "no" branch (AI-assisted)
     noPlanTravelerCount: "", preferredDestinations: "", budgetLevel: "", interests: [],
@@ -3162,12 +3166,12 @@ export default function MyTripApp() {
     // step 4
     hasHotels: "yes",
     hotels: [
-      { name: "מלון בצ'אנג מאי", alias: "", checkIn: "2026-08-01", checkOut: "2026-08-09" },
-      { name: "מלון בקוסמוי", alias: "", checkIn: "2026-08-09", checkOut: "2026-08-12" },
-      { name: "מלון בקופנגאן", alias: "", checkIn: "2026-08-12", checkOut: "2026-08-16" },
-      { name: "מלון בפוקט", alias: "", checkIn: "2026-08-16", checkOut: "2026-08-23" },
-      { name: "מלון בקנצ'נבורי", alias: "", checkIn: "2026-08-23", checkOut: "2026-08-27" },
-      { name: "מלון בבנגקוק", alias: "", checkIn: "2026-08-27", checkOut: "2026-08-31" },
+      { name: "", alias: "", checkIn: "2026-08-01", checkOut: "2026-08-09" },
+      { name: "", alias: "", checkIn: "2026-08-09", checkOut: "2026-08-12" },
+      { name: "", alias: "", checkIn: "2026-08-12", checkOut: "2026-08-16" },
+      { name: "", alias: "", checkIn: "2026-08-16", checkOut: "2026-08-23" },
+      { name: "", alias: "", checkIn: "2026-08-23", checkOut: "2026-08-27" },
+      { name: "", alias: "", checkIn: "2026-08-27", checkOut: "2026-08-31" },
     ],
   };
   const [preWizardOpen, setPreWizardOpen] = useState(false);
@@ -5191,7 +5195,10 @@ export default function MyTripApp() {
         .mt-wizard-qa > *:not(label) { flex:1; min-width:0; }
         .mt-modal-body .mt-field { margin-bottom:14px; }
         .mt-wizard-qa label { flex:1 1 0; font-weight:700; font-size:12.5px; color:var(--ink); text-align:right; line-height:1.3; }
-        .mt-wizard-qa input, .mt-wizard-qa textarea, .mt-wizard-qa .mt-daterange-btn, .mt-wizard-qa .mt-datefield { flex:2 1 0; min-width:0; border:1px solid var(--border); border-radius:8px; padding:7px 9px; font-size:13px; font-family:inherit; box-sizing:border-box; text-align:right; color:var(--ink); }
+        .mt-wizard-qa input, .mt-wizard-qa textarea, .mt-wizard-qa .mt-datefield-wrap { flex:2 1 0; min-width:0; border:1px solid var(--border); border-radius:8px; font-size:13px; font-family:inherit; box-sizing:border-box; text-align:right; color:var(--ink); }
+        .mt-wizard-qa input, .mt-wizard-qa textarea { padding:7px 9px; }
+        .mt-wizard-qa .mt-datefield-wrap { border:none; }
+        .mt-wizard-qa .mt-datefield-wrap .mt-daterange-btn { width:100%; box-sizing:border-box; }
         .mt-wizard-qa input:focus { outline:none; border-color:var(--teal); }
         .mt-wizard-qa input[type="number"] { text-align:center; }
         .mt-wizard-choice { border:1.5px solid var(--border); background:var(--surface); color:var(--ink); border-radius:20px; padding:6px 14px; font-size:12.5px; font-weight:500; cursor:pointer; }
@@ -5699,7 +5706,13 @@ export default function MyTripApp() {
                   {preWizardData.hasTripPlan === "yes" && (
                     <>
                       <div className="mt-wizard-qa"><label>{T.preWizardQName}</label><input value={preWizardData.tripName} onChange={(e) => setPreWizardData({ ...preWizardData, tripName: e.target.value })} placeholder={T.wizardTripNameHint} /></div>
+                      <div className="mt-wizard-qa"><label>{T.preWizardDestination}</label><input value={preWizardData.destination} onChange={(e) => setPreWizardData({ ...preWizardData, destination: e.target.value })} placeholder={T.wizardDestinationHint} /></div>
                       <div className="mt-wizard-qa">
+                        <label>{T.preWizardTripDates}</label>
+                        <DateRangeField startDate={preWizardData.planStartDate} endDate={preWizardData.planEndDate} lang={lang} T={T} initialViewMonth={preWizardRefDate}
+                          onChange={(s, e) => { setPreWizardData({ ...preWizardData, planStartDate: s, planEndDate: e }); if (s) setPreWizardRefDate(s); }} />
+                      </div>
+                      <div className="mt-field">
                         <label>{T.preWizardTravelerCount}</label>
                         <div className="mt-wizard-choices">
                           {["solo", "couple", "family", "group"].map((k) => (
@@ -5707,18 +5720,12 @@ export default function MyTripApp() {
                           ))}
                         </div>
                       </div>
-                      <div className="mt-wizard-qa"><label>{T.preWizardDestination}</label><input value={preWizardData.destination} onChange={(e) => setPreWizardData({ ...preWizardData, destination: e.target.value })} /></div>
-                      <div className="mt-wizard-qa">
-                        <label>{T.preWizardTripDates}</label>
-                        <DateRangeField startDate={preWizardData.planStartDate} endDate={preWizardData.planEndDate} lang={lang} T={T} initialViewMonth={preWizardRefDate}
-                          onChange={(s, e) => { setPreWizardData({ ...preWizardData, planStartDate: s, planEndDate: e }); if (s) setPreWizardRefDate(s); }} />
-                      </div>
                     </>
                   )}
                   {preWizardData.hasTripPlan === "no" && (
                     <>
                       <div className="mt-section-label">{T.preWizardAiSectionLabel}</div>
-                      <div className="mt-wizard-qa">
+                      <div className="mt-field">
                         <label>{T.preWizardTravelerCount}</label>
                         <div className="mt-wizard-choices">
                           {["solo", "couple", "family", "group"].map((k) => (
@@ -5789,19 +5796,19 @@ export default function MyTripApp() {
                               {preWizardData.flights.length > 1 && <button className="mt-btn ghost" style={{ padding: "2px 6px", marginTop: "-8px" }} onClick={() => removePreWizardFlight(i)}><X size={12} /></button>}
                             </span>
                           </div>
-                          <div className="mt-wizard-qa">
+                          <div className="mt-field">
                             <label>{T.flightNoCheck}</label>
                             <div className="mt-field-inline">
                               <input value={f.flightNumber || ""} onChange={(e) => updatePreWizardArrayItem("flights", i, { flightNumber: e.target.value })} />
                               <button className="mt-btn ghost" onClick={() => fetchWizardFlightData("flights", i)}><Download size={13} /> {T.fetchFlightData}</button>
                             </div>
+                            <div className="mt-hint">{T.flightNoCheckHint}</div>
                           </div>
-                          <div className="mt-hint" style={{ marginTop: "-8px", marginBottom: 8 }}>{T.flightNoCheckHint}</div>
                           {f.flightLookupMsg && <div className="mt-hint" style={{ marginBottom: 8 }}>{f.flightLookupMsg}</div>}
-                          <div className="mt-wizard-qa"><label>{T.from}</label><div className="mt-field-inline" style={{ flex: 2 }}><input value={f.from} onChange={(e) => updatePreWizardArrayItem("flights", i, { from: e.target.value })} /><button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openWizardLocationPicker("flights", i, "from")}><MapPin size={13} /></button></div></div>
-                          <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={f.fromAlias} onChange={(e) => updatePreWizardArrayItem("flights", i, { fromAlias: e.target.value })} /></div>
-                          <div className="mt-wizard-qa"><label>{T.to}</label><div className="mt-field-inline" style={{ flex: 2 }}><input value={f.to} onChange={(e) => updatePreWizardArrayItem("flights", i, { to: e.target.value })} /><button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openWizardLocationPicker("flights", i, "to")}><MapPin size={13} /></button></div></div>
-                          <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={f.toAlias} onChange={(e) => updatePreWizardArrayItem("flights", i, { toAlias: e.target.value })} /></div>
+                          <div className="mt-wizard-qa"><label>{T.from}</label><div className="mt-field-inline" style={{ flex: 2 }}><input value={f.from} onChange={(e) => updatePreWizardArrayItem("flights", i, { from: e.target.value })} placeholder={T.wizardFromHint} /><button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openWizardLocationPicker("flights", i, "from")}><MapPin size={13} /></button></div></div>
+                          <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={f.fromAlias} onChange={(e) => updatePreWizardArrayItem("flights", i, { fromAlias: e.target.value })} placeholder={T.wizardAliasHint} /></div>
+                          <div className="mt-wizard-qa"><label>{T.to}</label><div className="mt-field-inline" style={{ flex: 2 }}><input value={f.to} onChange={(e) => updatePreWizardArrayItem("flights", i, { to: e.target.value })} placeholder={T.wizardToHint} /><button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openWizardLocationPicker("flights", i, "to")}><MapPin size={13} /></button></div></div>
+                          <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={f.toAlias} onChange={(e) => updatePreWizardArrayItem("flights", i, { toAlias: e.target.value })} placeholder={T.wizardAliasHint} /></div>
                           <div className="mt-wizard-qa">
                             <label>{T.date}</label>
                             <DateField value={f.depDate} lang={lang} T={T} initialViewMonth={preWizardRefDate} onChange={(e) => { updatePreWizardArrayItem("flights", i, { depDate: e.target.value }); if (e.target.value) setPreWizardRefDate(e.target.value); }} />
@@ -5841,19 +5848,19 @@ export default function MyTripApp() {
                               {preWizardData.domesticFlights.length > 1 && <button className="mt-btn ghost" style={{ padding: "2px 6px", marginTop: "-8px" }} onClick={() => removePreWizardDomesticFlight(i)}><X size={12} /></button>}
                             </span>
                           </div>
-                          <div className="mt-wizard-qa">
+                          <div className="mt-field">
                             <label>{T.flightNoCheck}</label>
                             <div className="mt-field-inline">
                               <input value={f.flightNumber || ""} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { flightNumber: e.target.value })} />
                               <button className="mt-btn ghost" onClick={() => fetchWizardFlightData("domesticFlights", i)}><Download size={13} /> {T.fetchFlightData}</button>
                             </div>
+                            <div className="mt-hint">{T.flightNoCheckHint}</div>
                           </div>
-                          <div className="mt-hint" style={{ marginTop: "-8px", marginBottom: 8 }}>{T.flightNoCheckHint}</div>
                           {f.flightLookupMsg && <div className="mt-hint" style={{ marginBottom: 8 }}>{f.flightLookupMsg}</div>}
-                          <div className="mt-wizard-qa"><label>{T.from}</label><div className="mt-field-inline" style={{ flex: 2 }}><input value={f.from} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { from: e.target.value })} /><button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openWizardLocationPicker("domesticFlights", i, "from")}><MapPin size={13} /></button></div></div>
-                          <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={f.fromAlias} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { fromAlias: e.target.value })} /></div>
-                          <div className="mt-wizard-qa"><label>{T.to}</label><div className="mt-field-inline" style={{ flex: 2 }}><input value={f.to} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { to: e.target.value })} /><button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openWizardLocationPicker("domesticFlights", i, "to")}><MapPin size={13} /></button></div></div>
-                          <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={f.toAlias} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { toAlias: e.target.value })} /></div>
+                          <div className="mt-wizard-qa"><label>{T.from}</label><div className="mt-field-inline" style={{ flex: 2 }}><input value={f.from} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { from: e.target.value })} placeholder={T.wizardFromHint} /><button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openWizardLocationPicker("domesticFlights", i, "from")}><MapPin size={13} /></button></div></div>
+                          <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={f.fromAlias} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { fromAlias: e.target.value })} placeholder={T.wizardAliasHint} /></div>
+                          <div className="mt-wizard-qa"><label>{T.to}</label><div className="mt-field-inline" style={{ flex: 2 }}><input value={f.to} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { to: e.target.value })} placeholder={T.wizardToHint} /><button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openWizardLocationPicker("domesticFlights", i, "to")}><MapPin size={13} /></button></div></div>
+                          <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={f.toAlias} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { toAlias: e.target.value })} placeholder={T.wizardAliasHint} /></div>
                           <div className="mt-wizard-qa">
                             <label>{T.date}</label>
                             <DateField value={f.depDate} lang={lang} T={T} initialViewMonth={preWizardRefDate} onChange={(e) => { updatePreWizardArrayItem("domesticFlights", i, { depDate: e.target.value }); if (e.target.value) setPreWizardRefDate(e.target.value); }} />
@@ -5893,9 +5900,9 @@ export default function MyTripApp() {
                               {preWizardData.hotels.length > 1 && <button className="mt-btn ghost" style={{ padding: "2px 6px", marginTop: "-8px" }} onClick={() => removePreWizardHotel(i)}><X size={12} /></button>}
                             </span>
                           </div>
-                          <div className="mt-wizard-qa"><label>{T.hotelName}</label><div className="mt-field-inline" style={{ flex: 2 }}><input value={h.name} onChange={(e) => updatePreWizardArrayItem("hotels", i, { name: e.target.value })} /><button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openWizardLocationPicker("hotels", i, "name")}><MapPin size={13} /></button></div></div>
-                          <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={h.alias} onChange={(e) => updatePreWizardArrayItem("hotels", i, { alias: e.target.value })} /></div>
-                          <div className="mt-wizard-qa">
+                          <div className="mt-wizard-qa"><label>{T.hotelName}</label><div className="mt-field-inline" style={{ flex: 2 }}><input value={h.name} onChange={(e) => updatePreWizardArrayItem("hotels", i, { name: e.target.value })} placeholder={T.wizardHotelNameHint} /><button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openWizardLocationPicker("hotels", i, "name")}><MapPin size={13} /></button></div></div>
+                          <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={h.alias} onChange={(e) => updatePreWizardArrayItem("hotels", i, { alias: e.target.value })} placeholder={T.wizardAliasHint} /></div>
+                          <div className="mt-field">
                             <label>{T.checkInOut}</label>
                             <DateRangeField startDate={h.checkIn} endDate={h.checkOut} lang={lang} T={T} initialViewMonth={preWizardRefDate}
                               onChange={(s, e) => { updatePreWizardArrayItem("hotels", i, { checkIn: s, checkOut: e }); if (s) setPreWizardRefDate(s); }} />
