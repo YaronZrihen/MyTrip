@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.41.1";
+const APP_VERSION = "22.42.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1315,14 +1315,29 @@ function fetchJsonWithRetry(url, options, attemptsLeft) {
     return r.json();
   });
 }
+const __weatherCache = new Map();
 function fetchWeather(lat, lon, dateStr) {
-  return throttledCall(() => fetchJsonWithRetry(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&start_date=${dateStr}&end_date=${dateStr}`)
+  const key = `${Number(lat).toFixed(3)},${Number(lon).toFixed(3)}|${dateStr}`;
+  if (__weatherCache.has(key)) return __weatherCache.get(key);
+  // Open-Meteo's forecast endpoint only covers roughly the past 92 days to the next 16 days —
+  // a date outside that window always returns 400, so don't even try; just report "not available".
+  const daysAhead = Math.round((new Date(dateStr + "T00:00:00") - new Date(toLocalISODate(new Date()) + "T00:00:00")) / 86400000);
+  if (daysAhead < -92 || daysAhead > 16) {
+    const p = Promise.resolve(null);
+    __weatherCache.set(key, p);
+    return p;
+  }
+  const p = throttledCall(() => fetchJsonWithRetry(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&start_date=${dateStr}&end_date=${dateStr}`)
     .then((data) => {
       if (!data || !data.daily || !data.daily.time || !data.daily.time.length) return null;
       const codeArr = data.daily.weather_code || data.daily.weathercode;
       if (!codeArr) return null;
       return { code: codeArr[0], max: data.daily.temperature_2m_max[0], min: data.daily.temperature_2m_min[0] };
-    }));
+    })
+  ).then((result) => { if (!result) __weatherCache.delete(key); return result; })
+   .catch((err) => { __weatherCache.delete(key); throw err; });
+  __weatherCache.set(key, p);
+  return p;
 }
 
 const COL_WIDTHS = {
