@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.45.0";
+const APP_VERSION = "22.45.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -304,7 +304,7 @@ const T_DICT = {
     preWizardQ4: "האם מתוכננות טיסות פנים?", preWizardQ5: "כמה טיסות פנים מתוכננות?", preWizardQ6: "בין כמה מקומות לינה תדלגו?",
     preWizardFlightN: "טיסה {n}", preWizardHotelN: "מלון {n}", preWizardFlightDates: "תאריכי טיסה (הלוך – חזור)",
     preWizardDefineIntlFlights: "הגדר טיסות בינלאומיות", preWizardDefineDomesticFlights: "הגדר טיסות פנים", preWizardRoundTrip: "טיסת הלוך וחזור",
-    preWizardHasPlan: "האם יש לך תוכנית טיול?", preWizardQName: "שם הטיול", preWizardTravelerCount: "מספר מטיילים", preWizardDestination: "יעד",
+    preWizardHasPlan: "האם יש לך תוכנית טיול?", preWizardQName: "שם הטיול", preWizardTravelerCount: "מטיילים", preWizardDestination: "יעד",
     preWizardPreferredDest: "יעדים מועדפים", preWizardAccommodationPrefs: "העדפות לינה", preWizardNotes: "הערות, מגבלות ודרישות לתוכנית הטיול",
     preWizardAiPitch: "יש לי יכולות AI לתכנן לך מסלול טיול על פי הפרמטרים שהזנת. שם הטיול ייקבע לאחר תוצאות ה-AI.", preWizardActivateAi: "הפעל סוכן AI",
     preWizardHasFlights: "האם יש לך כרטיסי טיסה?", preWizardHasDomestic: "האם יש לך כרטיסי טיסות פנים?", preWizardHasHotels: "האם יש לך מלונות?", checkInOut: "צ'ק-אין / צ'ק-אאוט",
@@ -490,7 +490,7 @@ const T_DICT = {
     preWizardQ4: "Are domestic flights planned?", preWizardQ5: "How many domestic flights are planned?", preWizardQ6: "How many lodging places will you hop between?",
     preWizardFlightN: "Flight {n}", preWizardHotelN: "Hotel {n}", preWizardFlightDates: "Flight dates (there – back)",
     preWizardDefineIntlFlights: "Define international flights", preWizardDefineDomesticFlights: "Define domestic flights", preWizardRoundTrip: "Round-trip flight",
-    preWizardHasPlan: "Do you already have a trip plan?", preWizardQName: "Trip name", preWizardTravelerCount: "Number of travelers", preWizardDestination: "Destination",
+    preWizardHasPlan: "Do you already have a trip plan?", preWizardQName: "Trip name", preWizardTravelerCount: "Travelers", preWizardDestination: "Destination",
     preWizardPreferredDest: "Preferred destinations", preWizardAccommodationPrefs: "Accommodation preferences", preWizardNotes: "Notes, constraints and requirements for the trip plan",
     preWizardAiPitch: "I have AI capabilities to plan a route for you based on the parameters you entered. The trip name will be set after the AI results.", preWizardActivateAi: "Activate AI agent",
     preWizardHasFlights: "Do you have flight tickets?", preWizardHasDomestic: "Do you have domestic flight tickets?", preWizardHasHotels: "Do you have hotels?", checkInOut: "Check-in / Check-out",
@@ -4991,7 +4991,8 @@ export default function MyTripApp() {
         .mt-frame-end-group { display:flex; align-items:center; gap:8px; margin-inline-start:auto; flex-shrink:0; }
         .mt-frame-actions { display:flex; gap:2px; flex-shrink:0; }
         .mt-kebab-menu { min-width:180px; }
-        .mt-daterange-btn { display:flex; align-items:center; gap:7px; width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:13px; background:#fff; color:var(--ink); }
+        .mt-daterange-btn { display:flex; align-items:center; gap:7px; width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:13px; background:#fff; color:var(--ink); overflow:hidden; }
+        .mt-daterange-btn span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         .mt-datefield { display:flex; align-items:center; gap:7px; width:100%; border:1px solid var(--border); border-radius:8px; padding:6px 10px; background:#fff; color:var(--teal-dark); }
         .mt-datefield input[type="date"] { border:none; background:none; padding:0; font-size:13px; color:var(--ink); flex:1; font-family:inherit; position:relative; }
         .mt-datefield input[type="date"]::-webkit-calendar-picker-indicator { -webkit-appearance:none; appearance:none; position:absolute; inset:0; width:100%; height:100%; margin:0; padding:0; background:transparent; cursor:pointer; opacity:0; }
@@ -5186,7 +5187,7 @@ export default function MyTripApp() {
         .mt-wizard-subgroup { border:1px solid var(--border); border-radius:10px; padding:10px; margin-bottom:10px; background:var(--bg); }
         .mt-ai-suggest-box { border:1px solid var(--teal); border-radius:10px; padding:12px; margin-top:10px; background:var(--teal-tint); }
         .mt-wizard-qa { margin-bottom:14px; display:flex; align-items:center; gap:8px; }
-        .mt-wizard-qa > label { flex:0 0 100px; font-size:12.5px; font-weight:600; }
+        .mt-wizard-qa > label { flex:0 0 78px; font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         .mt-wizard-qa > *:not(label) { flex:1; min-width:0; }
         .mt-modal-body .mt-field { margin-bottom:14px; }
         .mt-wizard-qa label { flex:1 1 0; font-weight:700; font-size:12.5px; color:var(--ink); text-align:right; line-height:1.3; }
@@ -5194,6 +5195,8 @@ export default function MyTripApp() {
         .mt-wizard-qa input:focus { outline:none; border-color:var(--teal); }
         .mt-wizard-qa input[type="number"] { text-align:center; }
         .mt-wizard-choice { border:1.5px solid var(--border); background:var(--surface); color:var(--ink); border-radius:20px; padding:6px 14px; font-size:12.5px; font-weight:500; cursor:pointer; }
+        .mt-wizard-qa .mt-wizard-choices { gap:5px; margin-top:0; }
+        .mt-wizard-qa .mt-wizard-choice { padding:5px 8px; font-size:11px; white-space:nowrap; }
         .mt-wizard-choice.selected { background:var(--teal); border-color:var(--teal); color:#fff; }
         .mt-wizard-summary { margin-top:10px; padding:10px; background:var(--teal-tint); border-radius:8px; }
         .mt-loc-grid { display:grid; grid-template-columns:auto auto 2fr auto 1fr; align-items:center; gap:6px 6px; margin-top:4px; }
