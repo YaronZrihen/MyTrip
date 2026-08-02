@@ -12,7 +12,7 @@ import {
   Smartphone, Monitor, AlertTriangle, GripVertical, Check, FolderPlus, Sparkles,
   Route, Waypoints, Download, Upload, MapPin, Search, CircleCheck, Clock, ArrowDownUp, Copy, StickyNote, TrainFront,
   Bus, Motorbike, Bike, Scooter, Sailboat, ShipWheel, Anchor, Kayak, Helicopter, Caravan, Building2, Landmark, Home,
-  CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, BellRing, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2, MoreVertical, Menu, Calendar as CalendarIcon, Undo2, Redo2, Info, ExternalLink, Phone, Save, FolderOpen, ImagePlus, BookOpen, RefreshCw, Workflow, ArrowLeft, ArrowRight, CheckSquare, Paperclip, Briefcase, Compass, FolderTree, LayoutGrid, HelpCircle, Wine, Beer, PartyPopper, Mic2
+  CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, Cloud, Bell, BellRing, FileUp, Share2, UserPlus, MessageCircle, Printer, Wand2, MoreVertical, Menu, Calendar as CalendarIcon, Undo2, Redo2, Info, ExternalLink, Phone, Save, FolderOpen, ImagePlus, BookOpen, RefreshCw, Workflow, ArrowLeft, ArrowRight, CheckSquare, Paperclip, Briefcase, Compass, FolderTree, LayoutGrid, HelpCircle, Wine, Beer, PartyPopper, Mic2, FileText, FileSpreadsheet, FileArchive, Presentation
 } from "lucide-react";
 import { supabase, supabaseEnabled } from "./supabaseClient";
 
@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.37.0";
+const APP_VERSION = "22.38.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -213,6 +213,7 @@ const T_DICT = {
     preFlightChecklist: "צ'ק ליסט קדם טיסה", checklistReservations: "הזמנות", checklistDocuments: "מסמכי נסיעה", checklistOther: "נוספים",
     helpCenterTitle: "מרכז עזרה",
     fileManagerTitle: "ניהול קבצים", fileManagerFilter_all: "הכל", fileManagerFilter_byCategory: "לפי שייכות", fileManagerFilter_images: "תמונות", fileManagerFilter_documents: "מסמכים",
+    fileManagerRecordsFolder: "רשומות הטיול", fileSortName: "שם", fileSortDate: "תאריך", fileSortSize: "גודל",
     fileUploading: "מעלה קובץ…", fileUploadSuccess: "הקובץ הועלה ונשמר בענן.", fileUploadError: "העלאת הקובץ נכשלה, נסה שוב.",
     fileUploadNeedsSignIn: "הקובץ נשמר רק באופן זמני — התחבר עם Google כדי שהוא יישמר בענן ויישאר גם אחרי רענון.",
     fileManagerEmpty: "עדיין לא הועלו קבצים. קבצים שתעלה בכל מקום באפליקציה (כמו צ'ק ליסט) יופיעו כאן.",
@@ -395,6 +396,7 @@ const T_DICT = {
     preFlightChecklist: "Pre-Flight Checklist", checklistReservations: "Reservations", checklistDocuments: "Travel Documents", checklistOther: "Additional",
     helpCenterTitle: "Help Center",
     fileManagerTitle: "File Manager", fileManagerFilter_all: "All", fileManagerFilter_byCategory: "By Category", fileManagerFilter_images: "Images", fileManagerFilter_documents: "Documents",
+    fileManagerRecordsFolder: "Trip Records", fileSortName: "Name", fileSortDate: "Date", fileSortSize: "Size",
     fileUploading: "Uploading file…", fileUploadSuccess: "File uploaded and saved to the cloud.", fileUploadError: "File upload failed, try again.",
     fileUploadNeedsSignIn: "The file is only stored temporarily — sign in with Google so it's saved to the cloud and survives a refresh.",
     fileManagerEmpty: "No files uploaded yet. Files you upload anywhere in the app (like the checklist) will appear here.",
@@ -2512,21 +2514,45 @@ function CHECKLIST_CAT_LABEL(cat, T) {
   };
   return map[cat] || cat;
 }
-function FileManagerRow({ file, T, showCategory }) {
-  const Icon = file.type === "image" ? ImagePlus : FileUp;
+function FOLDER_LABEL(folderKey, T) {
+  if (folderKey === "record") return T.fileManagerRecordsFolder;
+  return CHECKLIST_CAT_LABEL(folderKey, T);
+}
+function formatFileSize(bytes) {
+  if (bytes == null) return "—";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+const FILE_TYPE_ICON = { image: ImagePlus, pdf: FileText, document: FileText, spreadsheet: FileSpreadsheet, presentation: Presentation, archive: FileArchive, other: FileUp };
+function FileManagerFolderRow({ folderKey, count, T, onOpen }) {
+  return (
+    <button className="mt-file-folder-row" onClick={onOpen}>
+      <span className="mt-file-manager-icon folder"><FolderOpen size={16} /></span>
+      <span className="mt-file-manager-info"><strong>{FOLDER_LABEL(folderKey, T)}</strong></span>
+      <span className="mt-hint">{count}</span>
+    </button>
+  );
+}
+function FileManagerFileRow({ file, T, lang }) {
+  const Icon = FILE_TYPE_ICON[file.type] || FileUp;
+  const d = new Date(file.uploadedAt);
+  const dateStr = `${fmtDate(toLocalISODate(d), lang)} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   const content = (
     <>
       <span className="mt-file-manager-icon"><Icon size={15} /></span>
       <span className="mt-file-manager-info">
         <strong>{file.name}</strong>
-        <span>{file.sourceLabel}{showCategory ? ` · ${CHECKLIST_CAT_LABEL(file.sourceCat, T)}` : ""}</span>
+        <span>{file.sourceLabel}</span>
       </span>
+      <span className="mt-file-manager-meta">{dateStr}</span>
+      <span className="mt-file-manager-meta">{formatFileSize(file.size)}</span>
     </>
   );
   return file.url ? (
-    <a className="mt-checklist-row" href={file.url} target="_blank" rel="noreferrer">{content}</a>
+    <a className="mt-checklist-row mt-file-row" href={file.url} target="_blank" rel="noreferrer">{content}</a>
   ) : (
-    <div className="mt-checklist-row">{content}</div>
+    <div className="mt-checklist-row mt-file-row">{content}</div>
   );
 }
 
@@ -3160,7 +3186,8 @@ export default function MyTripApp() {
   const [fileUploadMsg, setFileUploadMsg] = useState(null);
   const [managedFiles, setManagedFiles] = useState([]);
   const [fileManagerOpen, setFileManagerOpen] = useState(false);
-  const [fileManagerFilter, setFileManagerFilter] = useState("all");
+  const [fileManagerFolder, setFileManagerFolder] = useState(null);
+  const [fileManagerSort, setFileManagerSort] = useState({ key: "date", dir: "desc" });
   const [helpCenterOpen, setHelpCenterOpen] = useState(false);
   const [helpPopoverOpen, setHelpPopoverOpen] = useState(null);
   useEffect(() => { if (!actionsMenuOpen) setHelpPopoverOpen(null); }, [actionsMenuOpen]);
@@ -3438,7 +3465,17 @@ export default function MyTripApp() {
   }
   function inferFileType(filename) {
     const ext = (filename.split(".").pop() || "").toLowerCase();
-    return ["jpg", "jpeg", "png", "gif", "webp", "heic", "bmp", "svg"].includes(ext) ? "image" : "document";
+    if (["jpg", "jpeg", "png", "gif", "webp", "heic", "bmp", "svg"].includes(ext)) return "image";
+    if (ext === "pdf") return "pdf";
+    if (["doc", "docx", "rtf", "odt"].includes(ext)) return "document";
+    if (["xls", "xlsx", "csv", "ods"].includes(ext)) return "spreadsheet";
+    if (["ppt", "pptx", "odp"].includes(ext)) return "presentation";
+    if (["zip", "rar", "7z", "tar", "gz"].includes(ext)) return "archive";
+    return "other";
+  }
+  function folderKeyFor(cat) {
+    if (["checkin", "currency", "airport"].includes(cat)) return "other";
+    return cat;
   }
   function openChecklistUpload(cat, id) {
     setChecklistUploadTarget({ cat, id });
@@ -3455,7 +3492,7 @@ export default function MyTripApp() {
       setChecklist((c) => ({ ...c, [cat]: c[cat].map((it) => (it.id === id ? { ...it, doc: file.name, docUrl: null, docPath: null } : it)) }));
       setManagedFiles((prev) => [
         ...prev.filter((f) => !(f.sourceCat === cat && f.sourceId === id)),
-        { id: uid(), name: file.name, url: null, path: null, type: inferFileType(file.name), sourceCat: cat, sourceId: id, sourceLabel: label, uploadedAt: Date.now() },
+        { id: uid(), name: file.name, url: null, path: null, size: file.size, type: inferFileType(file.name), sourceCat: cat, sourceId: id, sourceLabel: label, uploadedAt: Date.now() },
       ]);
       setFileUploadMsg({ ok: false, reason: "not-signed-in" });
       setTimeout(() => setFileUploadMsg(null), 6000);
@@ -3469,7 +3506,7 @@ export default function MyTripApp() {
     setChecklist((c) => ({ ...c, [cat]: c[cat].map((it) => (it.id === id ? { ...it, doc: file.name, docUrl: uploaded.url, docPath: uploaded.path } : it)) }));
     setManagedFiles((prev) => [
       ...prev.filter((f) => !(f.sourceCat === cat && f.sourceId === id)),
-      { id: uid(), name: file.name, url: uploaded.url, path: uploaded.path, type: inferFileType(file.name), sourceCat: cat, sourceId: id, sourceLabel: label, uploadedAt: Date.now() },
+      { id: uid(), name: file.name, url: uploaded.url, path: uploaded.path, size: file.size, type: inferFileType(file.name), sourceCat: cat, sourceId: id, sourceLabel: label, uploadedAt: Date.now() },
     ]);
   }
   function removeChecklistDoc(cat, id) {
@@ -3500,9 +3537,9 @@ export default function MyTripApp() {
     setFileUploadMsg(uploaded ? { ok: true } : { ok: false, reason: "error" });
     setTimeout(() => setFileUploadMsg(null), 4000);
     if (!uploaded) return;
-    const attachment = { id: uid(), name: file.name, url: uploaded.url, path: uploaded.path, type: kind === "photo" ? "image" : inferFileType(file.name) };
+    const attachment = { id: uid(), name: file.name, url: uploaded.url, path: uploaded.path, size: file.size, type: kind === "photo" ? "image" : inferFileType(file.name), uploadedAt: Date.now() };
     setCardDraft((d) => ({ ...d, attachments: [...(d.attachments || []), attachment] }));
-    setManagedFiles((prev) => [...prev, { id: attachment.id, name: attachment.name, url: attachment.url, path: attachment.path, type: attachment.type, sourceCat: "record", sourceId: cardDraft.id, sourceLabel: label, uploadedAt: Date.now() }]);
+    setManagedFiles((prev) => [...prev, { id: attachment.id, name: attachment.name, url: attachment.url, path: attachment.path, size: attachment.size, type: attachment.type, sourceCat: "record", sourceId: cardDraft.id, sourceLabel: label, uploadedAt: attachment.uploadedAt }]);
   }
   function removeRowAttachment(attId) {
     const att = (cardDraft.attachments || []).find((a) => a.id === attId);
@@ -5105,8 +5142,15 @@ export default function MyTripApp() {
         .mt-flight-manager-row-bottom { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
         .mt-spin { animation:mt-spin-anim 1s linear infinite; }
         @keyframes mt-spin-anim { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
-        .mt-file-manager-tab { border:none; background:none; padding:8px 10px; font-size:12px; font-weight:600; color:var(--muted); border-bottom:2px solid transparent; }
-        .mt-file-manager-tab.active { color:var(--teal-dark); border-bottom-color:var(--teal); }
+        .mt-file-folder-row { display:flex; align-items:center; gap:10px; width:100%; padding:9px 4px; border:none; background:none; border-bottom:1px solid var(--border); text-align:start; cursor:pointer; }
+        .mt-file-manager-icon.folder { background:var(--amber-tint); color:var(--amber); }
+        .mt-file-row { justify-content:space-between; }
+        .mt-file-manager-meta { font-size:11px; color:var(--muted); flex-shrink:0; white-space:nowrap; padding-inline-start:8px; }
+        .mt-file-sort-row { display:flex; align-items:center; gap:8px; padding:4px 4px 6px; border-bottom:1px solid var(--border); margin-bottom:2px; }
+        .mt-file-sort-header-spacer { width:30px; flex-shrink:0; }
+        .mt-file-sort-header { display:flex; align-items:center; gap:2px; border:none; background:none; font-size:11px; font-weight:700; color:var(--muted); padding:0; flex:1; }
+        .mt-file-sort-header:nth-child(2) { flex:1; }
+        .mt-file-sort-header.active { color:var(--teal-dark); }
         .mt-file-manager-icon { width:30px; height:30px; border-radius:8px; background:var(--teal-tint); color:var(--teal-dark); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
         .mt-file-manager-info { display:flex; flex-direction:column; gap:2px; flex:1; overflow:hidden; }
         .mt-file-manager-info strong { font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -5397,7 +5441,7 @@ export default function MyTripApp() {
             <button className="mt-share-opt" onClick={() => { toggleReminders(); setActionsMenuOpen(false); }}><Bell size={14} /> {T.reminders}{remindersOn ? ` (${T.on})` : ""}</button>
             <button className="mt-share-opt" onClick={() => { setAiPanelOpen(true); setActionsMenuOpen(false); }}><Wand2 size={14} /> {T.aiAssistant}</button>
             <button className="mt-share-opt" onClick={() => { setChecklistOpen(true); setActionsMenuOpen(false); }}><CheckSquare size={14} /> {T.preFlightChecklist}</button>
-            <button className="mt-share-opt" onClick={() => { setFileManagerOpen(true); setActionsMenuOpen(false); }}><FileUp size={14} /> {T.fileManagerTitle}</button>
+            <button className="mt-share-opt" onClick={() => { setFileManagerOpen(true); setFileManagerFolder(null); setActionsMenuOpen(false); }}><FileUp size={14} /> {T.fileManagerTitle}</button>
         </div>
         </>
       )}
@@ -6140,29 +6184,50 @@ export default function MyTripApp() {
       {/* frame modal */}
       {fileManagerOpen && (
         <div className="mt-modal-backdrop" onClick={() => setFileManagerOpen(false)}>
-          <div className="mt-modal" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
-            <div className="mt-modal-header"><span className="mt-modal-title">{T.fileManagerTitle}</span><button className="mt-btn ghost" onClick={() => setFileManagerOpen(false)}><X size={16} /></button></div>
-            <div className="mt-file-manager-tabs">
-              {["all", "byCategory", "images", "documents"].map((f) => (
-                <button key={f} className={"mt-file-manager-tab" + (fileManagerFilter === f ? " active" : "")} onClick={() => setFileManagerFilter(f)}>{T["fileManagerFilter_" + f]}</button>
-              ))}
+          <div className="mt-modal" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
+            <div className="mt-modal-header">
+              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                {fileManagerFolder && <button className="mt-btn ghost" style={{ padding: "3px 6px" }} onClick={() => setFileManagerFolder(null)}>{lang === "he" ? <ArrowRight size={15} /> : <ArrowLeft size={15} />}</button>}
+                <span className="mt-modal-title">{fileManagerFolder ? FOLDER_LABEL(fileManagerFolder, T) : T.fileManagerTitle}</span>
+              </span>
+              <button className="mt-btn ghost" onClick={() => { setFileManagerOpen(false); setFileManagerFolder(null); }}><X size={16} /></button>
             </div>
             <div className="mt-modal-body">
               {managedFiles.length === 0 && <p className="mt-hint" style={{ margin: "10px 0" }}>{T.fileManagerEmpty}</p>}
-              {fileManagerFilter === "byCategory" ? (
-                Object.entries(
-                  managedFiles.reduce((acc, f) => { (acc[f.sourceCat] = acc[f.sourceCat] || []).push(f); return acc; }, {})
-                ).map(([cat, files]) => (
-                  <div key={cat}>
-                    <div className="mt-section-label">{CHECKLIST_CAT_LABEL(cat, T)}</div>
-                    {files.map((f) => <FileManagerRow key={f.id} file={f} T={T} />)}
-                  </div>
-                ))
-              ) : (
-                managedFiles
-                  .filter((f) => fileManagerFilter === "all" || (fileManagerFilter === "images" && f.type === "image") || (fileManagerFilter === "documents" && f.type === "document"))
-                  .map((f) => <FileManagerRow key={f.id} file={f} T={T} showCategory />)
-              )}
+              {managedFiles.length > 0 && (() => {
+                const grouped = managedFiles.reduce((acc, f) => { const k = folderKeyFor(f.sourceCat); (acc[k] = acc[k] || []).push(f); return acc; }, {});
+                if (!fileManagerFolder) {
+                  return Object.entries(grouped)
+                    .sort((a, b) => FOLDER_LABEL(a[0], T).localeCompare(FOLDER_LABEL(b[0], T)))
+                    .map(([key, files]) => <FileManagerFolderRow key={key} folderKey={key} count={files.length} T={T} onOpen={() => setFileManagerFolder(key)} />);
+                }
+                const files = (grouped[fileManagerFolder] || []).slice().sort((a, b) => {
+                  const dir = fileManagerSort.dir === "asc" ? 1 : -1;
+                  if (fileManagerSort.key === "name") return a.name.localeCompare(b.name) * dir;
+                  if (fileManagerSort.key === "size") return ((a.size || 0) - (b.size || 0)) * dir;
+                  return ((a.uploadedAt || 0) - (b.uploadedAt || 0)) * dir;
+                });
+                function sortHeader(key, label) {
+                  const active = fileManagerSort.key === key;
+                  return (
+                    <button className={"mt-file-sort-header" + (active ? " active" : "")}
+                      onClick={() => setFileManagerSort({ key, dir: active && fileManagerSort.dir === "asc" ? "desc" : "asc" })}>
+                      {label}{active && (fileManagerSort.dir === "asc" ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                    </button>
+                  );
+                }
+                return (
+                  <>
+                    <div className="mt-file-sort-row">
+                      <span className="mt-file-sort-header-spacer" />
+                      {sortHeader("name", T.fileSortName)}
+                      {sortHeader("date", T.fileSortDate)}
+                      {sortHeader("size", T.fileSortSize)}
+                    </div>
+                    {files.map((f) => <FileManagerFileRow key={f.id} file={f} T={T} lang={lang} />)}
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>
