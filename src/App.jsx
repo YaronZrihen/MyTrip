@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.43.0";
+const APP_VERSION = "22.45.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -235,7 +235,7 @@ const T_DICT = {
     routeErrNoRoute: "לא נמצא מסלול בין הנקודות", routeErrNetwork: "שגיאת רשת בעת החישוב",
     destination: "שם היעד", link: "קישור להזמנה", maplink: "קישור למיקום / מסלול",
     flightNo: "מספר טיסה", cost: "עלות", currency: "מטבע", notes: "הערות", frame: "מסגרת",
-    flightNoCheck: "בדיקת מספר טיסה (לא חובה — אם מוזן, הנתונים שיימשכו יהיו הקובעים)",
+    flightNoCheck: "בדיקת מספר טיסה", flightNoCheckHint: "לא חובה — אם מוזן, הנתונים שיימשכו יהיו הקובעים",
     flightNoCheckReturn: "בדיקת מספר טיסה — חזור (לא חובה — אם מוזן, הנתונים שיימשכו יהיו הקובעים)",
     flightDepTime: "שעת המראה", flightLandTime: "שעת נחיתה",
     noFrame: "ללא מסגרת (רמה עליונה)", selectType: "בחר...",
@@ -421,7 +421,7 @@ const T_DICT = {
     routeErrNoRoute: "No route found between these points", routeErrNetwork: "Network error during calculation",
     destination: "Venue", link: "Booking link", maplink: "Map / route link",
     flightNo: "Flight number", cost: "Cost", currency: "Currency", notes: "Notes", frame: "Frame",
-    flightNoCheck: "Flight number check (optional — if entered, the fetched data will take precedence)",
+    flightNoCheck: "Flight number check", flightNoCheckHint: "Optional — if entered, the fetched data will take precedence",
     flightNoCheckReturn: "Flight number check — return (optional — if entered, the fetched data will take precedence)",
     flightDepTime: "Departure time", flightLandTime: "Landing time",
     noFrame: "No frame (top level)", selectType: "Select...",
@@ -1907,6 +1907,10 @@ function FrameInlineDatePicker({ frame, ctx }) {
 function DateField({ value, onChange, lang, T, initialViewMonth }) {
   const [open, setOpen] = useState(false);
   const [viewMonth, setViewMonth] = useState(() => { const d = value ? new Date(value + "T00:00:00") : initialViewMonth ? new Date(initialViewMonth + "T00:00:00") : new Date(); d.setDate(1); return d; });
+  useEffect(() => {
+    if (!value && initialViewMonth) { const d = new Date(initialViewMonth + "T00:00:00"); d.setDate(1); setViewMonth(d); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialViewMonth]);
   const { refs, floatingStyles } = useFloating({
     open, onOpenChange: setOpen,
     placement: "bottom-start",
@@ -1968,6 +1972,10 @@ function DateField({ value, onChange, lang, T, initialViewMonth }) {
 function DateRangeField({ startDate, endDate, onChange, lang, T, initialViewMonth }) {
   const [open, setOpen] = useState(false);
   const [viewMonth, setViewMonth] = useState(() => { const d = startDate ? new Date(startDate + "T00:00:00") : initialViewMonth ? new Date(initialViewMonth + "T00:00:00") : new Date(); d.setDate(1); return d; });
+  useEffect(() => {
+    if (!startDate && initialViewMonth) { const d = new Date(initialViewMonth + "T00:00:00"); d.setDate(1); setViewMonth(d); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialViewMonth]);
   const [tempStart, setTempStart] = useState(startDate || "");
   const [tempEnd, setTempEnd] = useState(endDate || "");
   const { refs, floatingStyles } = useFloating({
@@ -3141,15 +3149,15 @@ export default function MyTripApp() {
     // step 2
     hasFlights: "yes",
     flights: [
-      { flightNumber: "", from: "תל אביב", fromAlias: "", to: "בנגקוק", toAlias: "", depDate: "2026-08-01", depTime: "", landTime: "", addTransferTo: true, addTransferFrom: true },
-      { flightNumber: "", from: "בנגקוק", fromAlias: "", to: "תל אביב", toAlias: "", depDate: "2026-08-31", depTime: "", landTime: "", addTransferTo: true, addTransferFrom: true },
+      { flightNumber: "", from: "", fromAlias: "", to: "", toAlias: "", depDate: "2026-08-01", depTime: "", landTime: "", addTransferTo: true, addTransferFrom: true },
+      { flightNumber: "", from: "", fromAlias: "", to: "", toAlias: "", depDate: "2026-08-31", depTime: "", landTime: "", addTransferTo: true, addTransferFrom: true },
     ],
     // step 3 (domestic)
     hasDomestic: "yes",
     domesticFlights: [
-      { flightNumber: "", from: "בנגקוק", fromAlias: "", to: "קוסמוי", toAlias: "", depDate: "2026-08-09", depTime: "", landTime: "", addTransferTo: true, addTransferFrom: true },
-      { flightNumber: "", from: "קוסמוי", fromAlias: "", to: "פוקט", toAlias: "", depDate: "2026-08-16", depTime: "", landTime: "", addTransferTo: true, addTransferFrom: true },
-      { flightNumber: "", from: "פוקט", fromAlias: "", to: "בנגקוק", toAlias: "", depDate: "2026-08-23", depTime: "", landTime: "", addTransferTo: true, addTransferFrom: true },
+      { flightNumber: "", from: "", fromAlias: "", to: "", toAlias: "", depDate: "2026-08-09", depTime: "", landTime: "", addTransferTo: true, addTransferFrom: true },
+      { flightNumber: "", from: "", fromAlias: "", to: "", toAlias: "", depDate: "2026-08-16", depTime: "", landTime: "", addTransferTo: true, addTransferFrom: true },
+      { flightNumber: "", from: "", fromAlias: "", to: "", toAlias: "", depDate: "2026-08-23", depTime: "", landTime: "", addTransferTo: true, addTransferFrom: true },
     ],
     // step 4
     hasHotels: "yes",
@@ -3173,6 +3181,19 @@ export default function MyTripApp() {
   const [preWizardData, setPreWizardData] = useState(PRE_WIZARD_DEFAULTS);
   const [preWizardLastSubmitted, setPreWizardLastSubmitted] = useState(null);
   const [preWizardRefDate, setPreWizardRefDate] = useState("");
+  useEffect(() => {
+    if (!preWizardOpen) return;
+    const { planStartDate, planEndDate } = preWizardData;
+    if (!planStartDate && !planEndDate) return;
+    setPreWizardData((d) => {
+      if (!d.flights.length) return d;
+      const flights = d.flights.slice();
+      if (planStartDate) flights[0] = { ...flights[0], depDate: planStartDate };
+      if (planEndDate && flights.length > 1) flights[flights.length - 1] = { ...flights[flights.length - 1], depDate: planEndDate };
+      return { ...d, flights };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preWizardData.planStartDate, preWizardData.planEndDate, preWizardOpen]);
   const [preWizardCreatedIds, setPreWizardCreatedIds] = useState(null);
   const [frameMenuOpenId, setFrameMenuOpenId] = useState(null);
   const [frameDraft, setFrameDraft] = useState(null);
@@ -3721,29 +3742,78 @@ export default function MyTripApp() {
   }
   function confirmPreWizard() {
     const d = preWizardData;
+    const liveRowsSnapshot = rows;
     function addDaysToISO(dateStr, days) {
       if (!dateStr) return dateStr;
       const [y, m, dd] = dateStr.split("-").map(Number);
       const dt = new Date(y, m - 1, dd + days);
       return toLocalISODate(dt);
     }
-    /* Creates the "to the airport" (before departure) and/or "from the airport" (after arrival)
-       transfer records for a flight, pasting the relevant airport's own details from the flight
-       itself — defaults to taxi, per the flight's own checkbox choices. */
-    function createAirportTransfers(f, frameId) {
+    /* Finds whatever the trip was already doing right before/after a given date, so a new transfer
+       can continue the chain instead of starting with a blank origin/destination. "before" looks at
+       the closest earlier date's last record; "after" looks at the closest later date's first record.
+       Combines the live trip's existing rows (for edit mode) with virtual checkin/checkout entries
+       built from the wizard's own hotels list (for a brand-new trip, where the hotels aren't part of
+       `rows` yet at this point) so adjacency works either way. */
+    function findAdjacentRow(targetDate, direction, excludeFlight) {
+      // Pseudo-rows are shaped to match what the consuming code reads for each direction: a "before"
+      // search reads .to (where you were, about to leave — the checkout), an "after" search reads
+      // .from (where you'll be, having just arrived — the checkin).
+      const hotelPseudoRows = (d.hasHotels === "yes" ? d.hotels : []).flatMap((h) => [
+        h.checkOut ? { date: h.checkOut, to: h.name, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl } : null,
+        h.checkIn ? { date: h.checkIn, from: h.name, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl } : null,
+      ].filter(Boolean));
+      const allFlightEntries = [...(d.hasFlights === "yes" ? d.flights : []), ...(d.hasDomestic === "yes" ? d.domesticFlights : [])].filter((fl) => fl !== excludeFlight);
+      const flightPseudoRows = allFlightEntries.flatMap((fl) => [
+        fl.depDate && fl.from ? { date: fl.depDate, to: fl.from, toAlias: fl.fromAlias, toLat: fl.fromLat, toLon: fl.fromLon, toPlaceId: fl.fromPlaceId, toVerifiedUrl: fl.fromVerifiedUrl } : null,
+        fl.depDate && fl.to ? { date: fl.overnight ? addDaysToISO(fl.depDate, 1) : fl.depDate, from: fl.to, fromAlias: fl.toAlias, fromLat: fl.toLat, fromLon: fl.toLon, fromPlaceId: fl.toPlaceId, fromVerifiedUrl: fl.toVerifiedUrl } : null,
+      ].filter(Boolean));
+      const pool = [...liveRowsSnapshot, ...hotelPseudoRows, ...flightPseudoRows];
+      // Same-day adjacency counts (e.g. hotel checkout happens the same calendar day as the flight),
+      // so both directions include the target date itself, not just strictly before/after it.
+      if (direction === "before") {
+        const candidates = pool.filter((r) => r.date && r.date <= targetDate && r.to);
+        if (!candidates.length) return null;
+        const maxDate = candidates.reduce((m, r) => (r.date > m ? r.date : m), candidates[0].date);
+        const sameDay = candidates.filter((r) => r.date === maxDate);
+        return sameDay[sameDay.length - 1];
+      }
+      const candidates = pool.filter((r) => r.date && r.date >= targetDate && r.from);
+      if (!candidates.length) return null;
+      const minDate = candidates.reduce((m, r) => (r.date < m ? r.date : m), candidates[0].date);
+      const sameDay = candidates.filter((r) => r.date === minDate);
+      return sameDay[0];
+    }
+    /* Creates the "to the airport" (positioned directly before the flight) and/or "from the airport"
+       (positioned directly after) transfer records, pasting the relevant airport's own details from
+       the flight itself, and — where an adjacent record already exists — continuing the chain by
+       pulling its location into the transfer's other end. Defaults to taxi.
+       For an international flight specifically: the pre-flight transfer gets a 3-hour stay duration,
+       and — if the flight's own departure time is known — its end time is set to depTime minus that
+       3 hours; the post-flight transfer's start time is set to the flight's own arrival time plus its
+       stay buffer (the same buffer already used to anchor the chain), so it's correct immediately
+       rather than only after the next recompute pass. */
+    function createAirportTransfers(f, frameId, flightRowId, isInternational) {
+      const PRE_FLIGHT_STAY_MIN = 180;
       if (f.addTransferTo && f.from) {
-        const idTo = addRow(f.depDate, null, frameId);
+        const idTo = addRowNear(f.depDate, frameId, flightRowId, "before");
+        const prevRow = findAdjacentRow(f.depDate, "before", f);
         updateRow(idTo, {
           typeId: "transfer", arrivalTypeId: "taxi",
           to: f.from, toAlias: f.fromAlias, toLat: f.fromLat, toLon: f.fromLon, toPlaceId: f.fromPlaceId, toVerifiedUrl: f.fromVerifiedUrl,
+          ...(prevRow && prevRow.to ? { from: prevRow.to, fromAlias: prevRow.toAlias, fromLat: prevRow.toLat, fromLon: prevRow.toLon, fromPlaceId: prevRow.toPlaceId, fromVerifiedUrl: prevRow.toVerifiedUrl } : {}),
+          ...(isInternational ? { stayDurationMin: PRE_FLIGHT_STAY_MIN, ...(f.depTime ? { endTime: addMinutesToTime(f.depTime, -PRE_FLIGHT_STAY_MIN), endTimeAuto: false } : {}) } : {}),
         });
       }
       if (f.addTransferFrom && f.to) {
         const landDate = f.overnight ? addDaysToISO(f.depDate, 1) : f.depDate;
-        const idFrom = addRow(landDate, null, frameId);
+        const idFrom = addRowNear(landDate, frameId, flightRowId, "after");
+        const nextRow = findAdjacentRow(landDate, "after", f);
         updateRow(idFrom, {
           typeId: "transfer", arrivalTypeId: "taxi",
           from: f.to, fromAlias: f.toAlias, fromLat: f.toLat, fromLon: f.toLon, fromPlaceId: f.toPlaceId, fromVerifiedUrl: f.toVerifiedUrl,
+          ...(nextRow && nextRow.from ? { to: nextRow.from, toAlias: nextRow.fromAlias, toLat: nextRow.fromLat, toLon: nextRow.fromLon, toPlaceId: nextRow.fromPlaceId, toVerifiedUrl: nextRow.fromVerifiedUrl } : {}),
+          ...(isInternational && f.landTime ? { startTime: addMinutesToTime(f.landTime, getDefaultStayMinutes("flight")), startTimeAuto: false } : {}),
         });
       }
     }
@@ -3774,17 +3844,19 @@ export default function MyTripApp() {
       if (rootFrame) {
         function syncFlightRows(typeId, entries) {
           const existing = rows.filter((r) => r.frameId === rootFrame.id && r.typeId === typeId).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-          entries.forEach((f, i) => {
+          const ids = entries.map((f, i) => {
             const patch = { typeId, from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, date: f.depDate, startTime: f.depTime || "", endTime: f.landTime || "", overnight: !!f.overnight, fromLat: f.fromLat, fromLon: f.fromLon, fromPlaceId: f.fromPlaceId, fromVerifiedUrl: f.fromVerifiedUrl, toLat: f.toLat, toLon: f.toLon, toPlaceId: f.toPlaceId, toVerifiedUrl: f.toVerifiedUrl };
-            if (existing[i]) updateRow(existing[i].id, patch);
-            else updateRow(addRow(f.depDate, null, rootFrame.id), patch);
+            const id = existing[i] ? existing[i].id : addRow(f.depDate, null, rootFrame.id);
+            updateRow(id, patch);
+            return id;
           });
           existing.slice(entries.length).forEach((r) => deleteRow(r.id));
+          return ids;
         }
-        syncFlightRows("flight", flights);
-        syncFlightRows("domestic-flight", domesticFlights);
-        flights.forEach((f) => createAirportTransfers(f, rootFrame.id));
-        domesticFlights.forEach((f) => createAirportTransfers(f, rootFrame.id));
+        const flightIds = syncFlightRows("flight", flights);
+        const domesticFlightIds = syncFlightRows("domestic-flight", domesticFlights);
+        flights.forEach((f, i) => createAirportTransfers(f, rootFrame.id, flightIds[i], true));
+        domesticFlights.forEach((f, i) => createAirportTransfers(f, rootFrame.id, domesticFlightIds[i], false));
 
         const existingHotelFrames = frames.filter((f) => f.parentFrameId === rootFrame.id && f.frameType === "hotel").sort((a, b) => (a.startDate || "").localeCompare(b.startDate || ""));
         hotels.forEach((h, i) => {
@@ -3807,14 +3879,10 @@ export default function MyTripApp() {
           } else {
             const newFrame = { id: uid(), name: h.alias || h.name || T.hotelFrameNameFallback, startDate: h.checkIn, endDate: h.checkOut, parentFrameId: rootFrame.id, collapsed: false, frameType: "hotel", hotelRef: h };
             setFrames((prev) => [...prev, newFrame]);
-            const idTransferIn = addRow(h.checkIn, null, newFrame.id);
-            updateRow(idTransferIn, { typeId: "transfer", arrivalTypeId: "taxi", to: h.name, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
             const id1 = addRow(h.checkIn, null, newFrame.id);
             updateRow(id1, { typeId: "checkin", startTime: "15:00", to: h.name, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
             const id2 = addRow(h.checkOut, null, newFrame.id);
             updateRow(id2, { typeId: "checkout", endTime: "11:00", to: h.name, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
-            const idTransferOut = addRow(h.checkOut, null, newFrame.id);
-            updateRow(idTransferOut, { typeId: "transfer", arrivalTypeId: "taxi" });
           }
         });
         existingHotelFrames.slice(hotels.length).forEach((hf) => {
@@ -3848,26 +3916,22 @@ export default function MyTripApp() {
       const id1 = addRow(f.depDate, null, mainFrame.id);
       updateRow(id1, { typeId: "flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, airline: f.airline, startTime: f.depTime || "", endTime: f.landTime || "", overnight: !!f.overnight, fromLat: f.fromLat, fromLon: f.fromLon, fromPlaceId: f.fromPlaceId, fromVerifiedUrl: f.fromVerifiedUrl, toLat: f.toLat, toLon: f.toLon, toPlaceId: f.toPlaceId, toVerifiedUrl: f.toVerifiedUrl });
       createdRowIds.push(id1);
-      createAirportTransfers(f, mainFrame.id);
+      createAirportTransfers(f, mainFrame.id, id1, true);
     });
     domesticFlights.forEach((f) => {
       const id1 = addRow(f.depDate, null, mainFrame.id);
       updateRow(id1, { typeId: "domestic-flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, airline: f.airline, startTime: f.depTime || "", endTime: f.landTime || "", overnight: !!f.overnight, fromLat: f.fromLat, fromLon: f.fromLon, fromPlaceId: f.fromPlaceId, fromVerifiedUrl: f.fromVerifiedUrl, toLat: f.toLat, toLon: f.toLon, toPlaceId: f.toPlaceId, toVerifiedUrl: f.toVerifiedUrl });
       createdRowIds.push(id1);
-      createAirportTransfers(f, mainFrame.id);
+      createAirportTransfers(f, mainFrame.id, id1, false);
     });
 
     hotelFrames.forEach((hf) => {
       const h = hf.hotelRef;
-      const idTransferIn = addRow(h.checkIn, null, hf.id);
-      updateRow(idTransferIn, { typeId: "transfer", arrivalTypeId: "taxi", to: h.name, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
       const id1 = addRow(h.checkIn, null, hf.id);
       updateRow(id1, { typeId: "checkin", startTime: "15:00", to: h.name, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
       const id2 = addRow(h.checkOut, null, hf.id);
       updateRow(id2, { typeId: "checkout", endTime: "11:00", to: h.name, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
-      const idTransferOut = addRow(h.checkOut, null, hf.id);
-      updateRow(idTransferOut, { typeId: "transfer", arrivalTypeId: "taxi" });
-      createdRowIds.push(idTransferIn, id1, id2, idTransferOut);
+      createdRowIds.push(id1, id2);
     });
 
     setPreWizardCreatedIds({ frameIds: newFrames.map((f) => f.id), rowIds: createdRowIds });
@@ -4169,6 +4233,25 @@ export default function MyTripApp() {
     applyRows((prev) => [...prev, nr]);
     return nr.id;
   }
+  /* Same as addRow, but inserted directly before/after a specific anchor row in the array instead
+     of always being appended at the end — guarantees visual ordering (e.g. a transfer landing
+     immediately before or after the flight it belongs to) regardless of insertion order elsewhere. */
+  function addRowNear(date, frameId, anchorId, position) {
+    const nr = {
+      id: uid(), parentId: null, frameId, date: date || toLocalISODate(new Date()),
+      typeId: "unset", arrivalTypeId: "walking", from: "", to: "", startTime: "", startTimeAuto: true, endTime: "", overnight: false, stayDurationMin: null,
+      destination: "", link: "", mapLink: "", flightNumber: "", costAmount: 0, costCurrency: "₪", fromAlias: "", toAlias: "",
+      notes: "", fromVerifiedUrl: "", fromVerifiedText: "", toVerifiedUrl: "", toVerifiedText: "",
+      fromLat: null, fromLon: null, toLat: null, toLon: null, routeDistanceKm: null, routeDurationMin: null, custom: {},
+    };
+    applyRows((prev) => {
+      const idx = prev.findIndex((r) => r.id === anchorId);
+      if (idx === -1) return [...prev, nr];
+      const insertAt = position === "before" ? idx : idx + 1;
+      return [...prev.slice(0, insertAt), nr, ...prev.slice(insertAt)];
+    });
+    return nr.id;
+  }
   function sortDayByTime(fid, date) {
     applyRows((prev) => {
       const topRows = prev.filter((r) => !r.parentId && (r.frameId || null) === (fid || null) && r.date === date);
@@ -4261,8 +4344,8 @@ export default function MyTripApp() {
   function confirmAddDay() {
     if (!addDayCtx || !addDayCtx.date || addDayIssue) return;
     const prevHotel = findLastHotelInfo(addDayCtx.date);
-    const hotelRaw = prevHotel ? prevHotel.name : T.demoHotelRaw;
-    const hotelAlias = prevHotel ? prevHotel.alias : T.demoHotelAlias;
+    const hotelRaw = prevHotel ? prevHotel.name : "";
+    const hotelAlias = prevHotel ? prevHotel.alias : "";
     const hotelLat = prevHotel ? prevHotel.lat : null, hotelLon = prevHotel ? prevHotel.lon : null;
     if (addDayCtx.addHotel) {
       const id1 = addRow(addDayCtx.date, null, addDayCtx.fid);
@@ -4740,14 +4823,10 @@ export default function MyTripApp() {
       if (frameDraft.frameType === "hotel") {
         const name = frameDraft.name.trim();
         const checkIn = frameDraft.startDate, checkOut = frameDraft.endDate;
-        const idTransferIn = addRow(checkIn, null, newFrameId);
-        updateRow(idTransferIn, { typeId: "transfer", arrivalTypeId: "taxi", to: name });
         const id1 = addRow(checkIn, null, newFrameId);
         updateRow(id1, { typeId: "checkin", startTime: "15:00", to: name });
         const id2 = addRow(checkOut, null, newFrameId);
         updateRow(id2, { typeId: "checkout", endTime: "11:00", to: name });
-        const idTransferOut = addRow(checkOut, null, newFrameId);
-        updateRow(idTransferOut, { typeId: "transfer", arrivalTypeId: "taxi" });
       }
     }
     closeFrameModal();
@@ -5107,6 +5186,8 @@ export default function MyTripApp() {
         .mt-wizard-subgroup { border:1px solid var(--border); border-radius:10px; padding:10px; margin-bottom:10px; background:var(--bg); }
         .mt-ai-suggest-box { border:1px solid var(--teal); border-radius:10px; padding:12px; margin-top:10px; background:var(--teal-tint); }
         .mt-wizard-qa { margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+        .mt-wizard-qa > label { flex:0 0 100px; font-size:12.5px; font-weight:600; }
+        .mt-wizard-qa > *:not(label) { flex:1; min-width:0; }
         .mt-modal-body .mt-field { margin-bottom:14px; }
         .mt-wizard-qa label { flex:1 1 0; font-weight:700; font-size:12.5px; color:var(--ink); text-align:right; line-height:1.3; }
         .mt-wizard-qa input, .mt-wizard-qa textarea, .mt-wizard-qa .mt-daterange-btn, .mt-wizard-qa .mt-datefield { flex:2 1 0; min-width:0; border:1px solid var(--border); border-radius:8px; padding:7px 9px; font-size:13px; font-family:inherit; box-sizing:border-box; text-align:right; color:var(--ink); }
@@ -5615,7 +5696,7 @@ export default function MyTripApp() {
                   {preWizardData.hasTripPlan === "yes" && (
                     <>
                       <div className="mt-wizard-qa"><label>{T.preWizardQName}</label><input value={preWizardData.tripName} onChange={(e) => setPreWizardData({ ...preWizardData, tripName: e.target.value })} placeholder={T.wizardTripNameHint} /></div>
-                      <div className="mt-field">
+                      <div className="mt-wizard-qa">
                         <label>{T.preWizardTravelerCount}</label>
                         <div className="mt-wizard-choices">
                           {["solo", "couple", "family", "group"].map((k) => (
@@ -5634,7 +5715,7 @@ export default function MyTripApp() {
                   {preWizardData.hasTripPlan === "no" && (
                     <>
                       <div className="mt-section-label">{T.preWizardAiSectionLabel}</div>
-                      <div className="mt-field">
+                      <div className="mt-wizard-qa">
                         <label>{T.preWizardTravelerCount}</label>
                         <div className="mt-wizard-choices">
                           {["solo", "couple", "family", "group"].map((k) => (
@@ -5705,13 +5786,14 @@ export default function MyTripApp() {
                               {preWizardData.flights.length > 1 && <button className="mt-btn ghost" style={{ padding: "2px 6px", marginTop: "-8px" }} onClick={() => removePreWizardFlight(i)}><X size={12} /></button>}
                             </span>
                           </div>
-                          <div className="mt-field">
+                          <div className="mt-wizard-qa">
                             <label>{T.flightNoCheck}</label>
                             <div className="mt-field-inline">
                               <input value={f.flightNumber || ""} onChange={(e) => updatePreWizardArrayItem("flights", i, { flightNumber: e.target.value })} />
                               <button className="mt-btn ghost" onClick={() => fetchWizardFlightData("flights", i)}><Download size={13} /> {T.fetchFlightData}</button>
                             </div>
                           </div>
+                          <div className="mt-hint" style={{ marginTop: "-8px", marginBottom: 8 }}>{T.flightNoCheckHint}</div>
                           {f.flightLookupMsg && <div className="mt-hint" style={{ marginBottom: 8 }}>{f.flightLookupMsg}</div>}
                           <div className="mt-wizard-qa"><label>{T.from}</label><div className="mt-field-inline" style={{ flex: 2 }}><input value={f.from} onChange={(e) => updatePreWizardArrayItem("flights", i, { from: e.target.value })} /><button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openWizardLocationPicker("flights", i, "from")}><MapPin size={13} /></button></div></div>
                           <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={f.fromAlias} onChange={(e) => updatePreWizardArrayItem("flights", i, { fromAlias: e.target.value })} /></div>
@@ -5756,13 +5838,14 @@ export default function MyTripApp() {
                               {preWizardData.domesticFlights.length > 1 && <button className="mt-btn ghost" style={{ padding: "2px 6px", marginTop: "-8px" }} onClick={() => removePreWizardDomesticFlight(i)}><X size={12} /></button>}
                             </span>
                           </div>
-                          <div className="mt-field">
+                          <div className="mt-wizard-qa">
                             <label>{T.flightNoCheck}</label>
                             <div className="mt-field-inline">
                               <input value={f.flightNumber || ""} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { flightNumber: e.target.value })} />
                               <button className="mt-btn ghost" onClick={() => fetchWizardFlightData("domesticFlights", i)}><Download size={13} /> {T.fetchFlightData}</button>
                             </div>
                           </div>
+                          <div className="mt-hint" style={{ marginTop: "-8px", marginBottom: 8 }}>{T.flightNoCheckHint}</div>
                           {f.flightLookupMsg && <div className="mt-hint" style={{ marginBottom: 8 }}>{f.flightLookupMsg}</div>}
                           <div className="mt-wizard-qa"><label>{T.from}</label><div className="mt-field-inline" style={{ flex: 2 }}><input value={f.from} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { from: e.target.value })} /><button className="mt-btn ghost mt-btn-icon" title={T.verify} onClick={() => openWizardLocationPicker("domesticFlights", i, "from")}><MapPin size={13} /></button></div></div>
                           <div className="mt-wizard-qa"><label>{T.aliasLabel}</label><input value={f.fromAlias} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { fromAlias: e.target.value })} /></div>
