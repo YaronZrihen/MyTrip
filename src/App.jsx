@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.46.0";
+const APP_VERSION = "22.47.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -3166,12 +3166,12 @@ export default function MyTripApp() {
     // step 4
     hasHotels: "yes",
     hotels: [
-      { name: "", alias: "", checkIn: "2026-08-01", checkOut: "2026-08-09" },
-      { name: "", alias: "", checkIn: "2026-08-09", checkOut: "2026-08-12" },
-      { name: "", alias: "", checkIn: "2026-08-12", checkOut: "2026-08-16" },
-      { name: "", alias: "", checkIn: "2026-08-16", checkOut: "2026-08-23" },
-      { name: "", alias: "", checkIn: "2026-08-23", checkOut: "2026-08-27" },
-      { name: "", alias: "", checkIn: "2026-08-27", checkOut: "2026-08-31" },
+      { name: "", alias: "", checkIn: "", checkOut: "" },
+      { name: "", alias: "", checkIn: "", checkOut: "" },
+      { name: "", alias: "", checkIn: "", checkOut: "" },
+      { name: "", alias: "", checkIn: "", checkOut: "" },
+      { name: "", alias: "", checkIn: "", checkOut: "" },
+      { name: "", alias: "", checkIn: "", checkOut: "" },
     ],
   };
   const [preWizardOpen, setPreWizardOpen] = useState(false);
@@ -3799,23 +3799,23 @@ export default function MyTripApp() {
        rather than only after the next recompute pass. */
     function createAirportTransfers(f, frameId, flightRowId, isInternational) {
       const PRE_FLIGHT_STAY_MIN = 180;
-      if (f.addTransferTo && f.from) {
+      if (f.addTransferTo) {
         const idTo = addRowNear(f.depDate, frameId, flightRowId, "before");
         const prevRow = findAdjacentRow(f.depDate, "before", f);
         updateRow(idTo, {
           typeId: "transfer", arrivalTypeId: "taxi",
-          to: f.from, toAlias: f.fromAlias, toLat: f.fromLat, toLon: f.fromLon, toPlaceId: f.fromPlaceId, toVerifiedUrl: f.fromVerifiedUrl,
+          ...(f.from ? { to: f.from, toAlias: f.fromAlias, toLat: f.fromLat, toLon: f.fromLon, toPlaceId: f.fromPlaceId, toVerifiedUrl: f.fromVerifiedUrl } : {}),
           ...(prevRow && prevRow.to ? { from: prevRow.to, fromAlias: prevRow.toAlias, fromLat: prevRow.toLat, fromLon: prevRow.toLon, fromPlaceId: prevRow.toPlaceId, fromVerifiedUrl: prevRow.toVerifiedUrl } : {}),
           ...(isInternational ? { stayDurationMin: PRE_FLIGHT_STAY_MIN, ...(f.depTime ? { endTime: addMinutesToTime(f.depTime, -PRE_FLIGHT_STAY_MIN), endTimeAuto: false } : {}) } : {}),
         });
       }
-      if (f.addTransferFrom && f.to) {
+      if (f.addTransferFrom) {
         const landDate = f.overnight ? addDaysToISO(f.depDate, 1) : f.depDate;
         const idFrom = addRowNear(landDate, frameId, flightRowId, "after");
         const nextRow = findAdjacentRow(landDate, "after", f);
         updateRow(idFrom, {
           typeId: "transfer", arrivalTypeId: "taxi",
-          from: f.to, fromAlias: f.toAlias, fromLat: f.toLat, fromLon: f.toLon, fromPlaceId: f.toPlaceId, fromVerifiedUrl: f.toVerifiedUrl,
+          ...(f.to ? { from: f.to, fromAlias: f.toAlias, fromLat: f.toLat, fromLon: f.toLon, fromPlaceId: f.toPlaceId, fromVerifiedUrl: f.toVerifiedUrl } : {}),
           ...(nextRow && nextRow.from ? { to: nextRow.from, toAlias: nextRow.fromAlias, toLat: nextRow.fromLat, toLon: nextRow.fromLon, toPlaceId: nextRow.fromPlaceId, toVerifiedUrl: nextRow.fromVerifiedUrl } : {}),
           ...(isInternational && f.landTime ? { startTime: addMinutesToTime(f.landTime, getDefaultStayMinutes("flight")), startTimeAuto: false } : {}),
         });
@@ -5189,6 +5189,7 @@ export default function MyTripApp() {
         .mt-wizard-step-line.active { background:var(--teal); }
         .mt-wizard-choices { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
         .mt-wizard-subgroup { border:1px solid var(--border); border-radius:10px; padding:10px; margin-bottom:10px; background:var(--bg); }
+        .mt-wizard-card-header { display:flex; justify-content:space-between; align-items:center; margin:-10px -10px 10px; padding:9px 12px; background:var(--teal-tint); border-radius:9px 9px 0 0; border-bottom:1px solid var(--border); font-weight:700; font-size:12.5px; color:var(--teal-dark); }
         .mt-ai-suggest-box { border:1px solid var(--teal); border-radius:10px; padding:12px; margin-top:10px; background:var(--teal-tint); }
         .mt-wizard-qa { margin-bottom:14px; display:flex; align-items:center; gap:8px; }
         .mt-wizard-qa > label { flex:0 0 78px; font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -5202,7 +5203,7 @@ export default function MyTripApp() {
         .mt-wizard-qa input:focus { outline:none; border-color:var(--teal); }
         .mt-wizard-qa input[type="number"] { text-align:center; }
         .mt-wizard-choice { border:1.5px solid var(--border); background:var(--surface); color:var(--ink); border-radius:20px; padding:6px 14px; font-size:12.5px; font-weight:500; cursor:pointer; }
-        .mt-wizard-qa .mt-wizard-choices { gap:5px; margin-top:0; }
+        .mt-wizard-qa .mt-wizard-choices { gap:5px; margin-top:0; justify-content:flex-end; }
         .mt-wizard-qa .mt-wizard-choice { padding:5px 8px; font-size:11px; white-space:nowrap; }
         .mt-wizard-choice.selected { background:var(--teal); border-color:var(--teal); color:#fff; }
         .mt-wizard-summary { margin-top:10px; padding:10px; background:var(--teal-tint); border-radius:8px; }
@@ -5788,7 +5789,7 @@ export default function MyTripApp() {
                     <>
                       {preWizardData.flights.map((f, i) => (
                         <div key={i} className="mt-wizard-subgroup">
-                          <div className="mt-section-label" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div className="mt-wizard-card-header">
                             <span>{T.preWizardFlightN.replace("{n}", i + 1)}</span>
                             <span style={{ display: "flex", gap: 2 }}>
                               <button className="mt-btn ghost" style={{ padding: "2px 6px", marginTop: "-8px" }} disabled={i === 0} onClick={() => movePreWizardArrayItem("flights", i, -1)}><ChevronUp size={12} /></button>
@@ -5840,7 +5841,7 @@ export default function MyTripApp() {
                     <>
                       {preWizardData.domesticFlights.map((f, i) => (
                         <div key={i} className="mt-wizard-subgroup">
-                          <div className="mt-section-label" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div className="mt-wizard-card-header">
                             <span>{T.preWizardFlightN.replace("{n}", i + 1)}</span>
                             <span style={{ display: "flex", gap: 2 }}>
                               <button className="mt-btn ghost" style={{ padding: "2px 6px", marginTop: "-8px" }} disabled={i === 0} onClick={() => movePreWizardArrayItem("domesticFlights", i, -1)}><ChevronUp size={12} /></button>
