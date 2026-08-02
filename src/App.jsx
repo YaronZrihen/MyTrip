@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.42.0";
+const APP_VERSION = "22.43.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -223,6 +223,7 @@ const T_DICT = {
     checklistPackingSub: "{n} מתוך {total} הושלמו", checklistShoppingSub: "{n} פריטים", checklistShoppingEmpty: "הרשימה ריקה — הוסף פריט למטה",
     deleteFrameOnly: "מחק מסגרת בלבד (התוכן יעבור למסגרת האם)", deleteFrameWithContent: "מחק מסגרת ואת כל התוכן שבתוכה",
     type: "תיאור", from: "מוצא", to: "יעד", start: "בשעה", end: "עד שעה", overnight: "חוצה חצות", arrivalMethod: "אמצעי הגעה",
+    addTransferToAirport: "הוסף רשומת העברות - אל השדה", addTransferFromAirport: "הוסף רשומת העברות - מהשדה",
     stayDuration: "משך שהות", stayDurationHint: "כמה זמן נשארים ביעד — קובע את שעת הסיום (שעת הגעה + משך שהות).",
     stayNone: "ללא שהות", minutesShort: "דק'", hoursShort: "שע'", stayAtDestination: "שהות ביעד", hourLetter: "ש",
     typeKindDesc: "תיאור", typeKindArrival: "אמצעי הגעה",
@@ -408,6 +409,7 @@ const T_DICT = {
     checklistPackingSub: "{n} of {total} done", checklistShoppingSub: "{n} items", checklistShoppingEmpty: "List is empty — add an item below",
     deleteFrameOnly: "Delete frame only (content moves to parent)", deleteFrameWithContent: "Delete frame and all its content",
     type: "Description", from: "Origin", to: "Destination", start: "At", end: "Until", overnight: "Crosses midnight", arrivalMethod: "Arrival method",
+    addTransferToAirport: "Add transfer record — to the airport", addTransferFromAirport: "Add transfer record — from the airport",
     stayDuration: "Stay duration", stayDurationHint: "How long you stay at the destination — determines the end time (arrival + stay).",
     stayNone: "No stay", minutesShort: "min", hoursShort: "hr", stayAtDestination: "Stay at destination", hourLetter: "h",
     typeKindDesc: "Description", typeKindArrival: "Arrival method",
@@ -3139,15 +3141,15 @@ export default function MyTripApp() {
     // step 2
     hasFlights: "yes",
     flights: [
-      { flightNumber: "", from: "תל אביב", fromAlias: "", to: "בנגקוק", toAlias: "", depDate: "2026-08-01", depTime: "", landTime: "" },
-      { flightNumber: "", from: "בנגקוק", fromAlias: "", to: "תל אביב", toAlias: "", depDate: "2026-08-31", depTime: "", landTime: "" },
+      { flightNumber: "", from: "תל אביב", fromAlias: "", to: "בנגקוק", toAlias: "", depDate: "2026-08-01", depTime: "", landTime: "", addTransferTo: true, addTransferFrom: true },
+      { flightNumber: "", from: "בנגקוק", fromAlias: "", to: "תל אביב", toAlias: "", depDate: "2026-08-31", depTime: "", landTime: "", addTransferTo: true, addTransferFrom: true },
     ],
     // step 3 (domestic)
     hasDomestic: "yes",
     domesticFlights: [
-      { flightNumber: "", from: "בנגקוק", fromAlias: "", to: "קוסמוי", toAlias: "", depDate: "2026-08-09", depTime: "", landTime: "" },
-      { flightNumber: "", from: "קוסמוי", fromAlias: "", to: "פוקט", toAlias: "", depDate: "2026-08-16", depTime: "", landTime: "" },
-      { flightNumber: "", from: "פוקט", fromAlias: "", to: "בנגקוק", toAlias: "", depDate: "2026-08-23", depTime: "", landTime: "" },
+      { flightNumber: "", from: "בנגקוק", fromAlias: "", to: "קוסמוי", toAlias: "", depDate: "2026-08-09", depTime: "", landTime: "", addTransferTo: true, addTransferFrom: true },
+      { flightNumber: "", from: "קוסמוי", fromAlias: "", to: "פוקט", toAlias: "", depDate: "2026-08-16", depTime: "", landTime: "", addTransferTo: true, addTransferFrom: true },
+      { flightNumber: "", from: "פוקט", fromAlias: "", to: "בנגקוק", toAlias: "", depDate: "2026-08-23", depTime: "", landTime: "", addTransferTo: true, addTransferFrom: true },
     ],
     // step 4
     hasHotels: "yes",
@@ -3599,13 +3601,13 @@ export default function MyTripApp() {
     showDemoNotice(T.preWizardAiDemoNotice);
   }
   function addPreWizardFlight() {
-    setPreWizardData((d) => ({ ...d, flights: [...d.flights, { flightNumber: "", from: "", fromAlias: "", to: "", toAlias: "", depDate: "", depTime: "", landTime: "", overnight: false, fromLat: null, fromLon: null, fromPlaceId: null, fromVerifiedUrl: "", toLat: null, toLon: null, toPlaceId: null, toVerifiedUrl: "" }] }));
+    setPreWizardData((d) => ({ ...d, flights: [...d.flights, { flightNumber: "", from: "", fromAlias: "", to: "", toAlias: "", depDate: "", depTime: "", landTime: "", overnight: false, fromLat: null, fromLon: null, fromPlaceId: null, fromVerifiedUrl: "", toLat: null, toLon: null, toPlaceId: null, toVerifiedUrl: "", addTransferTo: true, addTransferFrom: true }] }));
   }
   function removePreWizardFlight(idx) {
     setPreWizardData((d) => ({ ...d, flights: d.flights.length > 1 ? d.flights.filter((_, i) => i !== idx) : d.flights }));
   }
   function addPreWizardDomesticFlight() {
-    setPreWizardData((d) => ({ ...d, domesticFlights: [...d.domesticFlights, { flightNumber: "", from: "", fromAlias: "", to: "", toAlias: "", depDate: "", depTime: "", landTime: "", overnight: false, fromLat: null, fromLon: null, fromPlaceId: null, fromVerifiedUrl: "", toLat: null, toLon: null, toPlaceId: null, toVerifiedUrl: "" }] }));
+    setPreWizardData((d) => ({ ...d, domesticFlights: [...d.domesticFlights, { flightNumber: "", from: "", fromAlias: "", to: "", toAlias: "", depDate: "", depTime: "", landTime: "", overnight: false, fromLat: null, fromLon: null, fromPlaceId: null, fromVerifiedUrl: "", toLat: null, toLon: null, toPlaceId: null, toVerifiedUrl: "", addTransferTo: true, addTransferFrom: true }] }));
   }
   function removePreWizardDomesticFlight(idx) {
     setPreWizardData((d) => ({ ...d, domesticFlights: d.domesticFlights.length > 1 ? d.domesticFlights.filter((_, i) => i !== idx) : d.domesticFlights }));
@@ -3630,6 +3632,7 @@ export default function MyTripApp() {
       return rows.filter((r) => r.frameId === mainFrame.id && r.typeId === typeId).map((r) => ({
         flightNumber: r.flightNumber || "", from: r.from || "", fromAlias: r.fromAlias || "", to: r.to || "", toAlias: r.toAlias || "",
         depDate: r.date || "", depTime: r.startTime || "", landTime: r.endTime || "", overnight: !!r.overnight,
+        addTransferTo: false, addTransferFrom: false,
       }));
     }
     const liveFlights = mapFlightRows("flight");
@@ -3718,6 +3721,32 @@ export default function MyTripApp() {
   }
   function confirmPreWizard() {
     const d = preWizardData;
+    function addDaysToISO(dateStr, days) {
+      if (!dateStr) return dateStr;
+      const [y, m, dd] = dateStr.split("-").map(Number);
+      const dt = new Date(y, m - 1, dd + days);
+      return toLocalISODate(dt);
+    }
+    /* Creates the "to the airport" (before departure) and/or "from the airport" (after arrival)
+       transfer records for a flight, pasting the relevant airport's own details from the flight
+       itself — defaults to taxi, per the flight's own checkbox choices. */
+    function createAirportTransfers(f, frameId) {
+      if (f.addTransferTo && f.from) {
+        const idTo = addRow(f.depDate, null, frameId);
+        updateRow(idTo, {
+          typeId: "transfer", arrivalTypeId: "taxi",
+          to: f.from, toAlias: f.fromAlias, toLat: f.fromLat, toLon: f.fromLon, toPlaceId: f.fromPlaceId, toVerifiedUrl: f.fromVerifiedUrl,
+        });
+      }
+      if (f.addTransferFrom && f.to) {
+        const landDate = f.overnight ? addDaysToISO(f.depDate, 1) : f.depDate;
+        const idFrom = addRow(landDate, null, frameId);
+        updateRow(idFrom, {
+          typeId: "transfer", arrivalTypeId: "taxi",
+          from: f.to, fromAlias: f.toAlias, fromLat: f.toLat, fromLon: f.toLon, fromPlaceId: f.toPlaceId, fromVerifiedUrl: f.toVerifiedUrl,
+        });
+      }
+    }
     const flights = d.hasFlights === "yes" ? d.flights.filter((f) => f.depDate) : [];
     const domesticFlights = d.hasDomestic === "yes" ? d.domesticFlights.filter((f) => f.depDate) : [];
     const hotels = d.hasHotels === "yes" ? d.hotels.filter((h) => h.checkIn && h.checkOut) : [];
@@ -3754,6 +3783,8 @@ export default function MyTripApp() {
         }
         syncFlightRows("flight", flights);
         syncFlightRows("domestic-flight", domesticFlights);
+        flights.forEach((f) => createAirportTransfers(f, rootFrame.id));
+        domesticFlights.forEach((f) => createAirportTransfers(f, rootFrame.id));
 
         const existingHotelFrames = frames.filter((f) => f.parentFrameId === rootFrame.id && f.frameType === "hotel").sort((a, b) => (a.startDate || "").localeCompare(b.startDate || ""));
         hotels.forEach((h, i) => {
@@ -3817,11 +3848,13 @@ export default function MyTripApp() {
       const id1 = addRow(f.depDate, null, mainFrame.id);
       updateRow(id1, { typeId: "flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, airline: f.airline, startTime: f.depTime || "", endTime: f.landTime || "", overnight: !!f.overnight, fromLat: f.fromLat, fromLon: f.fromLon, fromPlaceId: f.fromPlaceId, fromVerifiedUrl: f.fromVerifiedUrl, toLat: f.toLat, toLon: f.toLon, toPlaceId: f.toPlaceId, toVerifiedUrl: f.toVerifiedUrl });
       createdRowIds.push(id1);
+      createAirportTransfers(f, mainFrame.id);
     });
     domesticFlights.forEach((f) => {
       const id1 = addRow(f.depDate, null, mainFrame.id);
       updateRow(id1, { typeId: "domestic-flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, airline: f.airline, startTime: f.depTime || "", endTime: f.landTime || "", overnight: !!f.overnight, fromLat: f.fromLat, fromLon: f.fromLon, fromPlaceId: f.fromPlaceId, fromVerifiedUrl: f.fromVerifiedUrl, toLat: f.toLat, toLon: f.toLon, toPlaceId: f.toPlaceId, toVerifiedUrl: f.toVerifiedUrl });
       createdRowIds.push(id1);
+      createAirportTransfers(f, mainFrame.id);
     });
 
     hotelFrames.forEach((hf) => {
@@ -5693,6 +5726,8 @@ export default function MyTripApp() {
                             <div className="mt-field"><label>{T.flightLandTime}</label><TimeField value={f.landTime} onChange={(e) => updatePreWizardArrayItem("flights", i, { landTime: e.target.value })} T={T} /></div>
                           </div>
                           <label className="mt-checkbox-row"><input type="checkbox" checked={!!f.overnight} onChange={(e) => updatePreWizardArrayItem("flights", i, { overnight: e.target.checked })} />{T.overnight}</label>
+                          <label className="mt-checkbox-row"><input type="checkbox" checked={!!f.addTransferTo} onChange={(e) => updatePreWizardArrayItem("flights", i, { addTransferTo: e.target.checked })} />{T.addTransferToAirport}</label>
+                          <label className="mt-checkbox-row"><input type="checkbox" checked={!!f.addTransferFrom} onChange={(e) => updatePreWizardArrayItem("flights", i, { addTransferFrom: e.target.checked })} />{T.addTransferFromAirport}</label>
                         </div>
                       ))}
                       <button className="mt-btn ghost" style={{ width: "100%" }} onClick={addPreWizardFlight}><Plus size={13} /> {T.preWizardAddFlight}</button>
@@ -5742,6 +5777,8 @@ export default function MyTripApp() {
                             <div className="mt-field"><label>{T.flightLandTime}</label><TimeField value={f.landTime} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { landTime: e.target.value })} T={T} /></div>
                           </div>
                           <label className="mt-checkbox-row"><input type="checkbox" checked={!!f.overnight} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { overnight: e.target.checked })} />{T.overnight}</label>
+                          <label className="mt-checkbox-row"><input type="checkbox" checked={!!f.addTransferTo} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { addTransferTo: e.target.checked })} />{T.addTransferToAirport}</label>
+                          <label className="mt-checkbox-row"><input type="checkbox" checked={!!f.addTransferFrom} onChange={(e) => updatePreWizardArrayItem("domesticFlights", i, { addTransferFrom: e.target.checked })} />{T.addTransferFromAirport}</label>
                         </div>
                       ))}
                       <button className="mt-btn ghost" style={{ width: "100%" }} onClick={addPreWizardDomesticFlight}><Plus size={13} /> {T.preWizardAddFlight}</button>
