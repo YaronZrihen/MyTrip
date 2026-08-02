@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.47.0";
+const APP_VERSION = "22.48.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -314,7 +314,7 @@ const T_DICT = {
     preWizardAiPendingName: "טיול בתכנון AI", preWizardAiDemoNotice: "זוהי הדגמה — במוצר האמיתי כאן יופעל סוכן AI שיתכנן עבורך מסלול מלא.",
     preWizardAddFlight: "הוסף טיסה", preWizardAddHotel: "הוסף מלון",
     preWizardSummary: "מוכן! בלחיצה על \"צור טיול\" ניצור עבורך מסגרת ראשית, מסגרת לטיסות הבינלאומיות, ומסגרת נפרדת לכל מלון — עם כל הרשומות ממוקמות לפי התאריכים שהזנת.",
-    intlFlightsFrameName: "טיסות בינלאומיות", hotelFrameNameFallback: "מלון",
+    intlFlightsFrameName: "טיסות בינלאומיות", hotelFrameNameFallback: "מלון", myHomeLabel: "הבית שלי",
     newTripAction: "צור טיול חדש", editTripDetails: "ערוך פרטי טיול",
     refreshAllFlights: "ניהול טיסות", flightRefreshRunning: "מרענן טיסות…",
     remindersManagerTitle: "תזכורות והתראות", remindersManagerEmpty: "אין עדיין תזכורות בטיול (מתווספות אוטומטית לרשומות טיסה וצ'ק-אאוט).",
@@ -502,7 +502,7 @@ const T_DICT = {
     preWizardAiPendingName: "AI-planned trip", preWizardAiDemoNotice: "This is a demo — in the real product, an AI agent would plan a full itinerary for you here.",
     preWizardAddFlight: "Add flight", preWizardAddHotel: "Add hotel",
     preWizardSummary: "Ready! Clicking \"Create trip\" will create a main frame, a frame for international flights, and a separate frame for each hotel — with all records placed according to the dates you entered.",
-    intlFlightsFrameName: "International Flights", hotelFrameNameFallback: "Hotel",
+    intlFlightsFrameName: "International Flights", hotelFrameNameFallback: "Hotel", myHomeLabel: "My Home",
     newTripAction: "Create new trip", editTripDetails: "Edit trip details",
     refreshAllFlights: "Flight management", flightRefreshRunning: "Refreshing flights…",
     remindersManagerTitle: "Reminders & Alerts", remindersManagerEmpty: "No reminders yet (added automatically to flight and check-out records).",
@@ -3805,7 +3805,7 @@ export default function MyTripApp() {
         updateRow(idTo, {
           typeId: "transfer", arrivalTypeId: "taxi",
           ...(f.from ? { to: f.from, toAlias: f.fromAlias, toLat: f.fromLat, toLon: f.fromLon, toPlaceId: f.fromPlaceId, toVerifiedUrl: f.fromVerifiedUrl } : {}),
-          ...(prevRow && prevRow.to ? { from: prevRow.to, fromAlias: prevRow.toAlias, fromLat: prevRow.toLat, fromLon: prevRow.toLon, fromPlaceId: prevRow.toPlaceId, fromVerifiedUrl: prevRow.toVerifiedUrl } : {}),
+          ...(prevRow && prevRow.to ? { from: prevRow.to, fromAlias: prevRow.toAlias, fromLat: prevRow.toLat, fromLon: prevRow.toLon, fromPlaceId: prevRow.toPlaceId, fromVerifiedUrl: prevRow.toVerifiedUrl } : { from: T.myHomeLabel }),
           ...(isInternational ? { stayDurationMin: PRE_FLIGHT_STAY_MIN, ...(f.depTime ? { endTime: addMinutesToTime(f.depTime, -PRE_FLIGHT_STAY_MIN), endTimeAuto: false } : {}) } : {}),
         });
       }
@@ -3816,7 +3816,7 @@ export default function MyTripApp() {
         updateRow(idFrom, {
           typeId: "transfer", arrivalTypeId: "taxi",
           ...(f.to ? { from: f.to, fromAlias: f.toAlias, fromLat: f.toLat, fromLon: f.toLon, fromPlaceId: f.toPlaceId, fromVerifiedUrl: f.toVerifiedUrl } : {}),
-          ...(nextRow && nextRow.from ? { to: nextRow.from, toAlias: nextRow.fromAlias, toLat: nextRow.fromLat, toLon: nextRow.fromLon, toPlaceId: nextRow.fromPlaceId, toVerifiedUrl: nextRow.fromVerifiedUrl } : {}),
+          ...(nextRow && nextRow.from ? { to: nextRow.from, toAlias: nextRow.fromAlias, toLat: nextRow.fromLat, toLon: nextRow.fromLon, toPlaceId: nextRow.fromPlaceId, toVerifiedUrl: nextRow.fromVerifiedUrl } : { to: T.myHomeLabel }),
           ...(isInternational && f.landTime ? { startTime: addMinutesToTime(f.landTime, getDefaultStayMinutes("flight")), startTimeAuto: false } : {}),
         });
       }
@@ -5193,6 +5193,8 @@ export default function MyTripApp() {
         .mt-ai-suggest-box { border:1px solid var(--teal); border-radius:10px; padding:12px; margin-top:10px; background:var(--teal-tint); }
         .mt-wizard-qa { margin-bottom:14px; display:flex; align-items:center; gap:8px; }
         .mt-wizard-qa > label { flex:0 0 78px; font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .mt-wizard-yn > label { flex:1; white-space:normal; overflow:visible; text-overflow:clip; }
+        .mt-wizard-yn > .mt-wizard-choices { flex:0 0 auto; }
         .mt-wizard-qa > *:not(label) { flex:1; min-width:0; }
         .mt-modal-body .mt-field { margin-bottom:14px; }
         .mt-wizard-qa label { flex:1 1 0; font-weight:700; font-size:12.5px; color:var(--ink); text-align:right; line-height:1.3; }
@@ -5697,7 +5699,7 @@ export default function MyTripApp() {
             <div className="mt-modal-body">
               {preWizardScreen === 0 && (
                 <>
-                  <div className="mt-wizard-qa">
+                  <div className="mt-wizard-qa mt-wizard-yn">
                     <label>{T.preWizardHasPlan}</label>
                     <div className="mt-wizard-choices">
                       <button className={"mt-wizard-choice" + (preWizardData.hasTripPlan === "yes" ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, hasTripPlan: "yes" })}>{T.yes}</button>
@@ -5778,7 +5780,7 @@ export default function MyTripApp() {
               )}
               {preWizardScreen === 1 && (
                 <>
-                  <div className="mt-wizard-qa">
+                  <div className="mt-wizard-qa mt-wizard-yn">
                     <label>{T.preWizardHasFlights}</label>
                     <div className="mt-wizard-choices">
                       <button className={"mt-wizard-choice" + (preWizardData.hasFlights === "yes" ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, hasFlights: "yes" })}>{T.yes}</button>
@@ -5830,7 +5832,7 @@ export default function MyTripApp() {
               )}
               {preWizardScreen === 2 && (
                 <>
-                  <div className="mt-wizard-qa">
+                  <div className="mt-wizard-qa mt-wizard-yn">
                     <label>{T.preWizardHasDomestic}</label>
                     <div className="mt-wizard-choices">
                       <button className={"mt-wizard-choice" + (preWizardData.hasDomestic === "yes" ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, hasDomestic: "yes" })}>{T.yes}</button>
@@ -5882,7 +5884,7 @@ export default function MyTripApp() {
               )}
               {preWizardScreen === 3 && (
                 <>
-                  <div className="mt-wizard-qa">
+                  <div className="mt-wizard-qa mt-wizard-yn">
                     <label>{T.preWizardHasHotels}</label>
                     <div className="mt-wizard-choices">
                       <button className={"mt-wizard-choice" + (preWizardData.hasHotels === "yes" ? " selected" : "")} onClick={() => setPreWizardData({ ...preWizardData, hasHotels: "yes" })}>{T.yes}</button>
@@ -5893,7 +5895,7 @@ export default function MyTripApp() {
                     <>
                       {preWizardData.hotels.map((h, i) => (
                         <div key={i} className="mt-wizard-subgroup">
-                          <div className="mt-section-label" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div className="mt-wizard-card-header">
                             <span>{T.preWizardHotelN.replace("{n}", i + 1)}</span>
                             <span style={{ display: "flex", gap: 2 }}>
                               <button className="mt-btn ghost" style={{ padding: "2px 6px", marginTop: "-8px" }} disabled={i === 0} onClick={() => movePreWizardArrayItem("hotels", i, -1)}><ChevronUp size={12} /></button>
@@ -6170,7 +6172,7 @@ export default function MyTripApp() {
                 </div>
               )}
 
-              {!noOriginNeeded(cardDraft.typeId) && (
+              {(!noOriginNeeded(cardDraft.typeId) || cardDraft.typeId === "transfer") && (
                 <div className="mt-field">
                   <label>{T.from}</label>
                   <div className="mt-loc-icons" style={{ marginBottom: 4 }}>
