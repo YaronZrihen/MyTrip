@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.50.0";
+const APP_VERSION = "22.50.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -3707,8 +3707,8 @@ export default function MyTripApp() {
       ].filter(Boolean));
       const allFlightEntries = [...(d.hasFlights === "yes" ? d.flights : []), ...(d.hasDomestic === "yes" ? d.domesticFlights : [])].filter((fl) => fl !== excludeFlight);
       const flightPseudoRows = allFlightEntries.flatMap((fl) => [
-        fl.depDate && fl.from ? { date: fl.depDate, to: fl.from, toAlias: fl.fromAlias, toLat: fl.fromLat, toLon: fl.fromLon, toPlaceId: fl.fromPlaceId, toVerifiedUrl: fl.fromVerifiedUrl } : null,
-        fl.depDate && fl.to ? { date: fl.overnight ? addDaysToISO(fl.depDate, 1) : fl.depDate, from: fl.to, fromAlias: fl.toAlias, fromLat: fl.toLat, fromLon: fl.toLon, fromPlaceId: fl.toPlaceId, fromVerifiedUrl: fl.toVerifiedUrl } : null,
+        fl.depDate && (fl.from || fl.fromAlias) ? { date: fl.depDate, to: fl.from || fl.fromAlias, toAlias: fl.fromAlias, toLat: fl.fromLat, toLon: fl.fromLon, toPlaceId: fl.fromPlaceId, toVerifiedUrl: fl.fromVerifiedUrl } : null,
+        fl.depDate && (fl.to || fl.toAlias) ? { date: fl.overnight ? addDaysToISO(fl.depDate, 1) : fl.depDate, from: fl.to || fl.toAlias, fromAlias: fl.toAlias, fromLat: fl.toLat, fromLon: fl.toLon, fromPlaceId: fl.toPlaceId, fromVerifiedUrl: fl.toVerifiedUrl } : null,
       ].filter(Boolean));
       const pool = [...liveRowsSnapshot, ...hotelPseudoRows, ...flightPseudoRows];
       // Same-day adjacency counts (e.g. hotel checkout happens the same calendar day as the flight),
@@ -3742,8 +3742,8 @@ export default function MyTripApp() {
         const prevRow = findAdjacentRow(f.depDate, "before", f);
         updateRow(idTo, {
           typeId: "transfer", arrivalTypeId: "taxi",
-          ...(f.from ? { to: f.from, toAlias: f.fromAlias, toLat: f.fromLat, toLon: f.fromLon, toPlaceId: f.fromPlaceId, toVerifiedUrl: f.fromVerifiedUrl } : {}),
-          ...(prevRow && prevRow.to ? { from: prevRow.to, fromAlias: prevRow.toAlias, fromLat: prevRow.toLat, fromLon: prevRow.toLon, fromPlaceId: prevRow.toPlaceId, fromVerifiedUrl: prevRow.toVerifiedUrl } : { from: T.myHomeLabel }),
+          ...((f.from || f.fromAlias) ? { to: f.from || f.fromAlias, toAlias: f.fromAlias, toLat: f.fromLat, toLon: f.fromLon, toPlaceId: f.fromPlaceId, toVerifiedUrl: f.fromVerifiedUrl } : {}),
+          ...(prevRow && (prevRow.to || prevRow.toAlias) ? { from: prevRow.to || prevRow.toAlias, fromAlias: prevRow.toAlias, fromLat: prevRow.toLat, fromLon: prevRow.toLon, fromPlaceId: prevRow.toPlaceId, fromVerifiedUrl: prevRow.toVerifiedUrl } : { from: T.myHomeLabel }),
           ...(isInternational ? { stayDurationMin: PRE_FLIGHT_STAY_MIN, ...(f.depTime ? { endTime: addMinutesToTime(f.depTime, -PRE_FLIGHT_STAY_MIN), endTimeAuto: false } : {}) } : {}),
         });
       }
@@ -3753,8 +3753,8 @@ export default function MyTripApp() {
         const nextRow = findAdjacentRow(landDate, "after", f);
         updateRow(idFrom, {
           typeId: "transfer", arrivalTypeId: "taxi",
-          ...(f.to ? { from: f.to, fromAlias: f.toAlias, fromLat: f.toLat, fromLon: f.toLon, fromPlaceId: f.toPlaceId, fromVerifiedUrl: f.toVerifiedUrl } : {}),
-          ...(nextRow && nextRow.from ? { to: nextRow.from, toAlias: nextRow.fromAlias, toLat: nextRow.fromLat, toLon: nextRow.fromLon, toPlaceId: nextRow.fromPlaceId, toVerifiedUrl: nextRow.fromVerifiedUrl } : { to: T.myHomeLabel }),
+          ...((f.to || f.toAlias) ? { from: f.to || f.toAlias, fromAlias: f.toAlias, fromLat: f.toLat, fromLon: f.toLon, fromPlaceId: f.toPlaceId, fromVerifiedUrl: f.toVerifiedUrl } : {}),
+          ...(nextRow && (nextRow.from || nextRow.fromAlias) ? { to: nextRow.from || nextRow.fromAlias, toAlias: nextRow.fromAlias, toLat: nextRow.fromLat, toLon: nextRow.fromLon, toPlaceId: nextRow.fromPlaceId, toVerifiedUrl: nextRow.fromVerifiedUrl } : { to: T.myHomeLabel }),
           ...(isInternational && f.landTime ? { startTime: addMinutesToTime(f.landTime, getDefaultStayMinutes("flight")), startTimeAuto: false } : {}),
         });
       }
