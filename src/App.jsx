@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.51.0";
+const APP_VERSION = "22.51.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -2249,7 +2249,7 @@ function computeFlightDurationLabel(row) {
 function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
   const { openCard, openHotelInfo, dragId } = ctx;
   const tm = typeMeta(r.typeId, types, T, lang); const Icon = ICONS[tm.icon] || Tag;
-  const fromLabel = (r.typeId === "transfer" && (r.from || r.fromAlias))
+  const fromLabel = ((r.typeId === "transfer" || r.typeId === "checkin" || r.typeId === "checkout") && (r.from || r.fromAlias))
     ? (r.fromAlias || r.from)
     : (noOriginNeeded(r.typeId) ? (prevRow ? (prevRow.toAlias || prevRow.to || "") : "") : (r.fromAlias || r.from));
   const toLabel = r.toAlias || r.to;
