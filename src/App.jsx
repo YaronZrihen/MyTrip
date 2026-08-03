@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.51.1";
+const APP_VERSION = "22.52.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -261,9 +261,6 @@ const T_DICT = {
     chronoWarning: "סדר הרשומות ביום זה אינו כרונולוגי לפי שעה", sortByTime: "מיין לפי שעה",
     addDayModalTitle: "הוספת יום חדש", addDayDate: "תאריך", confirmAdd: "הוסף",
     addDayAutoRecords: "רשומות אוטומטיות ליום", addDayHotel: "מלון", addDayTransport: "תחבורה", addDayPoi: "נקודת עניין",
-    demoLocationName: "וותיקן", demoLocationRaw: "Vatican City",
-    demoHotelRaw: "Hilton Garden Inn Rome Airport", demoHotelAlias: "הילטון גארדן אין רומא",
-    demoRestaurantRaw: "Ristorante dei Musei", demoRestaurantName: "מסעדת המוזיאון",
     pickSavedHotel: "בחר ממלונות שמורים", noSavedHotels: "אין עדיין מלונות שמורים — הם יישמרו אוטומטית ככל שתשתמש בהם.",
     pickTripHotel: "בחר ממלונות הטיול", noTripHotels: "אין עדיין מלונות בטיול זה — הוסף מלון דרך אשף הטיול.",
     verify: "אמת מול מפות", verified: "מאומת", openMap: "פתח במפה", pickFromMap: "בחר מהמפה", moreDetails: "עוד פרטים",
@@ -449,9 +446,6 @@ const T_DICT = {
     chronoWarning: "Records on this day are not in chronological time order", sortByTime: "Sort by time",
     addDayModalTitle: "Add a new day", addDayDate: "Date", confirmAdd: "Add",
     addDayAutoRecords: "Automatic records for the day", addDayHotel: "Hotel", addDayTransport: "Transportation", addDayPoi: "Point of interest",
-    demoLocationName: "Vatican", demoLocationRaw: "Vatican City",
-    demoHotelRaw: "Hilton Garden Inn Rome Airport", demoHotelAlias: "Hilton Garden Inn Rome",
-    demoRestaurantRaw: "Ristorante dei Musei", demoRestaurantName: "Museum Restaurant",
     pickSavedHotel: "Pick from saved hotels", noSavedHotels: "No saved hotels yet — they'll be remembered automatically as you use them.",
     pickTripHotel: "Pick from trip hotels", noTripHotels: "No hotels in this trip yet — add one via the trip wizard.",
     verify: "Verify with Maps", verified: "Verified", openMap: "Open in Maps", pickFromMap: "Pick from map", moreDetails: "More details",
@@ -4303,21 +4297,18 @@ export default function MyTripApp() {
     if (addDayCtx.addTransport) {
       const idBus = addRow(addDayCtx.date, null, addDayCtx.fid);
       updateRow(idBus, {
-        typeId: "bus", startTime: "08:00", to: T.demoLocationRaw, toAlias: T.demoLocationName,
+        typeId: "bus", startTime: "08:00",
         from: hotelRaw, fromAlias: hotelAlias, fromLat: hotelLat, fromLon: hotelLon,
       });
     }
     if (addDayCtx.addPoi) {
       const idPoi = addRow(addDayCtx.date, null, addDayCtx.fid);
-      updateRow(idPoi, { typeId: "poi", startTime: "10:15", endTime: "12:15", to: T.demoLocationRaw, toAlias: T.demoLocationName });
-      const idRestaurant = addRow(addDayCtx.date, null, addDayCtx.fid);
-      updateRow(idRestaurant, { typeId: "restaurant", startTime: "12:15", endTime: "13:45", to: T.demoRestaurantRaw, toAlias: T.demoRestaurantName });
+      updateRow(idPoi, { typeId: "poi", startTime: "10:15", endTime: "12:15" });
     }
     if (addDayCtx.addTransport) {
       const idTaxi = addRow(addDayCtx.date, null, addDayCtx.fid);
       updateRow(idTaxi, {
         typeId: "taxi", startTime: "13:45",
-        from: T.demoRestaurantRaw, fromAlias: T.demoRestaurantName,
         to: hotelRaw, toAlias: hotelAlias, toLat: hotelLat, toLon: hotelLon,
       });
     }
