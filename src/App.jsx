@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.49.0";
+const APP_VERSION = "22.50.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1539,38 +1539,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
   }, [row.id, row.from, row.to, row.fromAlias, row.toAlias, row.startTime, row.typeId, row.fromLat, row.fromLon, row.toLat, row.toLon, row.stayDurationMin, prevRow && prevRow.from, prevRow && prevRow.fromAlias, prevRow && prevRow.fromLat, prevRow && prevRow.fromLon, prevRow && prevRow.to, prevRow && prevRow.toAlias, prevRow && prevRow.toLat, prevRow && prevRow.toLon, prevRow && prevRow.endTime]);
 
   const [fromVerifyLoading, setFromVerifyLoading] = useState(false);
-  useEffect(() => {
-    if (!row.from) return;
-    const fullyVerified = hasGooglePlaces() ? (row.fromPlaceId && row.fromVerifiedText === row.from) : (row.fromVerifiedUrl && row.fromVerifiedText === row.from);
-    if (fullyVerified) return;
-    const timer = setTimeout(() => {
-      if (fromVerifyLoading) return;
-      setFromVerifyLoading(true);
-      autoVerifyLocationField(row, "from", lang).then((patch) => {
-        setFromVerifyLoading(false);
-        if (patch) updateRow(row.id, patch);
-      }).catch(() => setFromVerifyLoading(false));
-    }, 900);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [row.id, row.from, row.fromLat, row.fromLon, row.fromPlaceId]);
-
   const [toVerifyLoading, setToVerifyLoading] = useState(false);
-  useEffect(() => {
-    if (!row.to) return;
-    const fullyVerified = hasGooglePlaces() ? (row.toPlaceId && row.toVerifiedText === row.to) : (row.toVerifiedUrl && row.toVerifiedText === row.to);
-    if (fullyVerified) return;
-    const timer = setTimeout(() => {
-      if (toVerifyLoading) return;
-      setToVerifyLoading(true);
-      autoVerifyLocationField(row, "to", lang).then((patch) => {
-        setToVerifyLoading(false);
-        if (patch) updateRow(row.id, patch);
-      }).catch(() => setToVerifyLoading(false));
-    }, 900);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [row.id, row.to, row.toLat, row.toLon, row.toPlaceId]);
 
   const [weatherLoading, setWeatherLoading] = useState(false);
   const hasWeather = row.weatherCode != null && row.weatherForDate === row.date;
@@ -2206,38 +2175,7 @@ function MobileCardMeta({ row, prevRow, ctx }) {
   }, [row.id, row.from, row.to, row.fromAlias, row.toAlias, row.startTime, row.typeId, row.fromLat, row.fromLon, row.toLat, row.toLon, row.stayDurationMin, prevRow && prevRow.from, prevRow && prevRow.fromAlias, prevRow && prevRow.fromLat, prevRow && prevRow.fromLon, prevRow && prevRow.to, prevRow && prevRow.toAlias, prevRow && prevRow.toLat, prevRow && prevRow.toLon, prevRow && prevRow.endTime]);
 
   const [fromVerifyLoading, setFromVerifyLoading] = useState(false);
-  useEffect(() => {
-    if (!row.from) return;
-    const fullyVerified = hasGooglePlaces() ? (row.fromPlaceId && row.fromVerifiedText === row.from) : (row.fromVerifiedUrl && row.fromVerifiedText === row.from);
-    if (fullyVerified) return;
-    const timer = setTimeout(() => {
-      if (fromVerifyLoading) return;
-      setFromVerifyLoading(true);
-      autoVerifyLocationField(row, "from", lang).then((patch) => {
-        setFromVerifyLoading(false);
-        if (patch) updateRow(row.id, patch);
-      }).catch(() => setFromVerifyLoading(false));
-    }, 900);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [row.id, row.from, row.fromLat, row.fromLon, row.fromPlaceId]);
-
   const [toVerifyLoading, setToVerifyLoading] = useState(false);
-  useEffect(() => {
-    if (!row.to) return;
-    const fullyVerified = hasGooglePlaces() ? (row.toPlaceId && row.toVerifiedText === row.to) : (row.toVerifiedUrl && row.toVerifiedText === row.to);
-    if (fullyVerified) return;
-    const timer = setTimeout(() => {
-      if (toVerifyLoading) return;
-      setToVerifyLoading(true);
-      autoVerifyLocationField(row, "to", lang).then((patch) => {
-        setToVerifyLoading(false);
-        if (patch) updateRow(row.id, patch);
-      }).catch(() => setToVerifyLoading(false));
-    }, 900);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [row.id, row.to, row.toLat, row.toLon, row.toPlaceId]);
 
   function weatherIconEl() {
     if (weatherLoading) return <Cloud size={13} className="mt-weather-spin" />;
