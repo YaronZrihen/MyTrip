@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.52.0";
+const APP_VERSION = "22.53.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -3731,24 +3731,37 @@ export default function MyTripApp() {
        3 hours; the post-flight transfer's start time is set to the flight's own arrival time plus its
        stay buffer (the same buffer already used to anchor the chain), so it's correct immediately
        rather than only after the next recompute pass. */
+    /* Finds the row immediately before/after a given row in the trip's actual display order —
+       used to detect "this flight's own transfer" so editing flight/hotel data later can update
+       that existing transfer in place, instead of only ever being able to create new ones. */
+    function findAdjacentExistingRow(rowId, direction) {
+      const order = buildGlobalRowOrderPure(liveRowsSnapshot, frames, null);
+      const idx = order.findIndex((r) => r.id === rowId);
+      if (idx < 0) return null;
+      return direction === "before" ? (order[idx - 1] || null) : (order[idx + 1] || null);
+    }
     function createAirportTransfers(f, frameId, flightRowId, isInternational) {
       const PRE_FLIGHT_STAY_MIN = 180;
-      if (f.addTransferTo) {
-        const idTo = addRowNear(f.depDate, frameId, flightRowId, "before");
+      const existingBefore = findAdjacentExistingRow(flightRowId, "before");
+      const existingAfter = findAdjacentExistingRow(flightRowId, "after");
+      if (f.addTransferTo || (existingBefore && existingBefore.typeId === "transfer")) {
+        const idTo = (existingBefore && existingBefore.typeId === "transfer") ? existingBefore.id : addRowNear(f.depDate, frameId, flightRowId, "before");
         const prevRow = findAdjacentRow(f.depDate, "before", f);
         updateRow(idTo, {
           typeId: "transfer", arrivalTypeId: "taxi",
+          routeCalcSig: null, routeDistanceKm: null, routeDurationMin: null,
           ...((f.from || f.fromAlias) ? { to: f.from || f.fromAlias, toAlias: f.fromAlias, toLat: f.fromLat, toLon: f.fromLon, toPlaceId: f.fromPlaceId, toVerifiedUrl: f.fromVerifiedUrl } : {}),
           ...(prevRow && (prevRow.to || prevRow.toAlias) ? { from: prevRow.to || prevRow.toAlias, fromAlias: prevRow.toAlias, fromLat: prevRow.toLat, fromLon: prevRow.toLon, fromPlaceId: prevRow.toPlaceId, fromVerifiedUrl: prevRow.toVerifiedUrl } : { from: T.myHomeLabel }),
           ...(isInternational ? { stayDurationMin: PRE_FLIGHT_STAY_MIN, ...(f.depTime ? { endTime: addMinutesToTime(f.depTime, -PRE_FLIGHT_STAY_MIN), endTimeAuto: false } : {}) } : {}),
         });
       }
-      if (f.addTransferFrom) {
+      if (f.addTransferFrom || (existingAfter && existingAfter.typeId === "transfer")) {
         const landDate = f.overnight ? addDaysToISO(f.depDate, 1) : f.depDate;
-        const idFrom = addRowNear(landDate, frameId, flightRowId, "after");
+        const idFrom = (existingAfter && existingAfter.typeId === "transfer") ? existingAfter.id : addRowNear(landDate, frameId, flightRowId, "after");
         const nextRow = findAdjacentRow(landDate, "after", f);
         updateRow(idFrom, {
           typeId: "transfer", arrivalTypeId: "taxi",
+          routeCalcSig: null, routeDistanceKm: null, routeDurationMin: null,
           ...((f.to || f.toAlias) ? { from: f.to || f.toAlias, fromAlias: f.toAlias, fromLat: f.toLat, fromLon: f.toLon, fromPlaceId: f.toPlaceId, fromVerifiedUrl: f.toVerifiedUrl } : {}),
           ...(nextRow && (nextRow.from || nextRow.fromAlias) ? { to: nextRow.from || nextRow.fromAlias, toAlias: nextRow.fromAlias, toLat: nextRow.fromLat, toLon: nextRow.fromLon, toPlaceId: nextRow.fromPlaceId, toVerifiedUrl: nextRow.fromVerifiedUrl } : { to: T.myHomeLabel }),
           ...(isInternational && f.landTime ? { startTime: addMinutesToTime(f.landTime, getDefaultStayMinutes("flight")), startTimeAuto: false } : {}),
@@ -3810,7 +3823,7 @@ export default function MyTripApp() {
             // resolved address than the plain display name) would be silently overwritten every save.
             const isRowVerified = (r) => r && r.toVerifiedText === r.to && (r.toPlaceId || r.toVerifiedUrl);
             const nameChanged = h.name !== hf.name;
-            const locationPatch = { from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, to: h.name || h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl };
+            const locationPatch = { from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, to: h.name || h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, routeDistanceKm: 0, routeDurationMin: 0, routeCalcSig: `${h.name || h.alias}|${h.name || h.alias}|checkin|c` };
             if (checkinRow) updateRow(checkinRow.id, { ...((nameChanged || !isRowVerified(checkinRow)) ? locationPatch : {}), toAlias: h.alias, date: h.checkIn });
             if (checkoutRow) updateRow(checkoutRow.id, { ...((nameChanged || !isRowVerified(checkoutRow)) ? locationPatch : {}), toAlias: h.alias, date: h.checkOut });
             transferRows.forEach((tr) => updateRow(tr.id, { date: tr.date === (checkoutRow && checkoutRow.date) ? h.checkOut : h.checkIn }));
@@ -3818,9 +3831,9 @@ export default function MyTripApp() {
             const newFrame = { id: uid(), name: h.alias || h.name || T.hotelFrameNameFallback, startDate: h.checkIn, endDate: h.checkOut, parentFrameId: rootFrame.id, collapsed: false, frameType: "hotel", hotelRef: h };
             setFrames((prev) => [...prev, newFrame]);
             const id1 = addRow(h.checkIn, null, newFrame.id);
-            updateRow(id1, { typeId: "checkin", startTime: "15:00", from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
+            updateRow(id1, { typeId: "checkin", startTime: "15:00", from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, routeDistanceKm: 0, routeDurationMin: 0, routeCalcSig: `${h.name || h.alias}|${h.name || h.alias}|checkin|c` });
             const id2 = addRow(h.checkOut, null, newFrame.id);
-            updateRow(id2, { typeId: "checkout", endTime: "11:00", from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
+            updateRow(id2, { typeId: "checkout", endTime: "11:00", from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, routeDistanceKm: 0, routeDurationMin: 0, routeCalcSig: `${h.name || h.alias}|${h.name || h.alias}|checkout|c` });
           }
         });
         existingHotelFrames.slice(hotels.length).forEach((hf) => {
@@ -3866,9 +3879,9 @@ export default function MyTripApp() {
     hotelFrames.forEach((hf) => {
       const h = hf.hotelRef;
       const id1 = addRow(h.checkIn, null, hf.id);
-      updateRow(id1, { typeId: "checkin", startTime: "15:00", from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
+      updateRow(id1, { typeId: "checkin", startTime: "15:00", from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, routeDistanceKm: 0, routeDurationMin: 0, routeCalcSig: `${h.name || h.alias}|${h.name || h.alias}|checkin|c` });
       const id2 = addRow(h.checkOut, null, hf.id);
-      updateRow(id2, { typeId: "checkout", endTime: "11:00", from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
+      updateRow(id2, { typeId: "checkout", endTime: "11:00", from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, routeDistanceKm: 0, routeDurationMin: 0, routeCalcSig: `${h.name || h.alias}|${h.name || h.alias}|checkout|c` });
       createdRowIds.push(id1, id2);
     });
 
