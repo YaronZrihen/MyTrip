@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.50.1";
+const APP_VERSION = "22.50.2";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -3702,7 +3702,7 @@ export default function MyTripApp() {
       // search reads .to (where you were, about to leave — the checkout), an "after" search reads
       // .from (where you'll be, having just arrived — the checkin).
       const hotelPseudoRows = (d.hasHotels === "yes" ? d.hotels : []).flatMap((h) => [
-        h.checkOut ? { date: h.checkOut, to: h.name, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl } : null,
+        h.checkOut ? { date: h.checkOut, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl } : null,
         h.checkIn ? { date: h.checkIn, from: h.name, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl } : null,
       ].filter(Boolean));
       const allFlightEntries = [...(d.hasFlights === "yes" ? d.flights : []), ...(d.hasDomestic === "yes" ? d.domesticFlights : [])].filter((fl) => fl !== excludeFlight);
@@ -3814,7 +3814,7 @@ export default function MyTripApp() {
             // resolved address than the plain display name) would be silently overwritten every save.
             const isRowVerified = (r) => r && r.toVerifiedText === r.to && (r.toPlaceId || r.toVerifiedUrl);
             const nameChanged = h.name !== hf.name;
-            const locationPatch = { to: h.name, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl };
+            const locationPatch = { to: h.name || h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl };
             if (checkinRow) updateRow(checkinRow.id, { ...((nameChanged || !isRowVerified(checkinRow)) ? locationPatch : {}), toAlias: h.alias, date: h.checkIn });
             if (checkoutRow) updateRow(checkoutRow.id, { ...((nameChanged || !isRowVerified(checkoutRow)) ? locationPatch : {}), toAlias: h.alias, date: h.checkOut });
             transferRows.forEach((tr) => updateRow(tr.id, { date: tr.date === (checkoutRow && checkoutRow.date) ? h.checkOut : h.checkIn }));
@@ -3822,9 +3822,9 @@ export default function MyTripApp() {
             const newFrame = { id: uid(), name: h.alias || h.name || T.hotelFrameNameFallback, startDate: h.checkIn, endDate: h.checkOut, parentFrameId: rootFrame.id, collapsed: false, frameType: "hotel", hotelRef: h };
             setFrames((prev) => [...prev, newFrame]);
             const id1 = addRow(h.checkIn, null, newFrame.id);
-            updateRow(id1, { typeId: "checkin", startTime: "15:00", to: h.name, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
+            updateRow(id1, { typeId: "checkin", startTime: "15:00", to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
             const id2 = addRow(h.checkOut, null, newFrame.id);
-            updateRow(id2, { typeId: "checkout", endTime: "11:00", to: h.name, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
+            updateRow(id2, { typeId: "checkout", endTime: "11:00", to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
           }
         });
         existingHotelFrames.slice(hotels.length).forEach((hf) => {
@@ -3870,9 +3870,9 @@ export default function MyTripApp() {
     hotelFrames.forEach((hf) => {
       const h = hf.hotelRef;
       const id1 = addRow(h.checkIn, null, hf.id);
-      updateRow(id1, { typeId: "checkin", startTime: "15:00", to: h.name, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
+      updateRow(id1, { typeId: "checkin", startTime: "15:00", to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
       const id2 = addRow(h.checkOut, null, hf.id);
-      updateRow(id2, { typeId: "checkout", endTime: "11:00", to: h.name, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
+      updateRow(id2, { typeId: "checkout", endTime: "11:00", to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl });
       createdRowIds.push(id1, id2);
     });
 
