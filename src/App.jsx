@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.54.1";
+const APP_VERSION = "22.55.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -3598,6 +3598,8 @@ export default function MyTripApp() {
       return rows.filter((r) => r.frameId === mainFrame.id && r.typeId === typeId).map((r) => ({
         flightNumber: r.flightNumber || "", from: r.from || "", fromAlias: r.fromAlias || "", to: r.to || "", toAlias: r.toAlias || "",
         depDate: r.date || "", depTime: r.startTime || "", landTime: r.endTime || "", overnight: !!r.overnight,
+        fromLat: r.fromLat != null ? r.fromLat : null, fromLon: r.fromLon != null ? r.fromLon : null, fromPlaceId: r.fromPlaceId || null, fromVerifiedUrl: r.fromVerifiedUrl || "", fromVerifiedText: r.fromVerifiedText || "",
+        toLat: r.toLat != null ? r.toLat : null, toLon: r.toLon != null ? r.toLon : null, toPlaceId: r.toPlaceId || null, toVerifiedUrl: r.toVerifiedUrl || "", toVerifiedText: r.toVerifiedText || "",
         addTransferTo: false, addTransferFrom: false,
       }));
     }
@@ -3673,8 +3675,16 @@ export default function MyTripApp() {
       .then(({ ok, data }) => {
         if (!ok || !data || data.error) { updatePreWizardArrayItem(field, idx, { flightLookupMsg: (data && data.error) || T.flightLookupError }); return; }
         const patch = { flightLookupMsg: T.flightLookupSuccess };
-        if (data.departureLocation) patch.from = data.departureLocation;
-        if (data.arrivalLocation) patch.to = data.arrivalLocation;
+        if (data.departureLocation) {
+          patch.from = data.departureLocation;
+          patch.fromVerifiedText = data.departureLocation;
+          patch.fromVerifiedUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(data.departureLocation)}`;
+        }
+        if (data.arrivalLocation) {
+          patch.to = data.arrivalLocation;
+          patch.toVerifiedText = data.arrivalLocation;
+          patch.toVerifiedUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(data.arrivalLocation)}`;
+        }
         if (data.departureAlias) patch.fromAlias = data.departureAlias;
         if (data.arrivalAlias) patch.toAlias = data.arrivalAlias;
         if (data.airline) patch.airline = data.airline;
@@ -3815,7 +3825,7 @@ export default function MyTripApp() {
         function syncFlightRows(typeId, entries) {
           const existing = rows.filter((r) => r.frameId === rootFrame.id && r.typeId === typeId).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
           const ids = entries.map((f, i) => {
-            const patch = { typeId, from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, date: f.depDate, startTime: f.depTime || "", endTime: f.landTime || "", startTimeAuto: !f.depTime, endTimeAuto: !f.landTime, overnight: !!f.overnight, fromLat: f.fromLat, fromLon: f.fromLon, fromPlaceId: f.fromPlaceId, fromVerifiedUrl: f.fromVerifiedUrl, toLat: f.toLat, toLon: f.toLon, toPlaceId: f.toPlaceId, toVerifiedUrl: f.toVerifiedUrl };
+            const patch = { typeId, from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, date: f.depDate, startTime: f.depTime || "", endTime: f.landTime || "", startTimeAuto: !f.depTime, endTimeAuto: !f.landTime, overnight: !!f.overnight, fromLat: f.fromLat, fromLon: f.fromLon, fromPlaceId: f.fromPlaceId, fromVerifiedUrl: f.fromVerifiedUrl, fromVerifiedText: f.fromVerifiedText, toLat: f.toLat, toLon: f.toLon, toPlaceId: f.toPlaceId, toVerifiedUrl: f.toVerifiedUrl, toVerifiedText: f.toVerifiedText };
             const id = existing[i] ? existing[i].id : addRow(f.depDate, null, rootFrame.id);
             updateRow(id, patch);
             return id;
@@ -3885,13 +3895,13 @@ export default function MyTripApp() {
     const createdRowIds = [];
     flights.forEach((f) => {
       const id1 = addRow(f.depDate, null, mainFrame.id);
-      updateRow(id1, { typeId: "flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, airline: f.airline, startTime: f.depTime || "", endTime: f.landTime || "", startTimeAuto: !f.depTime, endTimeAuto: !f.landTime, overnight: !!f.overnight, fromLat: f.fromLat, fromLon: f.fromLon, fromPlaceId: f.fromPlaceId, fromVerifiedUrl: f.fromVerifiedUrl, toLat: f.toLat, toLon: f.toLon, toPlaceId: f.toPlaceId, toVerifiedUrl: f.toVerifiedUrl });
+      updateRow(id1, { typeId: "flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, airline: f.airline, startTime: f.depTime || "", endTime: f.landTime || "", startTimeAuto: !f.depTime, endTimeAuto: !f.landTime, overnight: !!f.overnight, fromLat: f.fromLat, fromLon: f.fromLon, fromPlaceId: f.fromPlaceId, fromVerifiedUrl: f.fromVerifiedUrl, fromVerifiedText: f.fromVerifiedText, toLat: f.toLat, toLon: f.toLon, toPlaceId: f.toPlaceId, toVerifiedUrl: f.toVerifiedUrl, toVerifiedText: f.toVerifiedText });
       createdRowIds.push(id1);
       createAirportTransfers(f, mainFrame.id, id1, true);
     });
     domesticFlights.forEach((f) => {
       const id1 = addRow(f.depDate, null, mainFrame.id);
-      updateRow(id1, { typeId: "domestic-flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, airline: f.airline, startTime: f.depTime || "", endTime: f.landTime || "", startTimeAuto: !f.depTime, endTimeAuto: !f.landTime, overnight: !!f.overnight, fromLat: f.fromLat, fromLon: f.fromLon, fromPlaceId: f.fromPlaceId, fromVerifiedUrl: f.fromVerifiedUrl, toLat: f.toLat, toLon: f.toLon, toPlaceId: f.toPlaceId, toVerifiedUrl: f.toVerifiedUrl });
+      updateRow(id1, { typeId: "domestic-flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, airline: f.airline, startTime: f.depTime || "", endTime: f.landTime || "", startTimeAuto: !f.depTime, endTimeAuto: !f.landTime, overnight: !!f.overnight, fromLat: f.fromLat, fromLon: f.fromLon, fromPlaceId: f.fromPlaceId, fromVerifiedUrl: f.fromVerifiedUrl, fromVerifiedText: f.fromVerifiedText, toLat: f.toLat, toLon: f.toLon, toPlaceId: f.toPlaceId, toVerifiedUrl: f.toVerifiedUrl, toVerifiedText: f.toVerifiedText });
       createdRowIds.push(id1);
       createAirportTransfers(f, mainFrame.id, id1, false);
     });
