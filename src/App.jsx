@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.55.0";
+const APP_VERSION = "22.56.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1275,8 +1275,29 @@ function computeGoogleRoute(a, b, travelMode) {
     })
     .catch(() => null);
 }
+/* Great-circle distance between two coordinates, in km — the right basis for a flight's distance,
+   since roads are irrelevant and "flying" was never a real travel mode for the routing APIs (which
+   only understand DRIVE/WALK/BICYCLE/TRANSIT), so it was silently falling back to a driving route
+   across the sea. */
+function haversineDistanceKm(a, b) {
+  const R = 6371;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat), dLon = toRad(b.lon - a.lon);
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
+}
+/* Rough flight-time estimate from great-circle distance: ~800 km/h average cruise speed, plus a
+   fixed buffer for taxi/takeoff/climb/descent/landing — for reference display only, never used to
+   set an actual scheduled departure/arrival time (those come from the flight's own real times). */
+function estimateFlightDurationMin(distanceKm) {
+  return (distanceKm / 800) * 60 + 30;
+}
 const __routeCache = new Map();
 function fetchRouteInfo(a, b, typeId) {
+  if (isFlightType(typeId)) {
+    const distanceKm = haversineDistanceKm(a, b);
+    return Promise.resolve({ distanceKm, durationMin: estimateFlightDurationMin(distanceKm) });
+  }
   const key = `${a.lat.toFixed(5)},${a.lon.toFixed(5)}|${b.lat.toFixed(5)},${b.lon.toFixed(5)}|${typeId}`;
   if (__routeCache.has(key)) return __routeCache.get(key);
   const p = (hasGooglePlaces()
