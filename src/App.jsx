@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.53.0";
+const APP_VERSION = "22.54.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1502,6 +1502,11 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
     else { origin = prevTo; originSource = "prevTo"; }
     const dest = rowEndPoint(row);
     if (!origin || !dest) { setRouteCalcError(!origin ? T.routeErrNoOrigin : T.routeErrNoDest); return; }
+    // Don't compute or show a distance for a location that hasn't actually been verified — an
+    // unverified geocode match can be wrong, and showing a confident-looking number for it is
+    // misleading.
+    const destVerified = row.toVerifiedText === row.to && (row.toPlaceId || row.toVerifiedUrl);
+    if (!destVerified) { setRouteCalcError(null); return; }
     const originLat = originSource === "own" ? row.fromLat : (prevRow && prevRow.toLat);
     const originLon = originSource === "own" ? row.fromLon : (prevRow && prevRow.toLon);
     const hasCoords = (originLat != null && originLon != null) ? "c" : "t";
@@ -2145,6 +2150,8 @@ function MobileCardMeta({ row, prevRow, ctx }) {
     else { origin = prevTo; originSource = "prevTo"; }
     const dest = rowEndPoint(row);
     if (!origin || !dest) return;
+    const destVerified = row.toVerifiedText === row.to && (row.toPlaceId || row.toVerifiedUrl);
+    if (!destVerified) return;
     const originLat = originSource === "own" ? row.fromLat : (prevRow && prevRow.toLat);
     const originLon = originSource === "own" ? row.fromLon : (prevRow && prevRow.toLon);
     const hasCoords = (originLat != null && originLon != null) ? "c" : "t";
@@ -3608,7 +3615,7 @@ export default function MyTripApp() {
     });
     return {
       hasTripPlan: "yes",
-      tripName: mainFrame.name || "", planStartDate: mainFrame.startDate || "", planEndDate: mainFrame.endDate || "",
+      tripName: mainFrame.name || "", destination: mainFrame.destination || "", planStartDate: mainFrame.startDate || "", planEndDate: mainFrame.endDate || "",
       hasFlights: liveFlights.length ? "yes" : "no", flights: liveFlights.length ? liveFlights : PRE_WIZARD_DEFAULTS.flights,
       hasDomestic: liveDomestic.length ? "yes" : "no", domesticFlights: liveDomestic.length ? liveDomestic : PRE_WIZARD_DEFAULTS.domesticFlights,
       hasHotels: liveHotels.length ? "yes" : "no", hotels: liveHotels.length ? liveHotels : PRE_WIZARD_DEFAULTS.hotels,
@@ -3737,16 +3744,26 @@ export default function MyTripApp() {
     function findAdjacentExistingRow(rowId, direction) {
       const order = buildGlobalRowOrderPure(liveRowsSnapshot, frames, null);
       const idx = order.findIndex((r) => r.id === rowId);
-      if (idx < 0) return null;
-      return direction === "before" ? (order[idx - 1] || null) : (order[idx + 1] || null);
+      if (idx < 0) return { found: false, row: null };
+      return { found: true, row: direction === "before" ? (order[idx - 1] || null) : (order[idx + 1] || null) };
     }
     function createAirportTransfers(f, frameId, flightRowId, isInternational) {
       const PRE_FLIGHT_STAY_MIN = 180;
-      const existingBefore = findAdjacentExistingRow(flightRowId, "before");
-      const existingAfter = findAdjacentExistingRow(flightRowId, "after");
-      if (f.addTransferTo || (existingBefore && existingBefore.typeId === "transfer")) {
-        const idTo = (existingBefore && existingBefore.typeId === "transfer") ? existingBefore.id : addRowNear(f.depDate, frameId, flightRowId, "before");
-        const prevRow = findAdjacentRow(f.depDate, "before", f);
+      const beforeInfo = findAdjacentExistingRow(flightRowId, "before");
+      const afterInfo = findAdjacentExistingRow(flightRowId, "after");
+      const existingBefore = beforeInfo.row;
+      const existingAfter = afterInfo.row;
+      const beforeIsTransfer = existingBefore && existingBefore.typeId === "transfer";
+      const afterIsTransfer = existingAfter && existingAfter.typeId === "transfer";
+      if (f.addTransferTo || beforeIsTransfer) {
+        const idTo = beforeIsTransfer ? existingBefore.id : addRowNear(f.depDate, frameId, flightRowId, "before");
+        // Trust the real row order when the flight is already part of it (editing an existing
+        // trip); only fall back to date-based matching for a brand-new trip not yet inserted.
+        // If a transfer already occupies this slot, look one step further back — before the
+        // transfer itself, not before the flight (which would just be the transfer again).
+        const prevRow = beforeInfo.found
+          ? (beforeIsTransfer ? findAdjacentExistingRow(existingBefore.id, "before").row : existingBefore)
+          : findAdjacentRow(f.depDate, "before", f);
         updateRow(idTo, {
           typeId: "transfer", arrivalTypeId: "taxi",
           routeCalcSig: null, routeDistanceKm: null, routeDurationMin: null,
@@ -3755,10 +3772,12 @@ export default function MyTripApp() {
           ...(isInternational ? { stayDurationMin: PRE_FLIGHT_STAY_MIN, ...(f.depTime ? { endTime: addMinutesToTime(f.depTime, -PRE_FLIGHT_STAY_MIN), endTimeAuto: false } : {}) } : {}),
         });
       }
-      if (f.addTransferFrom || (existingAfter && existingAfter.typeId === "transfer")) {
+      if (f.addTransferFrom || afterIsTransfer) {
         const landDate = f.overnight ? addDaysToISO(f.depDate, 1) : f.depDate;
-        const idFrom = (existingAfter && existingAfter.typeId === "transfer") ? existingAfter.id : addRowNear(landDate, frameId, flightRowId, "after");
-        const nextRow = findAdjacentRow(landDate, "after", f);
+        const idFrom = afterIsTransfer ? existingAfter.id : addRowNear(landDate, frameId, flightRowId, "after");
+        const nextRow = afterInfo.found
+          ? (afterIsTransfer ? findAdjacentExistingRow(existingAfter.id, "after").row : existingAfter)
+          : findAdjacentRow(landDate, "after", f);
         updateRow(idFrom, {
           typeId: "transfer", arrivalTypeId: "taxi",
           routeCalcSig: null, routeDistanceKm: null, routeDurationMin: null,
@@ -3785,7 +3804,7 @@ export default function MyTripApp() {
       const rootFrame = frames.find((f) => !f.parentFrameId);
       if (rootFrame) {
         setFrames((prev) => prev.map((f) => (f.id === rootFrame.id
-          ? { ...f, name: d.tripName || d.destination || f.name, startDate: allDates[0] || f.startDate, endDate: allDates[allDates.length - 1] || f.endDate }
+          ? { ...f, name: d.tripName || d.destination || f.name, startDate: allDates[0] || f.startDate, endDate: allDates[allDates.length - 1] || f.endDate, destination: d.destination || f.destination || "" }
           : f)));
       }
       // Sync flights/hotels into whatever already exists, by matching order (sorted by date) —
@@ -3852,7 +3871,7 @@ export default function MyTripApp() {
       setFrames((prev) => prev.filter((f) => !frameIdSet.has(f.id)));
       applyRows((prev) => prev.filter((r) => !rowIdSet.has(r.id)));
     }
-    const mainFrame = { id: uid(), name: d.tripName || d.destination || (lang === "he" ? "טיול חדש" : "New trip"), startDate, endDate, parentFrameId: null, collapsed: false, frameType: "flight" };
+    const mainFrame = { id: uid(), name: d.tripName || d.destination || (lang === "he" ? "טיול חדש" : "New trip"), startDate, endDate, parentFrameId: null, collapsed: false, frameType: "flight", destination: d.destination || "" };
     const newFrames = [mainFrame];
 
     const hotelFrames = hotels.map((h) => ({
