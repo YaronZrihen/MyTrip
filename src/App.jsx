@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.56.0";
+const APP_VERSION = "22.57.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -683,6 +683,15 @@ function detectTextAlign(text) {
 function typeDisplayName(t, lang) { return t.name_he != null ? (lang === "en" ? t.name_en : t.name_he) : t.name; }
 function isFlightType(typeId) { return typeId === "flight" || typeId === "domestic-flight"; }
 function noOriginNeeded(typeId) { return !isFlightType(typeId); }
+/* Whether a row should use its OWN from field as the route/display origin, rather than always
+   falling back to chain-inheritance from the previous row. Flights always do (existing rule).
+   Transfer/checkin/checkout now also do, but only when they actually have an explicit origin set
+   (e.g. from the wizard's airport-transfer feature) — otherwise they still inherit as before. */
+function rowUsesOwnOrigin(row) {
+  const hasOwnFrom = !!(row.from && row.from.trim());
+  if (row.typeId === "transfer" || row.typeId === "checkin" || row.typeId === "checkout") return hasOwnFrom;
+  return !noOriginNeeded(row.typeId) && hasOwnFrom;
+}
 function isAccommodationType(typeId) { return typeId === "checkin" || typeId === "checkout" || typeId === "hostel" || typeId === "apartment"; }
 
 /* Simplified OSM opening_hours check — handles common "Mo-Fr 09:00-18:00" style rules only.
@@ -990,7 +999,7 @@ function effectiveTransportType(row) {
   return noOriginNeeded(row.typeId) ? (row.arrivalTypeId || "walking") : row.typeId;
 }
 function rowOwnRouteUrl(row, prevRow) {
-  const ownFrom = (!noOriginNeeded(row.typeId) && row.from && row.from.trim()) ? rowStartPoint(row) : "";
+  const ownFrom = rowUsesOwnOrigin(row) ? rowStartPoint(row) : "";
   const prevTo = prevRow ? rowEndPoint(prevRow) : "";
   const origin = ownFrom || prevTo;
   const dest = rowEndPoint(row);
@@ -1516,7 +1525,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
   const [routeCalcError, setRouteCalcError] = useState(null);
   function forceRecalcRoute() { lastRouteCalcSig.current = null; setRouteCalcError(null); fetchRouteDistance(); }
   function fetchRouteDistance() {
-    const ownFrom = (!noOriginNeeded(row.typeId) && row.from && row.from.trim()) ? rowStartPoint(row) : "";
+    const ownFrom = rowUsesOwnOrigin(row) ? rowStartPoint(row) : "";
     const prevTo = prevRow ? rowEndPoint(prevRow) : "";
     let origin, originSource;
     if (ownFrom) { origin = ownFrom; originSource = "own"; }
@@ -1549,6 +1558,13 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
         setRouteCalcError(null);
         const patch = { routeDistanceKm: info.distanceKm, routeDurationMin: info.durationMin, toLat: b.lat, toLon: b.lon, routeCalcSig: sig };
         if (originSource === "own") { patch.fromLat = a.lat; patch.fromLon = a.lon; }
+        // Nothing precedes this row to inherit a start time from, but its end time is locked —
+        // work backward from the end using the route duration we just computed.
+        if (!row.startTime && row.endTime && row.endTimeAuto === false) {
+          patch.startTime = addMinutesToTime(row.endTime, -info.durationMin);
+          patch.startTimeAuto = false;
+          patch.startTimeSource = "computed";
+        }
         updateRow(row.id, patch);
       });
     }).catch(() => { lastRouteCalcSig.current = null; setDistLoading(false); setRouteCalcError(T.routeErrNetwork); });
@@ -2164,7 +2180,7 @@ function MobileCardMeta({ row, prevRow, ctx }) {
   }, [row.id, row.date, row.to, row.toAlias, row.toLat, row.toLon]);
 
   useEffect(() => {
-    const ownFrom = (!noOriginNeeded(row.typeId) && row.from && row.from.trim()) ? rowStartPoint(row) : "";
+    const ownFrom = rowUsesOwnOrigin(row) ? rowStartPoint(row) : "";
     const prevTo = prevRow ? rowEndPoint(prevRow) : "";
     let origin, originSource;
     if (ownFrom) { origin = ownFrom; originSource = "own"; }
@@ -2190,6 +2206,11 @@ function MobileCardMeta({ row, prevRow, ctx }) {
         if (!info) { lastRouteCalcSig.current = null; return; }
         const patch = { routeDistanceKm: info.distanceKm, routeDurationMin: info.durationMin, toLat: b.lat, toLon: b.lon, routeCalcSig: sig };
         if (originSource === "own") { patch.fromLat = a.lat; patch.fromLon = a.lon; }
+        if (!row.startTime && row.endTime && row.endTimeAuto === false) {
+          patch.startTime = addMinutesToTime(row.endTime, -info.durationMin);
+          patch.startTimeAuto = false;
+          patch.startTimeSource = "computed";
+        }
         updateRow(row.id, patch);
       });
     }).catch(() => { lastRouteCalcSig.current = null; setDistLoading(false); });
