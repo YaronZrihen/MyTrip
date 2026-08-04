@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.54.0";
+const APP_VERSION = "22.54.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -3767,8 +3767,8 @@ export default function MyTripApp() {
         updateRow(idTo, {
           typeId: "transfer", arrivalTypeId: "taxi",
           routeCalcSig: null, routeDistanceKm: null, routeDurationMin: null,
-          ...((f.from || f.fromAlias) ? { to: f.from || f.fromAlias, toAlias: f.fromAlias, toLat: f.fromLat, toLon: f.fromLon, toPlaceId: f.fromPlaceId, toVerifiedUrl: f.fromVerifiedUrl } : {}),
-          ...(prevRow && (prevRow.to || prevRow.toAlias) ? { from: prevRow.to || prevRow.toAlias, fromAlias: prevRow.toAlias, fromLat: prevRow.toLat, fromLon: prevRow.toLon, fromPlaceId: prevRow.toPlaceId, fromVerifiedUrl: prevRow.toVerifiedUrl } : { from: T.myHomeLabel }),
+          ...((f.from || f.fromAlias) ? { to: f.from || f.fromAlias, toAlias: f.fromAlias, toLat: f.fromLat, toLon: f.fromLon, toPlaceId: f.fromPlaceId, toVerifiedUrl: f.fromVerifiedUrl, ...(f.fromVerifiedUrl ? { toVerifiedText: f.from || f.fromAlias } : {}) } : {}),
+          ...(prevRow && (prevRow.to || prevRow.toAlias) ? { from: prevRow.to || prevRow.toAlias, fromAlias: prevRow.toAlias, fromLat: prevRow.toLat, fromLon: prevRow.toLon, fromPlaceId: prevRow.toPlaceId, fromVerifiedUrl: prevRow.toVerifiedUrl, ...(prevRow.toVerifiedUrl ? { fromVerifiedText: prevRow.to || prevRow.toAlias } : {}) } : { from: T.myHomeLabel }),
           ...(isInternational ? { stayDurationMin: PRE_FLIGHT_STAY_MIN, ...(f.depTime ? { endTime: addMinutesToTime(f.depTime, -PRE_FLIGHT_STAY_MIN), endTimeAuto: false } : {}) } : {}),
         });
       }
@@ -3781,8 +3781,8 @@ export default function MyTripApp() {
         updateRow(idFrom, {
           typeId: "transfer", arrivalTypeId: "taxi",
           routeCalcSig: null, routeDistanceKm: null, routeDurationMin: null,
-          ...((f.to || f.toAlias) ? { from: f.to || f.toAlias, fromAlias: f.toAlias, fromLat: f.toLat, fromLon: f.toLon, fromPlaceId: f.toPlaceId, fromVerifiedUrl: f.toVerifiedUrl } : {}),
-          ...(nextRow && (nextRow.from || nextRow.fromAlias) ? { to: nextRow.from || nextRow.fromAlias, toAlias: nextRow.fromAlias, toLat: nextRow.fromLat, toLon: nextRow.fromLon, toPlaceId: nextRow.fromPlaceId, toVerifiedUrl: nextRow.fromVerifiedUrl } : { to: T.myHomeLabel }),
+          ...((f.to || f.toAlias) ? { from: f.to || f.toAlias, fromAlias: f.toAlias, fromLat: f.toLat, fromLon: f.toLon, fromPlaceId: f.toPlaceId, fromVerifiedUrl: f.toVerifiedUrl, ...(f.toVerifiedUrl ? { fromVerifiedText: f.to || f.toAlias } : {}) } : {}),
+          ...(nextRow && (nextRow.from || nextRow.fromAlias) ? { to: nextRow.from || nextRow.fromAlias, toAlias: nextRow.fromAlias, toLat: nextRow.fromLat, toLon: nextRow.fromLon, toPlaceId: nextRow.fromPlaceId, toVerifiedUrl: nextRow.fromVerifiedUrl, ...(nextRow.fromVerifiedUrl ? { toVerifiedText: nextRow.from || nextRow.fromAlias } : {}) } : { to: T.myHomeLabel }),
           ...(isInternational && f.landTime ? { startTime: addMinutesToTime(f.landTime, getDefaultStayMinutes("flight")), startTimeAuto: false } : {}),
         });
       }
@@ -3842,7 +3842,8 @@ export default function MyTripApp() {
             // resolved address than the plain display name) would be silently overwritten every save.
             const isRowVerified = (r) => r && r.toVerifiedText === r.to && (r.toPlaceId || r.toVerifiedUrl);
             const nameChanged = h.name !== hf.name;
-            const locationPatch = { from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, to: h.name || h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, routeDistanceKm: 0, routeDurationMin: 0, routeCalcSig: `${h.name || h.alias}|${h.name || h.alias}|checkin|c` };
+            const verifiedName = h.nameVerifiedUrl ? (h.name || h.alias) : null;
+            const locationPatch = { from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, to: h.name || h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, routeDistanceKm: 0, routeDurationMin: 0, routeCalcSig: `${h.name || h.alias}|${h.name || h.alias}|checkin|c`, ...(verifiedName ? { fromVerifiedText: verifiedName, toVerifiedText: verifiedName } : {}) };
             if (checkinRow) updateRow(checkinRow.id, { ...((nameChanged || !isRowVerified(checkinRow)) ? locationPatch : {}), toAlias: h.alias, date: h.checkIn });
             if (checkoutRow) updateRow(checkoutRow.id, { ...((nameChanged || !isRowVerified(checkoutRow)) ? locationPatch : {}), toAlias: h.alias, date: h.checkOut });
             transferRows.forEach((tr) => updateRow(tr.id, { date: tr.date === (checkoutRow && checkoutRow.date) ? h.checkOut : h.checkIn }));
@@ -3850,9 +3851,9 @@ export default function MyTripApp() {
             const newFrame = { id: uid(), name: h.alias || h.name || T.hotelFrameNameFallback, startDate: h.checkIn, endDate: h.checkOut, parentFrameId: rootFrame.id, collapsed: false, frameType: "hotel", hotelRef: h };
             setFrames((prev) => [...prev, newFrame]);
             const id1 = addRow(h.checkIn, null, newFrame.id);
-            updateRow(id1, { typeId: "checkin", startTime: "15:00", from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, routeDistanceKm: 0, routeDurationMin: 0, routeCalcSig: `${h.name || h.alias}|${h.name || h.alias}|checkin|c` });
+            updateRow(id1, { typeId: "checkin", startTime: "15:00", from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, routeDistanceKm: 0, routeDurationMin: 0, routeCalcSig: `${h.name || h.alias}|${h.name || h.alias}|checkin|c`, ...(h.nameVerifiedUrl ? { fromVerifiedText: h.name || h.alias, toVerifiedText: h.name || h.alias } : {}) });
             const id2 = addRow(h.checkOut, null, newFrame.id);
-            updateRow(id2, { typeId: "checkout", endTime: "11:00", from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, routeDistanceKm: 0, routeDurationMin: 0, routeCalcSig: `${h.name || h.alias}|${h.name || h.alias}|checkout|c` });
+            updateRow(id2, { typeId: "checkout", endTime: "11:00", from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, routeDistanceKm: 0, routeDurationMin: 0, routeCalcSig: `${h.name || h.alias}|${h.name || h.alias}|checkout|c`, ...(h.nameVerifiedUrl ? { fromVerifiedText: h.name || h.alias, toVerifiedText: h.name || h.alias } : {}) });
           }
         });
         existingHotelFrames.slice(hotels.length).forEach((hf) => {
@@ -3898,9 +3899,9 @@ export default function MyTripApp() {
     hotelFrames.forEach((hf) => {
       const h = hf.hotelRef;
       const id1 = addRow(h.checkIn, null, hf.id);
-      updateRow(id1, { typeId: "checkin", startTime: "15:00", from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, routeDistanceKm: 0, routeDurationMin: 0, routeCalcSig: `${h.name || h.alias}|${h.name || h.alias}|checkin|c` });
+      updateRow(id1, { typeId: "checkin", startTime: "15:00", from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, routeDistanceKm: 0, routeDurationMin: 0, routeCalcSig: `${h.name || h.alias}|${h.name || h.alias}|checkin|c`, ...(h.nameVerifiedUrl ? { fromVerifiedText: h.name || h.alias, toVerifiedText: h.name || h.alias } : {}) });
       const id2 = addRow(h.checkOut, null, hf.id);
-      updateRow(id2, { typeId: "checkout", endTime: "11:00", from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, routeDistanceKm: 0, routeDurationMin: 0, routeCalcSig: `${h.name || h.alias}|${h.name || h.alias}|checkout|c` });
+      updateRow(id2, { typeId: "checkout", endTime: "11:00", from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, routeDistanceKm: 0, routeDurationMin: 0, routeCalcSig: `${h.name || h.alias}|${h.name || h.alias}|checkout|c`, ...(h.nameVerifiedUrl ? { fromVerifiedText: h.name || h.alias, toVerifiedText: h.name || h.alias } : {}) });
       createdRowIds.push(id1, id2);
     });
 
