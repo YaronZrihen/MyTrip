@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.57.1";
+const APP_VERSION = "22.58.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -314,6 +314,7 @@ const T_DICT = {
     intlFlightsFrameName: "טיסות בינלאומיות", hotelFrameNameFallback: "מלון", myHomeLabel: "הבית שלי",
     newTripAction: "צור טיול חדש", editTripDetails: "ערוך פרטי טיול",
     refreshAllFlights: "ניהול טיסות", flightRefreshRunning: "מרענן טיסות…",
+    recalculateAll: "חשב מסלולים וזמנים מחדש",
     remindersManagerTitle: "תזכורות והתראות", remindersManagerEmpty: "אין עדיין תזכורות בטיול (מתווספות אוטומטית לרשומות טיסה וצ'ק-אאוט).",
     remindersManagerHint: "כל תזכורת מחושבת אוטומטית מהשעה של הרשומה שלה. אפשר לכבות, או לשנות כמה שעות לפני שהיא תופיע.",
     hoursBeforeShort: "שעות לפני",
@@ -499,6 +500,7 @@ const T_DICT = {
     intlFlightsFrameName: "International Flights", hotelFrameNameFallback: "Hotel", myHomeLabel: "My Home",
     newTripAction: "Create new trip", editTripDetails: "Edit trip details",
     refreshAllFlights: "Flight management", flightRefreshRunning: "Refreshing flights…",
+    recalculateAll: "Recalculate routes & times",
     remindersManagerTitle: "Reminders & Alerts", remindersManagerEmpty: "No reminders yet (added automatically to flight and check-out records).",
     remindersManagerHint: "Each reminder is computed from its record's own time. Turn any off, or change how many hours before it fires.",
     hoursBeforeShort: "hours before",
@@ -4224,6 +4226,9 @@ export default function MyTripApp() {
     });
   }
   function updateRow(id, patch) { applyRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r))); }
+  function recalculateAllRoutesAndTimes() {
+    applyRows((prev) => prev.map((r) => ({ ...r, routeCalcSig: null, routeDistanceKm: null, routeDurationMin: null })));
+  }
   function setReminderOverride(rowId, ruleId, patch) {
     applyRows((prev) => prev.map((r) => {
       if (r.id !== rowId) return r;
@@ -5601,6 +5606,7 @@ export default function MyTripApp() {
             <button className="mt-share-opt" onClick={() => { openPreWizard(); setActionsMenuOpen(false); }}><Wand2 size={14} /> {T.tripWizard}</button>
             <button className="mt-share-opt" onClick={() => { openEditTripDetails(); setActionsMenuOpen(false); }}><Pencil size={14} /> {T.editTripDetails}</button>
             <button className="mt-share-opt" onClick={() => { setFlightManagerOpen(true); setActionsMenuOpen(false); }}><RefreshCw size={14} /> {T.refreshAllFlights}</button>
+            <button className="mt-share-opt" onClick={() => { recalculateAllRoutesAndTimes(); setActionsMenuOpen(false); }}><Route size={14} /> {T.recalculateAll}</button>
             <button className="mt-share-opt" onClick={() => { setHotelManagerOpen(true); setActionsMenuOpen(false); }}><BedDouble size={14} /> {T.hotelManagerTitle}</button>
             <button className="mt-share-opt" onClick={() => { setRemindersManagerOpen(true); setActionsMenuOpen(false); }}><Bell size={14} /> {T.remindersManagerTitle}</button>
             <div className="mt-action-cat-label"><span>{T.catSaveExport}</span><HelpButton topic="sharing" lang={lang} T={T} onOpenFull={openHelpTopic} size={13} openTopic={helpPopoverOpen} setOpenTopic={setHelpPopoverOpen} /></div>
