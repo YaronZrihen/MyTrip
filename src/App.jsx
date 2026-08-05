@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.57.0";
+const APP_VERSION = "22.57.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1269,7 +1269,7 @@ function computeGoogleRoute(a, b, travelMode) {
     destination: { location: { latLng: { latitude: b.lat, longitude: b.lon } } },
     travelMode,
   };
-  if (travelMode === "DRIVE") body.routingPreference = "TRAFFIC_AWARE";
+  if (travelMode === "DRIVE") body.routingPreference = "TRAFFIC_AWARE_OPTIMAL";
   return fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Goog-Api-Key": GOOGLE_PLACES_KEY, "X-Goog-FieldMask": fieldMask },
