@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.58.1";
+const APP_VERSION = "22.60.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -352,7 +352,9 @@ const T_DICT = {
     wizardBack: "הקודם", wizardNext: "הבא", wizardCreate: "צור טיול", wizardUpdate: "עדכן טיול",
     computedEndTimeHint: "שדה מחושב לפי מסלול Google Maps, בהתאם לאמצעי התחבורה שנבחר בתיאור.", chronoEndWarning: "רצף השעות (כולל שעות סיום) אינו כרונולוגי.",
     afterMidnightHint: "שעה זו היא לאחר חצות",
-    computedStartTimeHint: "שדה שנמשך אוטומטית משעת ההגעה של הרשומה הקודמת.",
+    inheritedStartTimeHint: "שדה שנמשך אוטומטית משעת ההגעה של הרשומה הקודמת.",
+    computedStartTimeHintBackward: "שדה שחושב אחורה משעת הסיום, לפי משך הנסיעה המחושב עד ליעד.",
+    apiTimeHint: "שדה שנמשך משליפת נתוני טיסה אמיתיים (לפי מספר טיסה).",
     flightLockedHint: "השדה ננעל כי הנתונים נמשכו ממספר טיסה. כדי לערוך ידנית, נקו את שדה מספר הטיסה.",
     noOriginHint: "אין צורך בשדה מוצא עבור סוג רשומה זה.",
     dragDayHint: "גרור להעברת היום למסגרת אחרת", dropDayToRoot: "שחרר כאן כדי להוציא את היום מהמסגרת", showOverallRoute: "הצג מסלול טיול כולל",
@@ -538,7 +540,9 @@ const T_DICT = {
     wizardBack: "Back", wizardNext: "Next", wizardCreate: "Create trip", wizardUpdate: "Update trip",
     computedEndTimeHint: "Computed from the Google Maps route, based on the transportation mode selected in the description.", chronoEndWarning: "The time sequence (including end times) isn't chronological.",
     afterMidnightHint: "This time is after midnight",
-    computedStartTimeHint: "Automatically pulled from the previous record's arrival time.",
+    inheritedStartTimeHint: "Automatically pulled from the previous record's arrival time.",
+    computedStartTimeHintBackward: "Computed backward from the end time, based on the calculated travel duration to the destination.",
+    apiTimeHint: "Pulled from a real flight-number lookup.",
     flightLockedHint: "Locked because this data was pulled from a flight number. Clear the flight number field to edit manually.",
     noOriginHint: "No origin field is needed for this record type.",
     dragDayHint: "Drag to move this day to another frame", dropDayToRoot: "Drop here to take this day out of its frame", showOverallRoute: "Show overall trip route",
@@ -981,6 +985,17 @@ function timeFieldColor(row, field) {
   const source = field === "start" ? row.startTimeSource : row.endTimeSource;
   if (auto === false) return source === "api" ? TIME_FIELD_COLORS.api : null;
   return source === "inherited" ? TIME_FIELD_COLORS.inherited : TIME_FIELD_COLORS.computed;
+}
+/* The hover-title text explaining WHY a time field is colored the way it is — matches the exact
+   state timeFieldColor detected, rather than showing one generic explanation for every color. */
+function timeFieldHint(row, field, T) {
+  const color = timeFieldColor(row, field);
+  if (!color) return undefined;
+  const auto = field === "start" ? row.startTimeAuto : row.endTimeAuto;
+  const source = field === "start" ? row.startTimeSource : row.endTimeSource;
+  if (auto === false && source === "api") return T.apiTimeHint;
+  if (source === "inherited") return T.inheritedStartTimeHint;
+  return field === "start" ? T.computedStartTimeHintBackward : T.computedEndTimeHint;
 }
 /* The stay duration at the row's own location, e.g. "שהות ביעד - 0.5 ש" for 30 minutes —
    informational only, never baked into the time field's own value. */
@@ -1564,8 +1579,11 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
         // Nothing precedes this row to inherit a start time from, but its end time is locked —
         // work backward from the end using the route duration we just computed.
         if (!row.startTime && row.endTime && row.endTimeAuto === false) {
+          // Leave startTimeAuto as-is (true) rather than locking it — this is a genuinely computed
+          // value like any other, and should keep behaving like one: if a real anchor later exists
+          // (e.g. a row gets inserted before this one), the normal chain logic should still be free
+          // to take over and recompute it from that anchor instead.
           patch.startTime = addMinutesToTime(row.endTime, -info.durationMin);
-          patch.startTimeAuto = false;
           patch.startTimeSource = "computed";
         }
         updateRow(row.id, patch);
@@ -1768,9 +1786,9 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
           {lang !== "he" && toVerified && <a className="mt-loc-badge" href={row.toVerifiedUrl} target="_blank" rel="noreferrer" title={T.openMap}><MapPin size={11} /></a>}
         </span>
       );
-      case "startTime": { const c = timeFieldColor(row, "start"); return <TimeField value={row.startTime} onChange={(e) => ctx.setStartTimeWithCascade(row.id, e.target.value)} T={T} className="mt-editable mt-time" style={c ? { borderBottom: `2px dashed ${c}` } : undefined} title={c ? T.computedStartTimeHint : undefined} />; }
+      case "startTime": { const c = timeFieldColor(row, "start"); return <TimeField value={row.startTime} onChange={(e) => ctx.setStartTimeWithCascade(row.id, e.target.value)} T={T} className="mt-editable mt-time" style={c ? { borderBottom: `2px dashed ${c}` } : undefined} title={timeFieldHint(row, "start", T)} />; }
       case "duration": return <span title={dur === null ? "" : dur} style={{ color: dur === null ? "var(--danger)" : "var(--muted)", fontSize: 12 }}>{dur === null ? "!" : dur}</span>;
-      case "endTime": { const c = timeFieldColor(row, "end"); return <TimeField value={row.endTime} onChange={(e) => ctx.setEndTimeWithCascade(row.id, e.target.value)} T={T} className="mt-editable mt-time" style={c ? { borderBottom: `2px dashed ${c}` } : undefined} title={c ? T.computedEndTimeHint : undefined} />; }
+      case "endTime": { const c = timeFieldColor(row, "end"); return <TimeField value={row.endTime} onChange={(e) => ctx.setEndTimeWithCascade(row.id, e.target.value)} T={T} className="mt-editable mt-time" style={c ? { borderBottom: `2px dashed ${c}` } : undefined} title={timeFieldHint(row, "end", T)} />; }
       case "stay": return <StayDurationField compact value={row.stayDurationMin != null ? row.stayDurationMin : getDefaultStayMinutes(row.typeId)} onChange={(m) => updateRow(row.id, { stayDurationMin: m })} T={T} />;
       case "route": return (
         <span className="mt-route-mini">
@@ -2211,8 +2229,11 @@ function MobileCardMeta({ row, prevRow, ctx }) {
         const patch = { routeDistanceKm: info.distanceKm, routeDurationMin: info.durationMin, toLat: b.lat, toLon: b.lon, routeCalcSig: sig };
         if (originSource === "own") { patch.fromLat = a.lat; patch.fromLon = a.lon; }
         if (!row.startTime && row.endTime && row.endTimeAuto === false) {
+          // Leave startTimeAuto as-is (true) rather than locking it — this is a genuinely computed
+          // value like any other, and should keep behaving like one: if a real anchor later exists
+          // (e.g. a row gets inserted before this one), the normal chain logic should still be free
+          // to take over and recompute it from that anchor instead.
           patch.startTime = addMinutesToTime(row.endTime, -info.durationMin);
-          patch.startTimeAuto = false;
           patch.startTimeSource = "computed";
         }
         updateRow(row.id, patch);
@@ -2319,7 +2340,7 @@ function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
       <div className="mt-card-divider" />
       <div className="mt-card-times-row" dir="ltr">
         <div className="mt-card-time-block">
-          <div className="mt-card-time-big" style={{ ...(r.startTime && Number(r.startTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "start") ? { borderBottom: `2px dashed ${timeFieldColor(r, "start")}` } : {}) }}>{r.startTime || "—"}</div>
+          <div className="mt-card-time-big" style={{ ...(r.startTime && Number(r.startTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "start") ? { borderBottom: `2px dashed ${timeFieldColor(r, "start")}` } : {}) }} title={r.startTime && Number(r.startTime.split(":")[0]) < 6 ? T.afterMidnightHint : undefined}>{r.startTime || "—"}</div>
           {fromLabel && <div className="mt-card-time-sub" dir="auto" title={fromLabel}>{truncateChars(fromLabel, 13)}</div>}
         </div>
         <div className="mt-card-connector">
@@ -2329,7 +2350,7 @@ function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
           <div className="mt-card-connector-sub">{rowDuration && <span className="mt-card-duration-text">{rowDuration}</span>}</div>
         </div>
         <div className="mt-card-time-block end">
-          <div className="mt-card-time-big" style={{ ...(r.endTime && Number(r.endTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "end") ? { borderBottom: `2px dashed ${timeFieldColor(r, "end")}` } : {}) }}>{r.endTime || "—"}</div>
+          <div className="mt-card-time-big" style={{ ...(r.endTime && Number(r.endTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "end") ? { borderBottom: `2px dashed ${timeFieldColor(r, "end")}` } : {}) }} title={r.endTime && Number(r.endTime.split(":")[0]) < 6 ? T.afterMidnightHint : undefined}>{r.endTime || "—"}</div>
           {toLabel && <div className="mt-card-time-sub" dir="auto" title={toLabel}>{truncateChars(toLabel, 13)}</div>}
         </div>
       </div>
@@ -2640,8 +2661,7 @@ function TimeField({ value, onChange, T, className, title, style, disabled }) {
     <span style={{ position: "relative", display: "block" }}>
       <button type="button" disabled={disabled} className={"mt-type-field-btn" + (className ? " " + className : "")} style={{ ...style, ...(disabled ? { opacity: 0.6, cursor: "not-allowed" } : {}) }} title={title} onClick={openPicker}>
         <Clock size={14} />
-        <span className="mt-type-text" dir="ltr" style={value && Number(value.split(":")[0]) < 6 ? { color: "#C1543A", fontWeight: 700 } : undefined}>{value || "--:--"}</span>
-        {value && Number(value.split(":")[0]) < 6 && <span className="mt-hint" style={{ color: "#C1543A", fontSize: 10 }} title={T.afterMidnightHint}>🌙</span>}
+        <span className="mt-type-text" dir="ltr" style={value && Number(value.split(":")[0]) < 6 ? { color: "#C1543A", fontWeight: 700 } : undefined} title={value && Number(value.split(":")[0]) < 6 ? T.afterMidnightHint : undefined}>{value || "--:--"}</span>
       </button>
       {open && (
         <div className="mt-modal-backdrop" onClick={() => setOpen(false)}>
@@ -3646,6 +3666,7 @@ export default function MyTripApp() {
         depDate: r.date || "", depTime: r.startTime || "", landTime: r.endTime || "", overnight: !!r.overnight,
         fromLat: r.fromLat != null ? r.fromLat : null, fromLon: r.fromLon != null ? r.fromLon : null, fromPlaceId: r.fromPlaceId || null, fromVerifiedUrl: r.fromVerifiedUrl || "", fromVerifiedText: r.fromVerifiedText || "",
         toLat: r.toLat != null ? r.toLat : null, toLon: r.toLon != null ? r.toLon : null, toPlaceId: r.toPlaceId || null, toVerifiedUrl: r.toVerifiedUrl || "", toVerifiedText: r.toVerifiedText || "",
+        timesFromApi: r.startTimeSource === "api" || r.endTimeSource === "api",
         addTransferTo: false, addTransferFrom: false,
       }));
     }
@@ -3735,8 +3756,8 @@ export default function MyTripApp() {
         if (data.arrivalAlias) patch.toAlias = data.arrivalAlias;
         if (data.airline) patch.airline = data.airline;
         if (data.departureDate) patch.depDate = data.departureDate;
-        if (data.departureTime) patch.depTime = data.departureTime;
-        if (data.arrivalTime) patch.landTime = data.arrivalTime;
+        if (data.departureTime) { patch.depTime = data.departureTime; patch.timesFromApi = true; }
+        if (data.arrivalTime) { patch.landTime = data.arrivalTime; patch.timesFromApi = true; }
         updatePreWizardArrayItem(field, idx, patch);
       })
       .catch(() => updatePreWizardArrayItem(field, idx, { flightLookupMsg: T.flightLookupError }));
@@ -3871,7 +3892,7 @@ export default function MyTripApp() {
         function syncFlightRows(typeId, entries) {
           const existing = rows.filter((r) => r.frameId === rootFrame.id && r.typeId === typeId).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
           const ids = entries.map((f, i) => {
-            const patch = { typeId, from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, date: f.depDate, startTime: f.depTime || "", endTime: f.landTime || "", startTimeAuto: !f.depTime, endTimeAuto: !f.landTime, overnight: !!f.overnight, fromLat: f.fromLat, fromLon: f.fromLon, fromPlaceId: f.fromPlaceId, fromVerifiedUrl: f.fromVerifiedUrl, fromVerifiedText: f.fromVerifiedText, toLat: f.toLat, toLon: f.toLon, toPlaceId: f.toPlaceId, toVerifiedUrl: f.toVerifiedUrl, toVerifiedText: f.toVerifiedText };
+            const patch = { typeId, from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, date: f.depDate, startTime: f.depTime || "", endTime: f.landTime || "", startTimeAuto: !f.depTime, endTimeAuto: !f.landTime, ...(f.timesFromApi ? { startTimeSource: "api", endTimeSource: "api" } : {}), overnight: !!f.overnight, fromLat: f.fromLat, fromLon: f.fromLon, fromPlaceId: f.fromPlaceId, fromVerifiedUrl: f.fromVerifiedUrl, fromVerifiedText: f.fromVerifiedText, toLat: f.toLat, toLon: f.toLon, toPlaceId: f.toPlaceId, toVerifiedUrl: f.toVerifiedUrl, toVerifiedText: f.toVerifiedText };
             const id = existing[i] ? existing[i].id : addRow(f.depDate, null, rootFrame.id);
             updateRow(id, patch);
             return id;
@@ -3909,7 +3930,7 @@ export default function MyTripApp() {
             const id1 = addRow(h.checkIn, null, newFrame.id);
             updateRow(id1, { typeId: "checkin", startTime: "15:00", from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, routeDistanceKm: 0, routeDurationMin: 0, routeCalcSig: `${h.name || h.alias}|${h.name || h.alias}|checkin|c`, ...(h.nameVerifiedUrl ? { fromVerifiedText: h.name || h.alias, toVerifiedText: h.name || h.alias } : {}) });
             const id2 = addRow(h.checkOut, null, newFrame.id);
-            updateRow(id2, { typeId: "checkout", endTime: "11:00", from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, routeDistanceKm: 0, routeDurationMin: 0, routeCalcSig: `${h.name || h.alias}|${h.name || h.alias}|checkout|c`, ...(h.nameVerifiedUrl ? { fromVerifiedText: h.name || h.alias, toVerifiedText: h.name || h.alias } : {}) });
+            updateRow(id2, { typeId: "checkout", endTime: "11:00", endTimeAuto: false, from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, routeDistanceKm: 0, routeDurationMin: 0, routeCalcSig: `${h.name || h.alias}|${h.name || h.alias}|checkout|c`, ...(h.nameVerifiedUrl ? { fromVerifiedText: h.name || h.alias, toVerifiedText: h.name || h.alias } : {}) });
           }
         });
         existingHotelFrames.slice(hotels.length).forEach((hf) => {
@@ -3941,13 +3962,13 @@ export default function MyTripApp() {
     const createdRowIds = [];
     flights.forEach((f) => {
       const id1 = addRow(f.depDate, null, mainFrame.id);
-      updateRow(id1, { typeId: "flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, airline: f.airline, startTime: f.depTime || "", endTime: f.landTime || "", startTimeAuto: !f.depTime, endTimeAuto: !f.landTime, overnight: !!f.overnight, fromLat: f.fromLat, fromLon: f.fromLon, fromPlaceId: f.fromPlaceId, fromVerifiedUrl: f.fromVerifiedUrl, fromVerifiedText: f.fromVerifiedText, toLat: f.toLat, toLon: f.toLon, toPlaceId: f.toPlaceId, toVerifiedUrl: f.toVerifiedUrl, toVerifiedText: f.toVerifiedText });
+      updateRow(id1, { typeId: "flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, airline: f.airline, startTime: f.depTime || "", endTime: f.landTime || "", startTimeAuto: !f.depTime, endTimeAuto: !f.landTime, ...(f.timesFromApi ? { startTimeSource: "api", endTimeSource: "api" } : {}), overnight: !!f.overnight, fromLat: f.fromLat, fromLon: f.fromLon, fromPlaceId: f.fromPlaceId, fromVerifiedUrl: f.fromVerifiedUrl, fromVerifiedText: f.fromVerifiedText, toLat: f.toLat, toLon: f.toLon, toPlaceId: f.toPlaceId, toVerifiedUrl: f.toVerifiedUrl, toVerifiedText: f.toVerifiedText });
       createdRowIds.push(id1);
       createAirportTransfers(f, mainFrame.id, id1, true);
     });
     domesticFlights.forEach((f) => {
       const id1 = addRow(f.depDate, null, mainFrame.id);
-      updateRow(id1, { typeId: "domestic-flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, airline: f.airline, startTime: f.depTime || "", endTime: f.landTime || "", startTimeAuto: !f.depTime, endTimeAuto: !f.landTime, overnight: !!f.overnight, fromLat: f.fromLat, fromLon: f.fromLon, fromPlaceId: f.fromPlaceId, fromVerifiedUrl: f.fromVerifiedUrl, fromVerifiedText: f.fromVerifiedText, toLat: f.toLat, toLon: f.toLon, toPlaceId: f.toPlaceId, toVerifiedUrl: f.toVerifiedUrl, toVerifiedText: f.toVerifiedText });
+      updateRow(id1, { typeId: "domestic-flight", from: f.from, fromAlias: f.fromAlias, to: f.to, toAlias: f.toAlias, flightNumber: f.flightNumber, airline: f.airline, startTime: f.depTime || "", endTime: f.landTime || "", startTimeAuto: !f.depTime, endTimeAuto: !f.landTime, ...(f.timesFromApi ? { startTimeSource: "api", endTimeSource: "api" } : {}), overnight: !!f.overnight, fromLat: f.fromLat, fromLon: f.fromLon, fromPlaceId: f.fromPlaceId, fromVerifiedUrl: f.fromVerifiedUrl, fromVerifiedText: f.fromVerifiedText, toLat: f.toLat, toLon: f.toLon, toPlaceId: f.toPlaceId, toVerifiedUrl: f.toVerifiedUrl, toVerifiedText: f.toVerifiedText });
       createdRowIds.push(id1);
       createAirportTransfers(f, mainFrame.id, id1, false);
     });
@@ -3957,7 +3978,7 @@ export default function MyTripApp() {
       const id1 = addRow(h.checkIn, null, hf.id);
       updateRow(id1, { typeId: "checkin", startTime: "15:00", from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, routeDistanceKm: 0, routeDurationMin: 0, routeCalcSig: `${h.name || h.alias}|${h.name || h.alias}|checkin|c`, ...(h.nameVerifiedUrl ? { fromVerifiedText: h.name || h.alias, toVerifiedText: h.name || h.alias } : {}) });
       const id2 = addRow(h.checkOut, null, hf.id);
-      updateRow(id2, { typeId: "checkout", endTime: "11:00", from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, routeDistanceKm: 0, routeDurationMin: 0, routeCalcSig: `${h.name || h.alias}|${h.name || h.alias}|checkout|c`, ...(h.nameVerifiedUrl ? { fromVerifiedText: h.name || h.alias, toVerifiedText: h.name || h.alias } : {}) });
+      updateRow(id2, { typeId: "checkout", endTime: "11:00", endTimeAuto: false, from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, routeDistanceKm: 0, routeDurationMin: 0, routeCalcSig: `${h.name || h.alias}|${h.name || h.alias}|checkout|c`, ...(h.nameVerifiedUrl ? { fromVerifiedText: h.name || h.alias, toVerifiedText: h.name || h.alias } : {}) });
       createdRowIds.push(id1, id2);
     });
 
@@ -4855,7 +4876,7 @@ export default function MyTripApp() {
         const id1 = addRow(checkIn, null, newFrameId);
         updateRow(id1, { typeId: "checkin", startTime: "15:00", to: name });
         const id2 = addRow(checkOut, null, newFrameId);
-        updateRow(id2, { typeId: "checkout", endTime: "11:00", to: name });
+        updateRow(id2, { typeId: "checkout", endTime: "11:00", endTimeAuto: false, to: name });
       }
     }
     closeFrameModal();
@@ -6298,8 +6319,8 @@ export default function MyTripApp() {
               </div>
 
               <div className="mt-field-row">
-                <div className="mt-field"><label>{T.start}</label><TimeField value={cardDraft.startTime} onChange={(e) => setCardDraft({ ...cardDraft, startTime: e.target.value, startTimeAuto: !e.target.value, startTimeSource: undefined })} T={T} disabled={flightLocked} style={timeFieldColor(cardDraft, "start") ? { borderBottom: `2px dashed ${timeFieldColor(cardDraft, "start")}` } : undefined} title={flightLocked ? T.flightLockedHint : (timeFieldColor(cardDraft, "start") ? T.computedStartTimeHint : undefined)} /></div>
-                <div className="mt-field"><label>{T.end}</label><TimeField value={cardDraft.endTime} onChange={(e) => setCardDraft({ ...cardDraft, endTime: e.target.value, endTimeAuto: !e.target.value, endTimeSource: undefined })} T={T} disabled={flightLocked} style={timeFieldColor(cardDraft, "end") ? { borderBottom: `2px dashed ${timeFieldColor(cardDraft, "end")}` } : undefined} title={flightLocked ? T.flightLockedHint : (timeFieldColor(cardDraft, "end") ? T.computedEndTimeHint : undefined)} /></div>
+                <div className="mt-field"><label>{T.start}</label><TimeField value={cardDraft.startTime} onChange={(e) => setCardDraft({ ...cardDraft, startTime: e.target.value, startTimeAuto: !e.target.value, startTimeSource: undefined })} T={T} disabled={flightLocked} style={timeFieldColor(cardDraft, "start") ? { borderBottom: `2px dashed ${timeFieldColor(cardDraft, "start")}` } : undefined} title={flightLocked ? T.flightLockedHint : timeFieldHint(cardDraft, "start", T)} /></div>
+                <div className="mt-field"><label>{T.end}</label><TimeField value={cardDraft.endTime} onChange={(e) => setCardDraft({ ...cardDraft, endTime: e.target.value, endTimeAuto: !e.target.value, endTimeSource: undefined })} T={T} disabled={flightLocked} style={timeFieldColor(cardDraft, "end") ? { borderBottom: `2px dashed ${timeFieldColor(cardDraft, "end")}` } : undefined} title={flightLocked ? T.flightLockedHint : timeFieldHint(cardDraft, "end", T)} /></div>
                 <div className="mt-field" style={{ maxWidth: 110 }}>
                   <label>{T.stayDuration}</label>
                   <StayDurationField value={cardDraft.stayDurationMin != null ? cardDraft.stayDurationMin : getDefaultStayMinutes(cardDraft.typeId)} onChange={(m) => setCardDraft({ ...cardDraft, stayDurationMin: m })} T={T} />
