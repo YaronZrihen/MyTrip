@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.58.0";
+const APP_VERSION = "22.58.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1524,6 +1524,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
   const [distLoading, setDistLoading] = useState(false);
 
   const lastRouteCalcSig = useRef(null);
+  useEffect(() => { lastRouteCalcSig.current = null; }, [ctx.recalcGeneration]);
   const [routeCalcError, setRouteCalcError] = useState(null);
   function forceRecalcRoute() { lastRouteCalcSig.current = null; setRouteCalcError(null); fetchRouteDistance(); }
   function fetchRouteDistance() {
@@ -1574,7 +1575,7 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
   useEffect(() => {
     fetchRouteDistance();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [row.id, row.from, row.to, row.fromAlias, row.toAlias, row.startTime, row.typeId, row.fromLat, row.fromLon, row.toLat, row.toLon, row.stayDurationMin, prevRow && prevRow.from, prevRow && prevRow.fromAlias, prevRow && prevRow.fromLat, prevRow && prevRow.fromLon, prevRow && prevRow.to, prevRow && prevRow.toAlias, prevRow && prevRow.toLat, prevRow && prevRow.toLon, prevRow && prevRow.endTime]);
+  }, [row.id, row.from, row.to, row.fromAlias, row.toAlias, row.startTime, row.typeId, row.fromLat, row.fromLon, row.toLat, row.toLon, row.stayDurationMin, prevRow && prevRow.from, prevRow && prevRow.fromAlias, prevRow && prevRow.fromLat, prevRow && prevRow.fromLon, prevRow && prevRow.to, prevRow && prevRow.toAlias, prevRow && prevRow.toLat, prevRow && prevRow.toLon, prevRow && prevRow.endTime, ctx.recalcGeneration]);
 
   const [fromVerifyLoading, setFromVerifyLoading] = useState(false);
   const [toVerifyLoading, setToVerifyLoading] = useState(false);
@@ -2161,6 +2162,7 @@ function MobileCardMeta({ row, prevRow, ctx }) {
   const { T, lang, updateRow, openCard, openHotelInfo } = ctx;
   const [distLoading, setDistLoading] = useState(false);
   const lastRouteCalcSig = useRef(null);
+  useEffect(() => { lastRouteCalcSig.current = null; }, [ctx.recalcGeneration]);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const routeUrl = rowOwnRouteUrl(row, prevRow);
   const hasWeather = row.weatherCode != null && row.weatherForDate === row.date;
@@ -2217,7 +2219,7 @@ function MobileCardMeta({ row, prevRow, ctx }) {
       });
     }).catch(() => { lastRouteCalcSig.current = null; setDistLoading(false); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [row.id, row.from, row.to, row.fromAlias, row.toAlias, row.startTime, row.typeId, row.fromLat, row.fromLon, row.toLat, row.toLon, row.stayDurationMin, prevRow && prevRow.from, prevRow && prevRow.fromAlias, prevRow && prevRow.fromLat, prevRow && prevRow.fromLon, prevRow && prevRow.to, prevRow && prevRow.toAlias, prevRow && prevRow.toLat, prevRow && prevRow.toLon, prevRow && prevRow.endTime]);
+  }, [row.id, row.from, row.to, row.fromAlias, row.toAlias, row.startTime, row.typeId, row.fromLat, row.fromLon, row.toLat, row.toLon, row.stayDurationMin, prevRow && prevRow.from, prevRow && prevRow.fromAlias, prevRow && prevRow.fromLat, prevRow && prevRow.fromLon, prevRow && prevRow.to, prevRow && prevRow.toAlias, prevRow && prevRow.toLat, prevRow && prevRow.toLon, prevRow && prevRow.endTime, ctx.recalcGeneration]);
 
   const [fromVerifyLoading, setFromVerifyLoading] = useState(false);
   const [toVerifyLoading, setToVerifyLoading] = useState(false);
@@ -4226,8 +4228,10 @@ export default function MyTripApp() {
     });
   }
   function updateRow(id, patch) { applyRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r))); }
+  const [recalcGeneration, setRecalcGeneration] = useState(0);
   function recalculateAllRoutesAndTimes() {
     applyRows((prev) => prev.map((r) => ({ ...r, routeCalcSig: null, routeDistanceKm: null, routeDurationMin: null })));
+    setRecalcGeneration((g) => g + 1);
   }
   function setReminderOverride(rowId, ruleId, patch) {
     applyRows((prev) => prev.map((r) => {
@@ -4884,7 +4888,7 @@ export default function MyTripApp() {
     collapsedParents, setCollapsedParents, collapsedGroups, setCollapsedGroups,
     toggleFrameCollapse, openFrameModal, setDeleteFrameConfirmId, updateFrameDates, nextDateInContext, lastDateInContext, frameTotals,
     openAddDayModal, sortDayByTime, getColWidth, startResize, displayCurrency, convertAmount, openHotelInfo,
-    frameMenuOpenId, setFrameMenuOpenId, generateTravelJournal,
+    frameMenuOpenId, setFrameMenuOpenId, generateTravelJournal, recalcGeneration,
   };
 
   function renderContext(fid, depth) {
