@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.61.0";
+const APP_VERSION = "22.62.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -197,6 +197,7 @@ const T_DICT = {
   he: {
     appName: "MyTrip Builder", addRow: "הוסף רשומה", addDay: "הוסף יום", newFrame: "מסגרת חדשה",
     catNewFrame: "מסגרות", catSaveExport: "שמירה, ייבוא וייצוא", catSharing: "שיתוף", catTools: "כלים", catViews: "תצוגות", catGeneral: "כללי",
+    catPreFlight: "קדם טיסה", catManagement: "ניהול",
     showHeader: "הצג את התפריט העליון", hideHeader: "הסתר את התפריט העליון",
     columns: "עמודות", addColumn: "הוסף עמודה", addType: "הוסף תיאור", resetColumnWidths: "איפוס רוחב עמודות (גרור את קצה כותרת העמודה לשינוי ידני)", actions: "פעולות", on: "פעיל", settings: "הגדרות", manageColumns: "ניהול עמודות", undo: "בטל פעולה אחרונה", redo: "חזור על פעולה", disableIntro: "בטל הצגת אנימציית פתיחה",
     exportFile: "שמור לקובץ", importFile: "ייבוא מקובץ", importSuccess: "הייבוא הצליח", importError: "הקובץ אינו תקין",
@@ -224,6 +225,7 @@ const T_DICT = {
     deleteFrameOnly: "מחק מסגרת בלבד (התוכן יעבור למסגרת האם)", deleteFrameWithContent: "מחק מסגרת ואת כל התוכן שבתוכה",
     type: "תיאור", from: "מוצא", to: "יעד", start: "בשעה", end: "עד שעה", overnight: "חוצה חצות", arrivalMethod: "אמצעי הגעה",
     addTransferToAirport: "הוסף רשומת העברות - אל השדה", addTransferFromAirport: "הוסף רשומת העברות - מהשדה",
+    addTransferBetweenHotels: "הוסף רשומת העברות למלון הבא",
     stayDuration: "משך שהות", stayDurationHint: "כמה זמן נשארים ביעד — קובע את שעת הסיום (שעת הגעה + משך שהות).",
     stayNone: "ללא שהות", minutesShort: "דק'", hoursShort: "שע'", stayAtDestination: "שהות ביעד", hourLetter: "ש",
     typeKindDesc: "תיאור", typeKindArrival: "אמצעי הגעה",
@@ -355,6 +357,7 @@ const T_DICT = {
     inheritedStartTimeHint: "שדה שנמשך אוטומטית משעת ההגעה של הרשומה הקודמת.",
     computedStartTimeHintBackward: "שדה שחושב אחורה משעת הסיום, לפי משך הנסיעה המחושב עד ליעד.",
     apiTimeHint: "שדה שנמשך משליפת נתוני טיסה אמיתיים (לפי מספר טיסה).",
+    manualTimeHint: "שדה זמן שהוזן ידנית.",
     flightLockedHint: "השדה ננעל כי הנתונים נמשכו ממספר טיסה. כדי לערוך ידנית, נקו את שדה מספר הטיסה.",
     noOriginHint: "אין צורך בשדה מוצא עבור סוג רשומה זה.",
     dragDayHint: "גרור להעברת היום למסגרת אחרת", dropDayToRoot: "שחרר כאן כדי להוציא את היום מהמסגרת", showOverallRoute: "הצג מסלול טיול כולל",
@@ -385,6 +388,7 @@ const T_DICT = {
   en: {
     appName: "MyTrip Builder", addRow: "Add record", addDay: "Add day", newFrame: "New frame",
     catNewFrame: "Frames", catSaveExport: "Save, Import & Export", catSharing: "Sharing", catTools: "Tools", catViews: "Views", catGeneral: "General",
+    catPreFlight: "Pre-Flight", catManagement: "Management",
     showHeader: "Show top menu", hideHeader: "Hide top menu",
     columns: "Columns", addColumn: "Add column", addType: "Add description", resetColumnWidths: "Reset column widths (drag a header's edge to resize manually)", actions: "Actions", on: "On", settings: "Settings", manageColumns: "Manage columns", undo: "Undo last action", redo: "Redo action", disableIntro: "Disable the opening animation",
     exportFile: "Save to file", importFile: "Import from file", importSuccess: "Import successful", importError: "This file isn't valid",
@@ -412,6 +416,7 @@ const T_DICT = {
     deleteFrameOnly: "Delete frame only (content moves to parent)", deleteFrameWithContent: "Delete frame and all its content",
     type: "Description", from: "Origin", to: "Destination", start: "At", end: "Until", overnight: "Crosses midnight", arrivalMethod: "Arrival method",
     addTransferToAirport: "Add transfer record — to the airport", addTransferFromAirport: "Add transfer record — from the airport",
+    addTransferBetweenHotels: "Add transfer record to the next hotel",
     stayDuration: "Stay duration", stayDurationHint: "How long you stay at the destination — determines the end time (arrival + stay).",
     stayNone: "No stay", minutesShort: "min", hoursShort: "hr", stayAtDestination: "Stay at destination", hourLetter: "h",
     typeKindDesc: "Description", typeKindArrival: "Arrival method",
@@ -543,6 +548,7 @@ const T_DICT = {
     inheritedStartTimeHint: "Automatically pulled from the previous record's arrival time.",
     computedStartTimeHintBackward: "Computed backward from the end time, based on the calculated travel duration to the destination.",
     apiTimeHint: "Pulled from a real flight-number lookup.",
+    manualTimeHint: "Manually entered time field.",
     flightLockedHint: "Locked because this data was pulled from a flight number. Clear the flight number field to edit manually.",
     noOriginHint: "No origin field is needed for this record type.",
     dragDayHint: "Drag to move this day to another frame", dropDayToRoot: "Drop here to take this day out of its frame", showOverallRoute: "Show overall trip route",
@@ -1007,13 +1013,22 @@ function timeFieldColor(row, field) {
 /* The hover-title text explaining WHY a time field is colored the way it is — matches the exact
    state timeFieldColor detected, rather than showing one generic explanation for every color. */
 function timeFieldHint(row, field, T) {
-  const color = timeFieldColor(row, field);
-  if (!color) return undefined;
+  const time = field === "start" ? row.startTime : row.endTime;
   const auto = field === "start" ? row.startTimeAuto : row.endTimeAuto;
   const source = field === "start" ? row.startTimeSource : row.endTimeSource;
-  if (auto === false && source === "api") return T.apiTimeHint;
-  if (source === "inherited") return T.inheritedStartTimeHint;
-  return field === "start" ? T.computedStartTimeHintBackward : T.computedEndTimeHint;
+  const midnightNote = time && Number(time.split(":")[0]) < 6 ? T.afterMidnightHint : null;
+  let provenanceHint;
+  const color = timeFieldColor(row, field);
+  if (!color) {
+    provenanceHint = (time && auto === false) ? T.manualTimeHint : undefined;
+  } else if (auto === false && source === "api") {
+    provenanceHint = T.apiTimeHint;
+  } else if (source === "inherited") {
+    provenanceHint = T.inheritedStartTimeHint;
+  } else {
+    provenanceHint = field === "start" ? T.computedStartTimeHintBackward : T.computedEndTimeHint;
+  }
+  return [provenanceHint, midnightNote].filter(Boolean).join(" · ") || undefined;
 }
 /* The stay duration at the row's own location, e.g. "שהות ביעד - 0.5 ש" for 30 minutes —
    informational only, never baked into the time field's own value. */
@@ -1117,7 +1132,7 @@ function googlePlaceDetails(placeId, lang) {
   const cacheKey = (lang === "he" ? "he" : "en") + "|" + placeId;
   const cached = getCacheEntry(LOCATION_DETAILS_CACHE_KEY, cacheKey, LOCATION_DETAILS_TTL_MS);
   if (cached) return Promise.resolve(cached);
-  const fieldMask = "displayName,formattedAddress,location,rating,userRatingCount,photos,regularOpeningHours,priceLevel,internationalPhoneNumber,websiteUri";
+  const fieldMask = "displayName,formattedAddress,location,rating,userRatingCount,photos,regularOpeningHours,priceLevel,internationalPhoneNumber,websiteUri,addressComponents";
   return fetch(`https://places.googleapis.com/v1/places/${placeId}?languageCode=${lang === "he" ? "he" : "en"}`, {
     headers: { "X-Goog-Api-Key": GOOGLE_PLACES_KEY, "X-Goog-FieldMask": fieldMask },
   }).then((r) => { if (!r.ok) return extractGoogleApiError(r); return r.json(); })
@@ -1125,6 +1140,16 @@ function googlePlaceDetails(placeId, lang) {
 }
 const PRICE_LEVEL_MAP = { PRICE_LEVEL_FREE: "0", PRICE_LEVEL_INEXPENSIVE: "₪", PRICE_LEVEL_MODERATE: "₪₪", PRICE_LEVEL_EXPENSIVE: "₪₪₪", PRICE_LEVEL_VERY_EXPENSIVE: "₪₪₪₪" };
 function priceLevelSymbol(level) { return PRICE_LEVEL_MAP[level] || null; }
+/* Extracts the city from Google Place Details' structured address components — far more reliable
+   than trying to guess it later from a name-only verified text string. Falls back to the broader
+   administrative area if no locality is present (e.g. some rural or unincorporated areas). */
+function cityFromAddressComponents(components) {
+  if (!components || !components.length) return null;
+  const locality = components.find((c) => c.types && c.types.includes("locality"));
+  if (locality) return locality.longText;
+  const fallback = components.find((c) => c.types && c.types.includes("administrative_area_level_2"));
+  return fallback ? fallback.longText : null;
+}
 function closingTimeForDate(hours, dateStr, lang) {
   if (!hours || !hours.periods || !dateStr) return null;
   const date = new Date(dateStr + "T00:00:00");
@@ -1216,7 +1241,7 @@ function nominatimSearch(query, lang) {
   return throttledCall(() => fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&accept-language=${lang === "he" ? "he,en" : "en"}&q=${encodeURIComponent(query)}`, { headers: { Accept: "application/json" } })
     .then((r) => { if (!r.ok) throw new Error("http-" + r.status); return r.json(); }))
     .then((data) => (data || []).map((d) => ({
-      source: "nominatim", lat: Number(d.lat), lon: Number(d.lon), text: d.display_name || d.name || query,
+      source: "nominatim", lat: Number(d.lat), lon: Number(d.lon), text: d.display_name || d.name || query, address: d.address,
     })));
 }
 function geocodeTextDetailed(text) {
@@ -2362,7 +2387,7 @@ function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
       <div className="mt-card-divider" />
       <div className="mt-card-times-row" dir="ltr">
         <div className="mt-card-time-block">
-          <div className="mt-card-time-big" style={{ ...(r.startTime && Number(r.startTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "start") ? { borderBottom: `2px dashed ${timeFieldColor(r, "start")}` } : {}) }} title={r.startTime && Number(r.startTime.split(":")[0]) < 6 ? T.afterMidnightHint : undefined}>{r.startTime || "—"}</div>
+          <div className="mt-card-time-big" style={{ ...(r.startTime && Number(r.startTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "start") ? { borderBottom: `2px dashed ${timeFieldColor(r, "start")}` } : {}) }} title={timeFieldHint(r, "start", T)}>{r.startTime || "—"}</div>
           {fromLabel && <div className="mt-card-time-sub" dir="auto" title={fromLabel}>{truncateChars(fromLabel, 13)}</div>}
         </div>
         <div className="mt-card-connector">
@@ -2372,7 +2397,7 @@ function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
           <div className="mt-card-connector-sub">{rowDuration && <span className="mt-card-duration-text">{rowDuration}</span>}</div>
         </div>
         <div className="mt-card-time-block end">
-          <div className="mt-card-time-big" style={{ ...(r.endTime && Number(r.endTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "end") ? { borderBottom: `2px dashed ${timeFieldColor(r, "end")}` } : {}) }} title={r.endTime && Number(r.endTime.split(":")[0]) < 6 ? T.afterMidnightHint : undefined}>{r.endTime || "—"}</div>
+          <div className="mt-card-time-big" style={{ ...(r.endTime && Number(r.endTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "end") ? { borderBottom: `2px dashed ${timeFieldColor(r, "end")}` } : {}) }} title={timeFieldHint(r, "end", T)}>{r.endTime || "—"}</div>
           {toLabel && <div className="mt-card-time-sub" dir="auto" title={toLabel}>{truncateChars(toLabel, 13)}</div>}
         </div>
       </div>
@@ -2683,7 +2708,7 @@ function TimeField({ value, onChange, T, className, title, style, disabled }) {
     <span style={{ position: "relative", display: "block" }}>
       <button type="button" disabled={disabled} className={"mt-type-field-btn" + (className ? " " + className : "")} style={{ ...style, ...(disabled ? { opacity: 0.6, cursor: "not-allowed" } : {}) }} title={title} onClick={openPicker}>
         <Clock size={14} />
-        <span className="mt-type-text" dir="ltr" style={value && Number(value.split(":")[0]) < 6 ? { color: "#C1543A", fontWeight: 700 } : undefined} title={value && Number(value.split(":")[0]) < 6 ? T.afterMidnightHint : undefined}>{value || "--:--"}</span>
+        <span className="mt-type-text" dir="ltr" style={value && Number(value.split(":")[0]) < 6 ? { color: "#C1543A", fontWeight: 700 } : undefined}>{value || "--:--"}</span>
       </button>
       {open && (
         <div className="mt-modal-backdrop" onClick={() => setOpen(false)}>
@@ -2894,6 +2919,8 @@ function truncateFrameName(name, max) {
   return name.slice(0, max) + "...";
 }
 function hotelCityForFrame(frame, rows) {
+  const checkinRow = rows.find((r) => r.frameId === frame.id && (r.typeId === "checkin" || r.typeId === "checkout") && (r.toCity || r.fromCity));
+  if (checkinRow) return checkinRow.toCity || checkinRow.fromCity;
   if (frame.hotelRef && frame.hotelRef.city) return frame.hotelRef.city;
   const parenMatch = frame.name.match(/\(([^)]+)\)\s*$/);
   if (parenMatch) return parenMatch[1].trim();
@@ -2943,7 +2970,7 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
                 ) : (
                   dayCount > 0 && <span className="mt-frame-daycount">{formatDayCount(dayCount, lang)}</span>
                 )}
-                {convertedTotal > 0 && (
+                {convertedTotal > 0 && effectiveFrameType !== "trip" && (
                   <span className="mt-frame-cost-inline">{displayCurrency} {convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                 )}
               </div>
@@ -3701,6 +3728,7 @@ export default function MyTripApp() {
         name: hf.name || "", alias: (checkinRow && checkinRow.toAlias) || "", checkIn: hf.startDate || "", checkOut: hf.endDate || "",
         nameLat: (checkinRow && checkinRow.toLat) || null, nameLon: (checkinRow && checkinRow.toLon) || null,
         namePlaceId: (checkinRow && checkinRow.toPlaceId) || null, nameVerifiedUrl: (checkinRow && checkinRow.toVerifiedUrl) || "",
+        nameCity: (checkinRow && checkinRow.toCity) || null,
         city: hotelCityForFrame(hf, rows) || "",
       };
     });
@@ -3804,7 +3832,7 @@ export default function MyTripApp() {
       // search reads .to (where you were, about to leave — the checkout), an "after" search reads
       // .from (where you'll be, having just arrived — the checkin).
       const hotelPseudoRows = (d.hasHotels === "yes" ? d.hotels : []).flatMap((h) => [
-        h.checkOut ? { date: h.checkOut, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl } : null,
+        h.checkOut ? { date: h.checkOut, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, toCity: h.nameCity } : null,
         h.checkIn ? { date: h.checkIn, from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl } : null,
       ].filter(Boolean));
       const allFlightEntries = [...(d.hasFlights === "yes" ? d.flights : []), ...(d.hasDomestic === "yes" ? d.domesticFlights : [])].filter((fl) => fl !== excludeFlight);
@@ -3943,7 +3971,7 @@ export default function MyTripApp() {
             const isRowVerified = (r) => r && r.toVerifiedText === r.to && (r.toPlaceId || r.toVerifiedUrl);
             const nameChanged = h.name !== hf.name;
             const verifiedName = h.nameVerifiedUrl ? (h.name || h.alias) : null;
-            const locationPatch = { from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, to: h.name || h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, routeDistanceKm: 0, routeDurationMin: 0, routeCalcSig: `${h.name || h.alias}|${h.name || h.alias}|checkin|c`, ...(verifiedName ? { fromVerifiedText: verifiedName, toVerifiedText: verifiedName } : {}) };
+            const locationPatch = { from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, fromCity: h.nameCity, to: h.name || h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, toCity: h.nameCity, routeDistanceKm: 0, routeDurationMin: 0, routeCalcSig: `${h.name || h.alias}|${h.name || h.alias}|checkin|c`, ...(verifiedName ? { fromVerifiedText: verifiedName, toVerifiedText: verifiedName } : {}) };
             if (checkinRow) updateRow(checkinRow.id, { ...((nameChanged || !isRowVerified(checkinRow)) ? locationPatch : {}), toAlias: h.alias, date: h.checkIn });
             if (checkoutRow) updateRow(checkoutRow.id, { ...((nameChanged || !isRowVerified(checkoutRow)) ? locationPatch : {}), toAlias: h.alias, date: h.checkOut });
             transferRows.forEach((tr) => updateRow(tr.id, { date: tr.date === (checkoutRow && checkoutRow.date) ? h.checkOut : h.checkIn }));
@@ -3951,9 +3979,9 @@ export default function MyTripApp() {
             const newFrame = { id: uid(), name: h.alias || h.name || T.hotelFrameNameFallback, startDate: h.checkIn, endDate: h.checkOut, parentFrameId: rootFrame.id, collapsed: false, frameType: "hotel", hotelRef: h };
             setFrames((prev) => [...prev, newFrame]);
             const id1 = addRow(h.checkIn, null, newFrame.id);
-            updateRow(id1, { typeId: "checkin", startTime: "15:00", from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, routeDistanceKm: 0, routeDurationMin: 0, routeCalcSig: `${h.name || h.alias}|${h.name || h.alias}|checkin|c`, ...(h.nameVerifiedUrl ? { fromVerifiedText: h.name || h.alias, toVerifiedText: h.name || h.alias } : {}) });
+            updateRow(id1, { typeId: "checkin", startTime: "15:00", from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, fromCity: h.nameCity, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, toCity: h.nameCity, routeDistanceKm: 0, routeDurationMin: 0, routeCalcSig: `${h.name || h.alias}|${h.name || h.alias}|checkin|c`, ...(h.nameVerifiedUrl ? { fromVerifiedText: h.name || h.alias, toVerifiedText: h.name || h.alias } : {}) });
             const id2 = addRow(h.checkOut, null, newFrame.id);
-            updateRow(id2, { typeId: "checkout", endTime: "11:00", endTimeAuto: false, from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, routeDistanceKm: 0, routeDurationMin: 0, routeCalcSig: `${h.name || h.alias}|${h.name || h.alias}|checkout|c`, ...(h.nameVerifiedUrl ? { fromVerifiedText: h.name || h.alias, toVerifiedText: h.name || h.alias } : {}) });
+            updateRow(id2, { typeId: "checkout", endTime: "11:00", endTimeAuto: false, from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, fromCity: h.nameCity, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, toCity: h.nameCity, routeDistanceKm: 0, routeDurationMin: 0, routeCalcSig: `${h.name || h.alias}|${h.name || h.alias}|checkout|c`, ...(h.nameVerifiedUrl ? { fromVerifiedText: h.name || h.alias, toVerifiedText: h.name || h.alias } : {}) });
           }
         });
         existingHotelFrames.slice(hotels.length).forEach((hf) => {
@@ -3999,10 +4027,25 @@ export default function MyTripApp() {
     hotelFrames.forEach((hf) => {
       const h = hf.hotelRef;
       const id1 = addRow(h.checkIn, null, hf.id);
-      updateRow(id1, { typeId: "checkin", startTime: "15:00", from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, routeDistanceKm: 0, routeDurationMin: 0, routeCalcSig: `${h.name || h.alias}|${h.name || h.alias}|checkin|c`, ...(h.nameVerifiedUrl ? { fromVerifiedText: h.name || h.alias, toVerifiedText: h.name || h.alias } : {}) });
+      updateRow(id1, { typeId: "checkin", startTime: "15:00", from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, fromCity: h.nameCity, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, toCity: h.nameCity, routeDistanceKm: 0, routeDurationMin: 0, routeCalcSig: `${h.name || h.alias}|${h.name || h.alias}|checkin|c`, ...(h.nameVerifiedUrl ? { fromVerifiedText: h.name || h.alias, toVerifiedText: h.name || h.alias } : {}) });
       const id2 = addRow(h.checkOut, null, hf.id);
-      updateRow(id2, { typeId: "checkout", endTime: "11:00", endTimeAuto: false, from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, routeDistanceKm: 0, routeDurationMin: 0, routeCalcSig: `${h.name || h.alias}|${h.name || h.alias}|checkout|c`, ...(h.nameVerifiedUrl ? { fromVerifiedText: h.name || h.alias, toVerifiedText: h.name || h.alias } : {}) });
+      updateRow(id2, { typeId: "checkout", endTime: "11:00", endTimeAuto: false, from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl, fromCity: h.nameCity, to: h.name || h.alias, toAlias: h.alias, toLat: h.nameLat, toLon: h.nameLon, toPlaceId: h.namePlaceId, toVerifiedUrl: h.nameVerifiedUrl, toCity: h.nameCity, routeDistanceKm: 0, routeDurationMin: 0, routeCalcSig: `${h.name || h.alias}|${h.name || h.alias}|checkout|c`, ...(h.nameVerifiedUrl ? { fromVerifiedText: h.name || h.alias, toVerifiedText: h.name || h.alias } : {}) });
       createdRowIds.push(id1, id2);
+    });
+    // Transfers between consecutive hotels — created at the main trip level, not inside either
+    // hotel's own frame, since the transfer belongs to neither stay specifically.
+    hotels.forEach((h, i) => {
+      if (i >= hotels.length - 1 || h.addTransferAfter === false) return;
+      const next = hotels[i + 1];
+      const idT = addRow(h.checkOut, null, mainFrame.id);
+      updateRow(idT, {
+        typeId: "transfer", arrivalTypeId: "taxi",
+        from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl,
+        to: next.name || next.alias, toAlias: next.alias, toLat: next.nameLat, toLon: next.nameLon, toPlaceId: next.namePlaceId, toVerifiedUrl: next.nameVerifiedUrl,
+        ...(h.nameVerifiedUrl ? { fromVerifiedText: h.name || h.alias } : {}),
+        ...(next.nameVerifiedUrl ? { toVerifiedText: next.name || next.alias } : {}),
+      });
+      createdRowIds.push(idT);
     });
 
     setPreWizardCreatedIds({ frameIds: newFrames.map((f) => f.id), rowIds: createdRowIds });
@@ -4563,9 +4606,10 @@ export default function MyTripApp() {
       const label = (details.displayName && details.displayName.text) || details.formattedAddress || prediction.text;
       const mapUrl = `https://www.google.com/maps/search/?api=1&query=${details.location.latitude},${details.location.longitude}&query_place_id=${prediction.placeId}`;
       const smartAlias = (details.displayName && details.displayName.text) || label.split(",")[0];
-      if (field === "from") applyLocationPatch("from", { from: label, fromVerifiedUrl: mapUrl, fromVerifiedText: label, fromLat: details.location.latitude, fromLon: details.location.longitude, fromPlaceId: prediction.placeId }, smartAlias);
-      else if (field === "to") applyLocationPatch("to", { to: label, toVerifiedUrl: mapUrl, toVerifiedText: label, toLat: details.location.latitude, toLon: details.location.longitude, toPlaceId: prediction.placeId }, smartAlias);
-      else if (field === "name") applyLocationPatch("name", { name: label, nameVerifiedUrl: mapUrl, nameVerifiedText: label, nameLat: details.location.latitude, nameLon: details.location.longitude, namePlaceId: prediction.placeId }, smartAlias);
+      const city = cityFromAddressComponents(details.addressComponents);
+      if (field === "from") applyLocationPatch("from", { from: label, fromVerifiedUrl: mapUrl, fromVerifiedText: label, fromLat: details.location.latitude, fromLon: details.location.longitude, fromPlaceId: prediction.placeId, fromCity: city }, smartAlias);
+      else if (field === "to") applyLocationPatch("to", { to: label, toVerifiedUrl: mapUrl, toVerifiedText: label, toLat: details.location.latitude, toLon: details.location.longitude, toPlaceId: prediction.placeId, toCity: city }, smartAlias);
+      else if (field === "name") applyLocationPatch("name", { name: label, nameVerifiedUrl: mapUrl, nameVerifiedText: label, nameLat: details.location.latitude, nameLon: details.location.longitude, namePlaceId: prediction.placeId, nameCity: city }, smartAlias);
       else if (field === "fromAlias") applyLocationPatch("fromAlias", { fromAlias: smartAlias });
       else if (field === "toAlias") applyLocationPatch("toAlias", { toAlias: smartAlias });
     }).catch(() => setLocPicker((p) => (p ? { ...p, loading: false, error: "network" } : p)));
@@ -4576,9 +4620,10 @@ export default function MyTripApp() {
     const label = result.text;
     const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(label)}`;
     const smartAlias = label.split(",")[0];
-    if (field === "from") applyLocationPatch("from", { from: label, fromVerifiedUrl: mapUrl, fromVerifiedText: label, fromLat: result.lat, fromLon: result.lon, fromPlaceId: null }, smartAlias);
-    else if (field === "to") applyLocationPatch("to", { to: label, toVerifiedUrl: mapUrl, toVerifiedText: label, toLat: result.lat, toLon: result.lon, toPlaceId: null }, smartAlias);
-    else if (field === "name") applyLocationPatch("name", { name: label, nameVerifiedUrl: mapUrl, nameVerifiedText: label, nameLat: result.lat, nameLon: result.lon, namePlaceId: null }, smartAlias);
+    const city = (result.address && (result.address.city || result.address.town || result.address.village)) || null;
+    if (field === "from") applyLocationPatch("from", { from: label, fromVerifiedUrl: mapUrl, fromVerifiedText: label, fromLat: result.lat, fromLon: result.lon, fromPlaceId: null, fromCity: city }, smartAlias);
+    else if (field === "to") applyLocationPatch("to", { to: label, toVerifiedUrl: mapUrl, toVerifiedText: label, toLat: result.lat, toLon: result.lon, toPlaceId: null, toCity: city }, smartAlias);
+    else if (field === "name") applyLocationPatch("name", { name: label, nameVerifiedUrl: mapUrl, nameVerifiedText: label, nameLat: result.lat, nameLon: result.lon, namePlaceId: null, nameCity: city }, smartAlias);
     else if (field === "fromAlias") applyLocationPatch("fromAlias", { fromAlias: smartAlias });
     else if (field === "toAlias") applyLocationPatch("toAlias", { toAlias: smartAlias });
   }
@@ -5020,7 +5065,7 @@ export default function MyTripApp() {
         .mt-avatar { width:26px; height:26px; border-radius:50%; background:var(--teal-tint); color:var(--teal-dark); display:flex; align-items:center; justify-content:center; border:1px solid var(--border); }
         .mt-toolbar-group { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
         .mt-floating-menu { background:var(--surface); color:var(--ink); border:1px solid var(--border); border-radius:10px; box-shadow:0 12px 32px rgba(20,40,35,.18); padding:10px; z-index:200; max-width:92vw; max-height:70vh; overflow-y:auto; }
-        .mt-floating-backdrop { position:fixed; inset:0; z-index:390; background:transparent; }
+        .mt-floating-backdrop { position:fixed; inset:0; z-index:390; background:rgba(20,35,32,.15); }
         .mt-menu-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:7px; }
         .mt-menu-head strong { font-size:12.5px; }
         .mt-share-opt { width:100%; display:flex; align-items:center; gap:8px; padding:8px; border-radius:7px; background:none; border:none; font-size:12.5px; text-align:start; color:var(--ink); }
@@ -5658,14 +5703,18 @@ export default function MyTripApp() {
         <>
           <div className="mt-floating-backdrop" onClick={() => setActionsMenuOpen(false)} />
           <div ref={actionsMenu.refs.setFloating} style={{ ...actionsMenu.floatingStyles, maxWidth: "min(240px, 92vw)", zIndex: 400 }} {...actionsMenu.getFloatingProps()} className="mt-floating-menu mt-kebab-menu">
+            <div className="mt-action-cat-label">{T.catPreFlight}</div>
+            <button className="mt-share-opt" onClick={() => { setChecklistOpen(true); setActionsMenuOpen(false); }}><CheckSquare size={14} /> {T.preFlightChecklist}</button>
+            <div className="mt-action-cat-label">{T.catManagement}</div>
+            <button className="mt-share-opt" onClick={() => { recalculateAllRoutesAndTimes(); setActionsMenuOpen(false); }}><Route size={14} /> {T.recalculateAll}</button>
+            <button className="mt-share-opt" onClick={() => { setFlightManagerOpen(true); setActionsMenuOpen(false); }}><RefreshCw size={14} /> {T.refreshAllFlights}</button>
+            <button className="mt-share-opt" onClick={() => { setHotelManagerOpen(true); setActionsMenuOpen(false); }}><BedDouble size={14} /> {T.hotelManagerTitle}</button>
+            <button className="mt-share-opt" onClick={() => { setFileManagerOpen(true); setFileManagerFolder(null); setActionsMenuOpen(false); }}><FileUp size={14} /> {T.fileManagerTitle}</button>
+            <button className="mt-share-opt" onClick={() => { setRemindersManagerOpen(true); setActionsMenuOpen(false); }}><Bell size={14} /> {T.remindersManagerTitle}</button>
             <div className="mt-action-cat-label"><span>{T.catNewFrame}</span><HelpButton topic="frames" lang={lang} T={T} onOpenFull={openHelpTopic} size={13} openTopic={helpPopoverOpen} setOpenTopic={setHelpPopoverOpen} /></div>
             <button className="mt-share-opt" onClick={() => { openFrameModal(null, null); setActionsMenuOpen(false); }}><FolderPlus size={14} /> {T.newFrame}</button>
             <button className="mt-share-opt" onClick={() => { openPreWizard(); setActionsMenuOpen(false); }}><Wand2 size={14} /> {T.tripWizard}</button>
             <button className="mt-share-opt" onClick={() => { openEditTripDetails(); setActionsMenuOpen(false); }}><Pencil size={14} /> {T.editTripDetails}</button>
-            <button className="mt-share-opt" onClick={() => { setFlightManagerOpen(true); setActionsMenuOpen(false); }}><RefreshCw size={14} /> {T.refreshAllFlights}</button>
-            <button className="mt-share-opt" onClick={() => { recalculateAllRoutesAndTimes(); setActionsMenuOpen(false); }}><Route size={14} /> {T.recalculateAll}</button>
-            <button className="mt-share-opt" onClick={() => { setHotelManagerOpen(true); setActionsMenuOpen(false); }}><BedDouble size={14} /> {T.hotelManagerTitle}</button>
-            <button className="mt-share-opt" onClick={() => { setRemindersManagerOpen(true); setActionsMenuOpen(false); }}><Bell size={14} /> {T.remindersManagerTitle}</button>
             <div className="mt-action-cat-label"><span>{T.catSaveExport}</span><HelpButton topic="sharing" lang={lang} T={T} onOpenFull={openHelpTopic} size={13} openTopic={helpPopoverOpen} setOpenTopic={setHelpPopoverOpen} /></div>
             <button className="mt-share-opt" onClick={openSaveTripModal}><Save size={14} /> {T.saveTripByName}</button>
             <button className="mt-share-opt" onClick={openLoadTripModal}><FolderOpen size={14} /> {T.loadSavedTrip}</button>
@@ -5680,8 +5729,6 @@ export default function MyTripApp() {
             <div className="mt-action-cat-label">{T.catTools}</div>
             <button className="mt-share-opt" onClick={() => { toggleReminders(); setActionsMenuOpen(false); }}><Bell size={14} /> {T.reminders}{remindersOn ? ` (${T.on})` : ""}</button>
             <button className="mt-share-opt" onClick={() => { setAiPanelOpen(true); setActionsMenuOpen(false); }}><Wand2 size={14} /> {T.aiAssistant}</button>
-            <button className="mt-share-opt" onClick={() => { setChecklistOpen(true); setActionsMenuOpen(false); }}><CheckSquare size={14} /> {T.preFlightChecklist}</button>
-            <button className="mt-share-opt" onClick={() => { setFileManagerOpen(true); setFileManagerFolder(null); setActionsMenuOpen(false); }}><FileUp size={14} /> {T.fileManagerTitle}</button>
         </div>
         </>
       )}
@@ -5989,6 +6036,12 @@ export default function MyTripApp() {
                             <DateRangeField startDate={h.checkIn} endDate={h.checkOut} lang={lang} T={T} initialViewMonth={preWizardRefDate}
                               onChange={(s, e) => { updatePreWizardArrayItem("hotels", i, { checkIn: s, checkOut: e }); if (s) setPreWizardRefDate(s); }} />
                           </div>
+                          {i < preWizardData.hotels.length - 1 && (
+                            <label className="mt-checkbox-row">
+                              <input type="checkbox" checked={h.addTransferAfter !== false} onChange={(e) => updatePreWizardArrayItem("hotels", i, { addTransferAfter: e.target.checked })} />
+                              {T.addTransferBetweenHotels}
+                            </label>
+                          )}
                         </div>
                       ))}
                       <button className="mt-btn ghost" style={{ width: "100%" }} onClick={addPreWizardHotel}><Plus size={13} /> {T.preWizardAddHotel}</button>
