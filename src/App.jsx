@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.65.1";
+const APP_VERSION = "22.66.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -598,6 +598,35 @@ const T_DICT = {
 function getTypeHint() { return ""; }
 
 function uid() { return Math.random().toString(36).slice(2, 10); }
+/* A hover tooltip rendered via a portal (escaping any ancestor's overflow/clipping) and kept
+   within the viewport by floating-ui's shift middleware — used instead of the native title
+   attribute (unstylable) or a pure-CSS pseudo-element (can't dynamically stay in bounds). */
+function HoverTip({ text, children }) {
+  const [open, setOpen] = useState(false);
+  const { refs, floatingStyles } = useFloating({
+    open, onOpenChange: setOpen,
+    placement: "top",
+    strategy: "fixed",
+    middleware: [offset(6), shift({ padding: 8 }), flip()],
+    whileElementsMounted: autoUpdate,
+  });
+  if (!text) return children;
+  return (
+    <>
+      {React.cloneElement(children, {
+        ref: refs.setReference,
+        onMouseEnter: (e) => { setOpen(true); children.props.onMouseEnter && children.props.onMouseEnter(e); },
+        onMouseLeave: (e) => { setOpen(false); children.props.onMouseLeave && children.props.onMouseLeave(e); },
+        onFocus: (e) => { setOpen(true); children.props.onFocus && children.props.onFocus(e); },
+        onBlur: (e) => { setOpen(false); children.props.onBlur && children.props.onBlur(e); },
+      })}
+      {open && createPortal(
+        <div ref={refs.setFloating} style={{ ...floatingStyles, zIndex: 600 }} className="mt-hovertip">{text}</div>,
+        document.body
+      )}
+    </>
+  );
+}
 function useFloatingMenu(open, onOpenChange) {
   const { refs, floatingStyles, context } = useFloating({
     open, onOpenChange,
@@ -2418,7 +2447,9 @@ function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
       <div className="mt-card-divider" />
       <div className="mt-card-times-row" dir="ltr">
         <div className="mt-card-time-block">
-          <div className="mt-card-time-big" style={{ ...(r.startTime && Number(r.startTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "start") ? { borderBottom: `2px dashed ${timeFieldColor(r, "start")}` } : {}) }} data-tooltip={timeFieldHint(r, "start", T) || undefined}>{r.startTime || "—"}</div>
+          <HoverTip text={timeFieldHint(r, "start", T)}>
+            <div className="mt-card-time-big" style={{ ...(r.startTime && Number(r.startTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "start") ? { borderBottom: `2px dashed ${timeFieldColor(r, "start")}` } : {}) }}>{r.startTime || "—"}</div>
+          </HoverTip>
           {fromLabel && <div className="mt-card-time-sub" dir="auto" title={fromLabel}>{truncateChars(fromLabel, 13)}</div>}
         </div>
         <div className="mt-card-connector">
@@ -2428,7 +2459,9 @@ function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
           <div className="mt-card-connector-sub">{rowDuration && <span className="mt-card-duration-text">{rowDuration}</span>}</div>
         </div>
         <div className="mt-card-time-block end">
-          <div className="mt-card-time-big" style={{ ...(r.endTime && Number(r.endTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "end") ? { borderBottom: `2px dashed ${timeFieldColor(r, "end")}` } : {}) }} data-tooltip={timeFieldHint(r, "end", T) || undefined}>{r.endTime || "—"}</div>
+          <HoverTip text={timeFieldHint(r, "end", T)}>
+            <div className="mt-card-time-big" style={{ ...(r.endTime && Number(r.endTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "end") ? { borderBottom: `2px dashed ${timeFieldColor(r, "end")}` } : {}) }}>{r.endTime || "—"}</div>
+          </HoverTip>
           {toLabel && <div className="mt-card-time-sub" dir="auto" title={toLabel}>{truncateChars(toLabel, 13)}</div>}
         </div>
       </div>
@@ -2737,10 +2770,12 @@ function TimeField({ value, onChange, T, className, title, style, disabled }) {
   const marks = mode === "hour" ? hourMarks : minMarks;
   return (
     <span style={{ position: "relative", display: "block" }}>
-      <button type="button" disabled={disabled} className={"mt-type-field-btn" + (className ? " " + className : "")} style={{ ...style, ...(disabled ? { opacity: 0.6, cursor: "not-allowed" } : {}) }} data-tooltip={title || undefined} onClick={openPicker}>
-        <Clock size={14} />
-        <span className="mt-type-text" dir="ltr" style={value && Number(value.split(":")[0]) < 6 ? { color: "#C1543A", fontWeight: 700 } : undefined}>{value || "--:--"}</span>
-      </button>
+      <HoverTip text={title}>
+        <button type="button" disabled={disabled} className={"mt-type-field-btn" + (className ? " " + className : "")} style={{ ...style, ...(disabled ? { opacity: 0.6, cursor: "not-allowed" } : {}) }} onClick={openPicker}>
+          <Clock size={14} />
+          <span className="mt-type-text" dir="ltr" style={value && Number(value.split(":")[0]) < 6 ? { color: "#C1543A", fontWeight: 700 } : undefined}>{value || "--:--"}</span>
+        </button>
+      </HoverTip>
       {open && (
         <div className="mt-modal-backdrop" onClick={() => setOpen(false)}>
           <div className="mt-modal mt-time-modal mt-clock-modal" onClick={(e) => e.stopPropagation()}>
@@ -3013,7 +3048,7 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
                 ) : (
                   dayCount > 0 && <span className="mt-frame-daycount">{formatDayCount(dayCount, lang)}</span>
                 )}
-                {convertedTotal > 0 && effectiveFrameType !== "trip" && effectiveFrameType !== "flight" && (
+                {convertedTotal > 0 && effectiveFrameType !== "trip" && effectiveFrameType !== "flight" && effectiveFrameType !== "hotel" && (
                   <span className="mt-frame-cost-inline">{displayCurrency} {convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                 )}
               </div>
@@ -5366,18 +5401,12 @@ export default function MyTripApp() {
         .mt-type-icon svg { width:12px; height:12px; color:#fff; }
         .mt-type-btn { border:none; background:none; padding:0; display:flex; align-items:center; gap:5px; font-size:12.8px; font-weight:500; color:var(--ink); max-width:100%; }
         .mt-type-field-btn { display:flex; align-items:center; gap:7px; width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 10px; background:var(--surface); font-size:13px; font-weight:500; color:var(--ink); box-sizing:border-box; position:relative; }
-        [data-tooltip] { position:relative; }
-        [data-tooltip]::after {
-          content: attr(data-tooltip);
-          position: absolute; bottom: calc(100% + 6px); left: 50%;
-          direction: rtl; text-align: start; white-space: normal; width: max-content; max-width: min(170px, calc(100vw - 24px));
-          background: #1E2A28; color: #fff; font-size: 11.5px; font-weight: 500; line-height: 1.5;
-          padding: 6px 9px; border-radius: 7px; box-shadow: 0 4px 12px rgba(0,0,0,.18);
-          opacity: 0; pointer-events: none; transform: translate(-50%, 3px); transition: opacity .12s, transform .12s;
-          z-index: 500;
+        .mt-hovertip {
+          direction: rtl; text-align: start; white-space: normal; width: max-content; max-width: min(200px, calc(100vw - 24px));
+          background: var(--surface); color: var(--ink); font-size: 11.5px; font-weight: 500; line-height: 1.5;
+          padding: 6px 9px; border-radius: 7px; border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,.12);
         }
-        [data-tooltip]:hover::after, [data-tooltip]:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
-        html[dir="ltr"] [data-tooltip]::after { direction: ltr; }
+        html[dir="ltr"] .mt-hovertip { direction: ltr; }
         .mt-type-field-btn:hover { border-color:var(--teal); }
         .mt-type-modal { max-width:340px; width:92vw; max-height:70vh; display:flex; flex-direction:column; padding:12px; }
         .mt-time-modal { max-width:240px; width:84vw; padding:18px; }
@@ -5888,6 +5917,7 @@ export default function MyTripApp() {
             <button className="mt-share-opt" onClick={() => { openFrameModal(null, null); setActionsMenuOpen(false); }}><FolderPlus size={14} /> {T.newFrame}</button>
             <button className="mt-share-opt" onClick={() => { openPreWizard(); setActionsMenuOpen(false); }}><Wand2 size={14} /> {T.tripWizard}</button>
             <button className="mt-share-opt" onClick={() => { openEditTripDetails(); setActionsMenuOpen(false); }}><Pencil size={14} /> {T.editTripDetails}</button>
+            <button className="mt-share-opt" onClick={openRouteImport}><Route size={14} /> {T.importRoute}</button>
             <div className="mt-action-cat-label"><span>{T.catManagement}</span><HelpButton topic="management" lang={lang} T={T} onOpenFull={openHelpTopic} size={13} openTopic={helpPopoverOpen} setOpenTopic={setHelpPopoverOpen} /></div>
             <button className="mt-share-opt" onClick={() => { recalculateAllRoutesAndTimes(); setActionsMenuOpen(false); }}><Route size={14} /> {T.recalculateAll}</button>
             <button className="mt-share-opt" onClick={() => { setFlightManagerOpen(true); setActionsMenuOpen(false); }}><RefreshCw size={14} /> {T.refreshAllFlights}</button>
@@ -5900,7 +5930,6 @@ export default function MyTripApp() {
             <button className="mt-share-opt" onClick={() => { exportToFile(); setActionsMenuOpen(false); }}><Download size={14} /> {T.exportFile}</button>
             <button className="mt-share-opt" onClick={() => { importInputRef.current && importInputRef.current.click(); setActionsMenuOpen(false); }}><Upload size={14} /> {T.importFile}</button>
             <button className="mt-share-opt" onClick={() => { exportToPDF(); setActionsMenuOpen(false); }}><Printer size={14} /> {T.exportPdf}</button>
-            <button className="mt-share-opt" onClick={openRouteImport}><Route size={14} /> {T.importRoute}</button>
             <div className="mt-action-cat-label">{T.catSharing}</div>
             <button className="mt-share-opt disabled" onClick={() => { showDemoNotice(T.demoNeedsAccounts); setActionsMenuOpen(false); }}><UserPlus size={14} /> {T.shareWithUser}</button>
             <button className="mt-share-opt disabled" onClick={() => { showDemoNotice(T.demoNeedsAccounts); setActionsMenuOpen(false); }}><Users size={14} /> {T.shareEditAccess}</button>
