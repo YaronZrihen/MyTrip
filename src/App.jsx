@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.60.0";
+const APP_VERSION = "22.61.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -800,6 +800,14 @@ function collectRowsUnderPure(rows, frames, fid) {
 function frameTotalsPure(rows, frames, fid) {
   const t = {};
   collectRowsUnderPure(rows, frames, fid).forEach((r) => { const amt = Number(r.costAmount) || 0; if (!amt) return; t[r.costCurrency] = (t[r.costCurrency] || 0) + amt; });
+  const addFrameOwnCost = (f) => {
+    const amt = Number(f.costAmount) || 0;
+    if (amt) t[f.costCurrency] = (t[f.costCurrency] || 0) + amt;
+    childFramesPure(frames, f.id).forEach(addFrameOwnCost);
+  };
+  const self = frames.find((f) => f.id === fid);
+  if (self) addFrameOwnCost(self);
+  else childFramesPure(frames, fid).forEach(addFrameOwnCost);
   return t;
 }
 function frameDateIssue(draft, rows, frames, T) {
@@ -950,7 +958,7 @@ function recomputeChainTimesPure(rows, frames) {
     const patch = {};
     const startBroken = cur.startTimeAuto === false && !cur.startTime;
     const endBroken = cur.endTimeAuto === false && !cur.endTime;
-    if ((cur.startTimeAuto !== false || startBroken) && prevInDate && prevInDate.endTime) {
+    if ((cur.startTimeAuto !== false || startBroken) && !isPreFlightBufferTransfer(cur) && prevInDate && prevInDate.endTime) {
       const prevStay = prevInDate.stayDurationMin != null ? prevInDate.stayDurationMin : getDefaultStayMinutes(prevInDate.typeId);
       const anchor = addMinutesToTime(prevInDate.endTime, prevStay);
       if (anchor !== cur.startTime) patch.startTime = anchor;
@@ -976,6 +984,16 @@ function recomputeChainTimesPure(rows, frames) {
   return rows.map((r) => (patches.has(r.id) ? { ...r, ...patches.get(r.id) } : r));
 }
 const TIME_FIELD_COLORS = { computed: "#2E9B57", inherited: "#3E7CB1", api: "#C9971E" };
+const PRE_FLIGHT_STAY_MIN = 180;
+/* Recognizes the transfer right before an international flight — created with a locked end time
+   (departure minus the buffer) and this exact stay duration. For these specifically, the start time
+   should be driven by the backward route calculation (how long the trip there actually takes), not
+   blind inheritance from whatever record happens to precede it — inheriting from an unrelated prior
+   record (like a hotel checkout) isn't a meaningful "when do I need to leave" signal the way the
+   route-based calculation is. */
+function isPreFlightBufferTransfer(row) {
+  return row.typeId === "transfer" && row.endTimeAuto === false && row.stayDurationMin === PRE_FLIGHT_STAY_MIN;
+}
 /* Determines which of the three provenance colors (if any) applies to a row's start/end time field.
    'field' is 'start' or 'end'. Manual, plain user-typed values get no color at all. */
 function timeFieldColor(row, field) {
@@ -1578,12 +1596,14 @@ function RowLine({ row, depth, hasChildren, collapsed, toggleCollapse, prevRow, 
         if (originSource === "own") { patch.fromLat = a.lat; patch.fromLon = a.lon; }
         // Nothing precedes this row to inherit a start time from, but its end time is locked —
         // work backward from the end using the route duration we just computed.
-        if (!row.startTime && row.endTime && row.endTimeAuto === false) {
-          // Leave startTimeAuto as-is (true) rather than locking it — this is a genuinely computed
-          // value like any other, and should keep behaving like one: if a real anchor later exists
-          // (e.g. a row gets inserted before this one), the normal chain logic should still be free
-          // to take over and recompute it from that anchor instead.
+        // For the pre-international-flight buffer transfer, the chain engine deliberately never
+        // inherits its start (see isPreFlightBufferTransfer) — so this backward calculation is the
+        // ONLY thing that ever sets it, and should keep it fresh (recompute whenever the route
+        // changes) rather than only filling in a blank once. For any other locked-end row, only
+        // step in when nothing else has set a start at all.
+        if (row.endTime && row.endTimeAuto === false && (isPreFlightBufferTransfer(row) || !row.startTime)) {
           patch.startTime = addMinutesToTime(row.endTime, -info.durationMin);
+          patch.startTimeAuto = true;
           patch.startTimeSource = "computed";
         }
         updateRow(row.id, patch);
@@ -2228,12 +2248,14 @@ function MobileCardMeta({ row, prevRow, ctx }) {
         if (!info) { lastRouteCalcSig.current = null; return; }
         const patch = { routeDistanceKm: info.distanceKm, routeDurationMin: info.durationMin, toLat: b.lat, toLon: b.lon, routeCalcSig: sig };
         if (originSource === "own") { patch.fromLat = a.lat; patch.fromLon = a.lon; }
-        if (!row.startTime && row.endTime && row.endTimeAuto === false) {
-          // Leave startTimeAuto as-is (true) rather than locking it — this is a genuinely computed
-          // value like any other, and should keep behaving like one: if a real anchor later exists
-          // (e.g. a row gets inserted before this one), the normal chain logic should still be free
-          // to take over and recompute it from that anchor instead.
+        // For the pre-international-flight buffer transfer, the chain engine deliberately never
+        // inherits its start (see isPreFlightBufferTransfer) — so this backward calculation is the
+        // ONLY thing that ever sets it, and should keep it fresh (recompute whenever the route
+        // changes) rather than only filling in a blank once. For any other locked-end row, only
+        // step in when nothing else has set a start at all.
+        if (row.endTime && row.endTimeAuto === false && (isPreFlightBufferTransfer(row) || !row.startTime)) {
           patch.startTime = addMinutesToTime(row.endTime, -info.durationMin);
+          patch.startTimeAuto = true;
           patch.startTimeSource = "computed";
         }
         updateRow(row.id, patch);
@@ -3825,7 +3847,6 @@ export default function MyTripApp() {
       return { found: true, row: direction === "before" ? (order[idx - 1] || null) : (order[idx + 1] || null) };
     }
     function createAirportTransfers(f, frameId, flightRowId, isInternational) {
-      const PRE_FLIGHT_STAY_MIN = 180;
       const beforeInfo = findAdjacentExistingRow(flightRowId, "before");
       const afterInfo = findAdjacentExistingRow(flightRowId, "after");
       const existingBefore = beforeInfo.row;
@@ -3860,7 +3881,9 @@ export default function MyTripApp() {
           routeCalcSig: null, routeDistanceKm: null, routeDurationMin: null,
           ...((f.to || f.toAlias) ? { from: f.to || f.toAlias, fromAlias: f.toAlias, fromLat: f.toLat, fromLon: f.toLon, fromPlaceId: f.toPlaceId, fromVerifiedUrl: f.toVerifiedUrl, ...(f.toVerifiedUrl ? { fromVerifiedText: f.to || f.toAlias } : {}) } : {}),
           ...(nextRow && (nextRow.from || nextRow.fromAlias) ? { to: nextRow.from || nextRow.fromAlias, toAlias: nextRow.fromAlias, toLat: nextRow.fromLat, toLon: nextRow.fromLon, toPlaceId: nextRow.fromPlaceId, toVerifiedUrl: nextRow.fromVerifiedUrl, ...(nextRow.fromVerifiedUrl ? { toVerifiedText: nextRow.from || nextRow.fromAlias } : {}) } : { to: T.myHomeLabel }),
-          ...(isInternational && f.landTime ? { startTime: addMinutesToTime(f.landTime, getDefaultStayMinutes("flight")), startTimeAuto: false } : {}),
+          // No explicit startTime here — the normal chain-inheritance mechanism already computes
+          // this exact value (the flight's own end + its stay buffer) automatically, and correctly
+          // marks it "inherited" once it does.
         });
       }
     }
@@ -4018,9 +4041,18 @@ export default function MyTripApp() {
     routeImportStops.forEach((name) => {
       const startTime = `${String(h % 24).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
       h += 1;
-      const endTime = `${String(h % 24).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
       const id = addRow(routeImportDate, null, fid);
-      updateRow(id, { typeId: "poi", to: name, startTime, endTime });
+      updateRow(id, { typeId: "poi", to: name, toAlias: name, startTime, stayDurationMin: 30 });
+      // One-time geocode lookup as a direct, explicit consequence of the user's own "confirm import"
+      // click — not a passive background effect. Runs once per imported stop, never again afterward.
+      geocodeTextDetailed(name).then((result) => {
+        if (!result) return;
+        updateRow(id, {
+          toLat: result.lat, toLon: result.lon,
+          toVerifiedText: name,
+          toVerifiedUrl: `https://www.google.com/maps/search/?api=1&query=${result.lat},${result.lon}`,
+        });
+      }).catch(() => {});
     });
     setRouteImportOpen(false);
   }
@@ -6786,6 +6818,16 @@ export default function MyTripApp() {
                 <DateRangeField startDate={frameDraft.startDate} endDate={frameDraft.endDate} lang={lang} T={T}
                   onChange={(s, e) => setFrameDraft({ ...frameDraft, startDate: s, endDate: e })} />
               </div>
+              {frameDraft.frameType === "hotel" && (
+                <div className="mt-field-row">
+                  <div className="mt-field"><label>{T.cost}</label><input type="number" value={frameDraft.costAmount || ""} onChange={(e) => setFrameDraft({ ...frameDraft, costAmount: e.target.value })} /></div>
+                  <div className="mt-field"><label>{T.currency}</label>
+                    <select value={frameDraft.costCurrency || "₪"} onChange={(e) => setFrameDraft({ ...frameDraft, costCurrency: e.target.value })}>
+                      {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                </div>
+              )}
               {frameIssue && <div className="mt-error"><AlertTriangle /> {frameIssue}</div>}
             </div>
             <div className="mt-modal-footer">
