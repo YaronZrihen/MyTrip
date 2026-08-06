@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.64.1";
+const APP_VERSION = "22.65.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -1023,7 +1023,11 @@ function timeFieldColor(row, field) {
   if (!time) return null;
   const auto = field === "start" ? row.startTimeAuto : row.endTimeAuto;
   const source = field === "start" ? row.startTimeSource : row.endTimeSource;
-  if (auto === false) return source === "api" ? TIME_FIELD_COLORS.api : null;
+  if (auto === false) {
+    if (source === "api") return TIME_FIELD_COLORS.api;
+    if (source === "computed") return TIME_FIELD_COLORS.computed;
+    return null;
+  }
   return source === "inherited" ? TIME_FIELD_COLORS.inherited : TIME_FIELD_COLORS.computed;
 }
 /* The hover-title text explaining WHY a time field is colored the way it is — matches the exact
@@ -1251,6 +1255,17 @@ function autoVerifyLocationField(row, field, lang) {
 function googlePlacePhotoUrl(photoName, maxWidth) {
   if (!GOOGLE_PLACES_KEY || !photoName) return null;
   return `https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=${maxWidth || 480}&key=${GOOGLE_PLACES_KEY}`;
+}
+const __cityCache = new Map();
+function fetchCityForCoords(lat, lon) {
+  const key = `${lat.toFixed(4)},${lon.toFixed(4)}`;
+  if (__cityCache.has(key)) return __cityCache.get(key);
+  const p = throttledCall(() => fetch(`https://nominatim.openstreetmap.org/reverse?format=json&addressdetails=1&lat=${lat}&lon=${lon}&accept-language=he,en`, { headers: { Accept: "application/json" } })
+    .then((r) => { if (!r.ok) throw new Error("http-" + r.status); return r.json(); }))
+    .then((data) => (data && data.address) ? (data.address.city || data.address.town || data.address.village || null) : null)
+    .catch(() => null);
+  __cityCache.set(key, p);
+  return p;
 }
 function nominatimSearch(query, lang) {
   if (!query || !query.trim()) return Promise.resolve([]);
@@ -2950,7 +2965,7 @@ function hotelCityForFrame(frame, rows) {
   return null;
 }
 function FrameBlock({ frame, depth, ctx, renderContext }) {
-  const { T, lang, toggleFrameCollapse, openFrameModal, setDeleteFrameConfirmId, openAddDayModal, addRow, lastDateInContext, frameTotals, displayCurrency, convertAmount, frameMenuOpenId, setFrameMenuOpenId, onDropDay, dragDayKey, rows, frames, openHotelInfo } = ctx;
+  const { T, lang, toggleFrameCollapse, openFrameModal, setDeleteFrameConfirmId, openAddDayModal, addRow, lastDateInContext, frameTotals, displayCurrency, convertAmount, frameMenuOpenId, setFrameMenuOpenId, onDropDay, dragDayKey, rows, frames, openHotelInfo, updateRow } = ctx;
   const totals = frameTotals(frame.id);
   const convertedTotal = Object.entries(totals).reduce((sum, [cur, amt]) => sum + convertAmount(amt, cur, displayCurrency), 0);
   const color = FRAME_COLORS[depth % FRAME_COLORS.length];
@@ -2960,6 +2975,19 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
   const dayCount = frame.startDate && frame.endDate ? Math.round((new Date(frame.endDate + "T00:00:00") - new Date(frame.startDate + "T00:00:00")) / 86400000) + 1 : 0;
   const effectiveFrameType = effectiveFrameTypeOf(frame, rows);
   const hotelRowWithPlace = effectiveFrameType === "hotel" ? rows.find((r) => r.frameId === frame.id && (r.typeId === "checkin" || r.typeId === "checkout") && (r.fromPlaceId || r.toPlaceId)) : null;
+  useEffect(() => {
+    if (effectiveFrameType !== "hotel") return;
+    if (hotelCityForFrame(frame, rows)) return;
+    const anchorRow = rows.find((r) => r.frameId === frame.id && (r.typeId === "checkin" || r.typeId === "checkout") && r.toLat != null && r.toLon != null);
+    if (!anchorRow) return;
+    let cancelled = false;
+    fetchCityForCoords(anchorRow.toLat, anchorRow.toLon).then((city) => {
+      if (cancelled || !city) return;
+      updateRow(anchorRow.id, { toCity: city });
+    }).catch(() => {});
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [frame.id, effectiveFrameType]);
   return (
     <div className="mt-frame-block" style={{ "--frame-color": color }}>
       <div ref={setFrameDropRef} className={"mt-frame-header" + (dragDayKey ? " droppable" : "") + (isFrameOver ? " mt-drop-hover" : "") + (effectiveFrameType ? " mt-frame-header-special" : "")} onClick={() => toggleFrameCollapse(frame.id)}>
@@ -2980,8 +3008,7 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
               <div className="mt-frame-header-row2-start">
                 {effectiveFrameType === "hotel" && hotelCityForFrame(frame, rows) ? (
                   <span className="mt-frame-city">
-                    {hotelCityLabel(hotelCityForFrame(frame, rows), lang)}
-                    {dayCount > 0 && ` (${formatDayCount(dayCount, lang)})`}
+                    {dayCount > 0 && `${formatDayCount(dayCount, lang)} `}({hotelCityLabel(hotelCityForFrame(frame, rows), lang)})
                   </span>
                 ) : (
                   dayCount > 0 && <span className="mt-frame-daycount">{formatDayCount(dayCount, lang)}</span>
@@ -3911,7 +3938,7 @@ export default function MyTripApp() {
           routeCalcSig: null, routeDistanceKm: null, routeDurationMin: null,
           ...((f.from || f.fromAlias) ? { to: f.from || f.fromAlias, toAlias: f.fromAlias, toLat: f.fromLat, toLon: f.fromLon, toPlaceId: f.fromPlaceId, toVerifiedUrl: f.fromVerifiedUrl, ...(f.fromVerifiedUrl ? { toVerifiedText: f.from || f.fromAlias } : {}) } : {}),
           ...(prevRow && (prevRow.to || prevRow.toAlias) ? { from: prevRow.to || prevRow.toAlias, fromAlias: prevRow.toAlias, fromLat: prevRow.toLat, fromLon: prevRow.toLon, fromPlaceId: prevRow.toPlaceId, fromVerifiedUrl: prevRow.toVerifiedUrl, ...(prevRow.toVerifiedUrl ? { fromVerifiedText: prevRow.to || prevRow.toAlias } : {}) } : { from: T.myHomeLabel }),
-          ...(isInternational ? { stayDurationMin: PRE_FLIGHT_STAY_MIN, ...(f.depTime ? { endTime: addMinutesToTime(f.depTime, -PRE_FLIGHT_STAY_MIN), endTimeAuto: false } : {}) } : {}),
+          ...(isInternational ? { stayDurationMin: PRE_FLIGHT_STAY_MIN, ...(f.depTime ? { endTime: addMinutesToTime(f.depTime, -PRE_FLIGHT_STAY_MIN), endTimeAuto: false, endTimeSource: "computed" } : {}) } : {}),
         });
       }
       if (f.addTransferFrom || afterIsTransfer) {
@@ -5342,14 +5369,14 @@ export default function MyTripApp() {
         [data-tooltip] { position:relative; }
         [data-tooltip]::after {
           content: attr(data-tooltip);
-          position: absolute; bottom: calc(100% + 6px); inset-inline-start: 0;
-          direction: rtl; text-align: start; white-space: normal; width: max-content; max-width: 220px;
+          position: absolute; bottom: calc(100% + 6px); left: 50%;
+          direction: rtl; text-align: start; white-space: normal; width: max-content; max-width: min(170px, calc(100vw - 24px));
           background: #1E2A28; color: #fff; font-size: 11.5px; font-weight: 500; line-height: 1.5;
           padding: 6px 9px; border-radius: 7px; box-shadow: 0 4px 12px rgba(0,0,0,.18);
-          opacity: 0; pointer-events: none; transform: translateY(3px); transition: opacity .12s, transform .12s;
+          opacity: 0; pointer-events: none; transform: translate(-50%, 3px); transition: opacity .12s, transform .12s;
           z-index: 500;
         }
-        [data-tooltip]:hover::after, [data-tooltip]:focus-visible::after { opacity: 1; transform: translateY(0); }
+        [data-tooltip]:hover::after, [data-tooltip]:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
         html[dir="ltr"] [data-tooltip]::after { direction: ltr; }
         .mt-type-field-btn:hover { border-color:var(--teal); }
         .mt-type-modal { max-width:340px; width:92vw; max-height:70vh; display:flex; flex-direction:column; padding:12px; }
