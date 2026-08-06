@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.63.0";
+const APP_VERSION = "22.64.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -4004,6 +4004,23 @@ export default function MyTripApp() {
           applyRows((prev) => prev.filter((r) => r.frameId !== hf.id));
           setFrames((prev) => prev.filter((f) => f.id !== hf.id));
         });
+        // Transfers between consecutive hotels — same logic as the create-new-trip path, but here
+        // we also need to find and update an existing matching transfer (by date + hotel names) if
+        // one is already there, instead of always creating a new one on every save.
+        hotels.forEach((h, i) => {
+          if (i >= hotels.length - 1 || h.addTransferAfter === false) return;
+          const next = hotels[i + 1];
+          const existingT = rows.find((r) => r.frameId === rootFrame.id && r.typeId === "transfer" && r.date === h.checkOut && (r.from === (h.name || h.alias) || r.fromAlias === h.alias) && (r.to === (next.name || next.alias) || r.toAlias === next.alias));
+          const idT = existingT ? existingT.id : addRow(h.checkOut, null, rootFrame.id);
+          updateRow(idT, {
+            typeId: "transfer", arrivalTypeId: "taxi", date: h.checkOut,
+            from: h.name || h.alias, fromAlias: h.alias, fromLat: h.nameLat, fromLon: h.nameLon, fromPlaceId: h.namePlaceId, fromVerifiedUrl: h.nameVerifiedUrl,
+            to: next.name || next.alias, toAlias: next.alias, toLat: next.nameLat, toLon: next.nameLon, toPlaceId: next.namePlaceId, toVerifiedUrl: next.nameVerifiedUrl,
+            routeCalcSig: null, routeDistanceKm: null, routeDurationMin: null,
+            ...(h.nameVerifiedUrl ? { fromVerifiedText: h.name || h.alias } : {}),
+            ...(next.nameVerifiedUrl ? { toVerifiedText: next.name || next.alias } : {}),
+          });
+        });
       }
       setPreWizardLastSubmitted(d);
       closePreWizard();
@@ -4188,11 +4205,16 @@ export default function MyTripApp() {
       const starsHtml = r.personalRating ? `<div class="jn-stars">${"★".repeat(r.personalRating)}${"☆".repeat(5 - r.personalRating)}</div>` : "";
       const experienceHtml = r.personalExperience && r.personalExperience.trim()
         ? `<div class="jn-experience">${esc(r.personalExperience)}</div>` : "";
-      return `<div class="jn-row" style="padding-inline-start:${depth * 18}px;border-inline-start:${depth ? "2px solid #E4EAE8" : "none"}">
-        <div class="jn-row-top">
-          <div class="jn-row-main"><span class="jn-row-dot" style="background:${tm.color || "#256D64"}"></span><strong>${esc(tm.name)}</strong>${from || to ? ` — ${esc(from)}${from && to ? " → " : ""}${esc(to)}` : ""}</div>
-          <div class="jn-row-meta">${r.startTime || ""}${r.endTime && r.endTime !== r.startTime ? " – " + r.endTime : ""}${Number(r.costAmount) > 0 ? ` · ${esc(r.costCurrency)}${r.costAmount}` : ""}</div>
+      const timeHtml = (r.startTime || r.endTime)
+        ? `<div class="jn-card-time">${r.startTime ? `<span>${r.startTime}</span>` : ""}${r.startTime && r.endTime && r.endTime !== r.startTime ? `<span class="jn-card-time-sep">→</span>` : ""}${r.endTime && r.endTime !== r.startTime ? `<span>${r.endTime}</span>` : ""}</div>` : "";
+      return `<div class="jn-card" style="margin-inline-start:${depth * 16}px">
+        <div class="jn-card-head">
+          <span class="jn-card-icon" style="background:${tm.color || "#256D64"}"></span>
+          <span class="jn-card-title">${esc(tm.name)}</span>
+          ${Number(r.costAmount) > 0 ? `<span class="jn-card-cost">${esc(r.costCurrency)}${r.costAmount}</span>` : ""}
         </div>
+        ${from || to ? `<div class="jn-card-route">${esc(from)}${from && to ? " ← " : ""}${esc(to)}</div>` : ""}
+        ${timeHtml}
         ${r.notes ? `<div class="jn-notes">${esc(r.notes)}</div>` : ""}
         ${starsHtml}${experienceHtml}
       </div>`;
@@ -4282,15 +4304,18 @@ export default function MyTripApp() {
       .jn-frame-dates{color:#7A8B87;font-size:12px;}
       .jn-frame-mini{font-size:12px;color:#256D64;font-weight:600;margin-top:2px;margin-bottom:8px;}
       .jn-day{margin-top:18px;}
-      .jn-day-head{font-weight:800;font-size:13.5px;margin-bottom:6px;color:#1E2A28;border-bottom:2px solid #256D64;display:inline-block;padding-bottom:2px;}
+      .jn-day-head{font-weight:800;font-size:13.5px;margin-bottom:8px;color:#1E2A28;border-bottom:2px solid #256D64;display:inline-block;padding-bottom:2px;}
       .jn-day-dow{font-weight:400;color:#7A8B87;}
-      .jn-row{padding:8px 0;border-bottom:1px solid #EEF1F0;}
-      .jn-row-top{display:flex;justify-content:space-between;gap:10px;}
-      .jn-row-main{font-size:13.5px;}
-      .jn-row-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-inline-end:6px;}
-      .jn-row-meta{color:#7A8B87;font-size:12px;white-space:nowrap;}
-      .jn-notes{color:#7A8B87;font-size:12px;margin-top:3px;}
-      .jn-stars{color:#D9A23D;font-size:13px;margin-top:4px;}
+      .jn-card{background:#fff;border:1px solid #CBD8D2;border-radius:12px;padding:11px 13px;margin-bottom:8px;box-shadow:0 1px 3px rgba(30,42,40,.06);}
+      .jn-card-head{display:flex;align-items:center;gap:9px;}
+      .jn-card-icon{width:22px;height:22px;border-radius:8px;flex-shrink:0;display:inline-block;}
+      .jn-card-title{font-weight:700;font-size:13.5px;flex:1;}
+      .jn-card-cost{font-size:12px;font-weight:700;color:#D9A23D;white-space:nowrap;}
+      .jn-card-route{font-size:12.5px;color:#3A4A46;margin-top:6px;}
+      .jn-card-time{font-size:13px;font-weight:700;color:#1E2A28;margin-top:5px;display:flex;align-items:center;gap:6px;}
+      .jn-card-time-sep{color:#7A8B87;font-weight:400;}
+      .jn-notes{color:#7A8B87;font-size:12px;margin-top:5px;}
+      .jn-stars{color:#D9A23D;font-size:13px;margin-top:5px;}
       .jn-experience{margin-top:6px;line-height:1.7;white-space:pre-wrap;color:#333;font-size:13px;background:#FAFBFA;border-radius:8px;padding:8px 10px;}
       a{color:#256D64;}
     </style></head><body>
@@ -5277,7 +5302,11 @@ export default function MyTripApp() {
         .mt-flow-label { font-size:9.5px; color:var(--muted); text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:78px; }
         .mt-flow-arrow { display:flex; align-items:center; color:var(--border); flex-shrink:0; margin-top:15px; }
         .mt-flow-empty { padding:20px; text-align:center; color:var(--muted); font-size:13px; }
-        table.mt-table { width:100%; table-layout:fixed; border-collapse:separate; border-spacing:0; background:var(--surface); border-radius:10px; overflow:hidden; border:1px solid var(--border); }
+        table.mt-table { width:100%; table-layout:fixed; border-collapse:separate; border-spacing:0; background:var(--surface); border-radius:10px; border:1px solid var(--border); }
+        table.mt-table thead tr:first-child th:first-child { border-start-start-radius:9px; }
+        table.mt-table thead tr:first-child th:last-child { border-start-end-radius:9px; }
+        table.mt-table tbody tr:last-child td:first-child { border-end-start-radius:9px; }
+        table.mt-table tbody tr:last-child td:last-child { border-end-end-radius:9px; }
         .mt-table thead th { text-align:start; font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); font-weight:600; padding:6px 10px; background:#FAFCFB; border-bottom:1px solid var(--border); white-space:nowrap; position:relative; overflow:hidden; text-overflow:ellipsis; }
         .mt-table th.from, .mt-table th.to { padding-inline-start:10px; }
         .mt-col-resizer { position:absolute; top:2px; bottom:2px; inset-inline-end:-2px; width:3px; cursor:col-resize; user-select:none; z-index:5; background:rgba(37,109,100,.10); border-radius:2px; }
