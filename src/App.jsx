@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.62.0";
+const APP_VERSION = "22.63.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -33,7 +33,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 const DEFAULT_MAP_CENTER = [41.9, 12.49]; // Rome — reasonable default for this itinerary
-const ICONS = { Plane, PlaneTakeoff, Car, BedDouble, Footprints, Users, Sun, Ship, KeySquare, Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music, TrainFront, Bus, Motorbike, Bike, Scooter, Sailboat, ShipWheel, Anchor, Kayak, Helicopter, Caravan, Building2, Landmark, Home, MapPin, Compass, FolderTree, Wand2, CheckSquare, LayoutGrid, Share2 };
+const ICONS = { Plane, PlaneTakeoff, Car, BedDouble, Footprints, Users, Sun, Ship, KeySquare, Tag, Star, Flag, Camera, Utensils, ShoppingBag, Music, TrainFront, Bus, Motorbike, Bike, Scooter, Sailboat, ShipWheel, Anchor, Kayak, Helicopter, Caravan, Building2, Landmark, Home, MapPin, Compass, FolderTree, Wand2, CheckSquare, LayoutGrid, Share2, Route };
 const HE_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 const EN_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const FRAME_COLORS = ["#256D64", "#3E7CB1", "#8B6F47", "#7A5C9E", "#C1443A", "#5B8C5A"];
@@ -55,24 +55,32 @@ const HELP_TOPICS = {
     title_he: "מסגרות", title_en: "Frames",
     short_he: "מסגרת היא קונטיינר לטיול, למלון או לטיסה. אפשר לקנן מסגרות זו בתוך זו, ולהגדיר סוג (בסיסית/טיול/טיסה/מלון) לעיצוב מותאם.",
     short_en: "A frame is a container for a trip, hotel, or flight. Frames can be nested, and given a type (basic/trip/flight/hotel) for tailored styling.",
-    full_he: "מסגרות מאורגנות בהיררכיה: מסגרת ראשית (הטיול כולו) יכולה להכיל תת-מסגרות (מלון בודד, קטע טיסה). למסגרות מסוג 'טיול'/'טיסה'/'מלון' יש עיצוב כותרת מיוחד עם סמל, תגי תאריך וסך ימים. אפשר ליצור מסגרת חדשה מתפריט הפעולות, לגרור ולשחרר ימים בין מסגרות, ולמחוק מסגרת עם שתי אפשרויות: מחיקת המסגרת בלבד (התוכן עובר להורה) או מחיקה מלאה של המסגרת ותוכנה.",
-    full_en: "Frames are organized hierarchically: a main frame (the whole trip) can contain sub-frames (a single hotel, a flight leg). Frames of type 'trip'/'flight'/'hotel' get special header styling with an icon, date badges, and total days. Create a new frame from the actions menu, drag-and-drop days between frames, and delete a frame with two options: delete the frame only (content moves to parent) or fully delete the frame and its content.",
+    full_he: "מסגרות מאורגנות בהיררכיה: מסגרת ראשית (הטיול כולו) יכולה להכיל תת-מסגרות (מלון בודד, קטע טיסה). למסגרות מסוג 'טיול'/'טיסה'/'מלון' יש עיצוב כותרת מיוחד עם סמל, תגי תאריך וסך ימים; למסגרת מלון מוצג גם שם העיר. אפשר להגדיר עלות כוללת ומטבע למסגרת מלון (למשל מחיר הזמנה מרוכז) — היא נכנסת לחישוב הסך הכולל של הטיול לצד עלויות הרשומות הבודדות. אפשר ליצור מסגרת חדשה מתפריט הפעולות, לגרור ולשחרר ימים בין מסגרות, ולמחוק מסגרת עם שתי אפשרויות: מחיקת המסגרת בלבד (התוכן עובר להורה) או מחיקה מלאה של המסגרת ותוכנה.",
+    full_en: "Frames are organized hierarchically: a main frame (the whole trip) can contain sub-frames (a single hotel, a flight leg). Frames of type 'trip'/'flight'/'hotel' get special header styling with an icon, date badges, and total days; a hotel frame also shows the city. You can set an overall cost and currency on a hotel frame (e.g. a bundled booking price) — it's included in the trip's total cost alongside individual record costs. Create a new frame from the actions menu, drag-and-drop days between frames, and delete a frame with two options: delete the frame only (content moves to parent) or fully delete the frame and its content.",
+  },
+  management: {
+    icon: "Route",
+    title_he: "ניהול", title_en: "Management",
+    short_he: "חשב מסלולים וזמנים מחדש לכל הטיול, ונהל טיסות, מלונות, קבצים ותזכורות — הכל בקטגוריית 'ניהול' בתפריט הפעולות.",
+    short_en: "Recalculate routes and times for the whole trip, and manage flights, hotels, files, and reminders — all in the 'Management' category of the actions menu.",
+    full_he: "תפריט פעולות ← ניהול מרכז חמישה כלים: 'חשב מסלולים וזמנים מחדש' מנקה את המרחק/משך/שעה השמורים בכל רשומות הטיול ומחשב אותם מחדש מול הנתונים העדכניים — שימושי אחרי עריכה מרובה או אחרי עדכון מיקום; 'ניהול טיסות' מרענן את כל הטיסות בטיול מול נתוני API אמיתיים; 'ניהול מלונות' מציג את כל המלונות עם סטטוס אימות מיקום וכפתור חיפוש ידני; 'ניהול קבצים' מציג את כל הקבצים המצורפים לטיול בתצוגת תיקיות; 'תזכורות והתראות' מגדיר כללי ברירת מחדל לפי סוג רשומה.",
+    full_en: "Actions ← Management centralizes five tools: 'Recalculate routes & times' clears the stored distance/duration/time on every record in the trip and recomputes them against current data — useful after heavy editing or a location update; 'Flight management' refreshes every flight in the trip against real API data; 'Hotel management' lists every hotel with its location-verification status and a manual search button; 'File management' shows every file attached to the trip in a folder view; 'Reminders & alerts' sets default rules by record type.",
   },
   wizard: {
     icon: "Wand2",
     title_he: "אשף הטיול", title_en: "Trip Wizard",
     short_he: "מבצע שאלות מונחות ובונה עבורך את שלד הטיול: פרטי בסיס, טיסות בינ״ל, טיסות פנים ומלונות — הכל בכמה לחיצות.",
     short_en: "Asks guided questions and builds your trip skeleton for you: basics, international flights, domestic flights, and hotels — all in a few clicks.",
-    full_he: "האשף נפתח מתפריט פעולות ← אשף הטיול. במסך הראשון תבחר האם יש לך כבר תוכנית טיול קונקרטית (שם/מטיילים/יעד/תאריכים) או שתרצה עזרה בתכנון (תקציב/תחומי עניין/קצב/הערות). לאחר מכן שלושה שלבים ממוספרים: טיסות בינלאומיות, טיסות פנים (עם אפשרות הלוך-חזור), ומלונות. ניתן להוסיף כמה טיסות/מלונות שרוצים, ולערוך את פרטי הטיול שוב מאוחר יותר דרך אותו כפתור 'ערוך פרטי טיול'.",
-    full_en: "Open the wizard from Actions ← Trip Wizard. On the first screen, choose whether you already have a concrete plan (name/travelers/destination/dates) or want planning help (budget/interests/pace/notes). Then three numbered steps follow: international flights, domestic flights (with a round-trip option), and hotels. Add as many flights/hotels as you like, and edit trip details again later via the same 'Edit Trip Details' button.",
+    full_he: "האשף נפתח מתפריט פעולות ← אשף הטיול. במסך הראשון תבחר האם יש לך כבר תוכנית טיול קונקרטית (שם/מטיילים/יעד/תאריכים) או שתרצה עזרה בתכנון (תקציב/תחומי עניין/קצב/הערות). לאחר מכן שלושה שלבים ממוספרים: טיסות בינלאומיות, טיסות פנים (עם אפשרות הלוך-חזור), ומלונות. לכל טיסה אפשר לסמן הוספת רשומת העברה אל/מהשדה אוטומטית, ולכל מלון (חוץ מהאחרון) אפשר לסמן הוספת רשומת העברה למלון הבא. ניתן להוסיף כמה טיסות/מלונות שרוצים, ולערוך את פרטי הטיול שוב מאוחר יותר דרך אותו כפתור 'ערוך פרטי טיול'.",
+    full_en: "Open the wizard from Actions ← Trip Wizard. On the first screen, choose whether you already have a concrete plan (name/travelers/destination/dates) or want planning help (budget/interests/pace/notes). Then three numbered steps follow: international flights, domestic flights (with a round-trip option), and hotels. Each flight can automatically add a transfer to/from the airport, and each hotel (except the last) can add a transfer to the next one. Add as many flights/hotels as you like, and edit trip details again later via the same 'Edit Trip Details' button.",
   },
   checklist: {
     icon: "CheckSquare",
     title_he: "צ'ק ליסט קדם טיסה", title_en: "Pre-Flight Checklist",
     short_he: "רשימת מטלות לפני הטיסה: הזמנות, מסמכים, צ'ק-אין ועוד. ציוד לטיסה ורשימת קניות נמצאים בדפים נפרדים.",
     short_en: "Pre-flight task list: reservations, documents, check-in and more. Flight packing and shopping list are on separate pages.",
-    full_he: "נגיש מתפריט פעולות ← כלים ← צ'ק ליסט קדם טיסה. פס ההתקדמות בראש הדף מציג אחוז השלמה (רשימת הקניות אינה נכללת בחישוב, וארגון הציוד לטיסה מוגבל ל-30% מסך ההתקדמות). ניתן לסמן כל פריט כהושלם, לצרף מסמך (חוץ מרשימת הציוד), ולהוסיף פריטים חדשים בכל קטגוריה. ארגון ציוד ורשימת קניות הם דפים נפרדים עם ניווט מהדף הראשי.",
-    full_en: "Access via Actions ← Tools ← Pre-Flight Checklist. The progress bar at the top shows completion percent (the shopping list is excluded, and flight packing is capped at 30% of total progress). Mark any item complete, attach a document (except for packing items), and add new items in any category. Packing and shopping are separate pages, navigated to from the main page.",
+    full_he: "נגיש מתפריט פעולות ← קדם טיסה ← צ'ק ליסט קדם טיסה. פס ההתקדמות בראש הדף מציג אחוז השלמה (רשימת הקניות אינה נכללת בחישוב, וארגון הציוד לטיסה מוגבל ל-30% מסך ההתקדמות). ניתן לסמן כל פריט כהושלם, לצרף מסמך (חוץ מרשימת הציוד), ולהוסיף פריטים חדשים בכל קטגוריה. ארגון ציוד ורשימת קניות הם דפים נפרדים עם ניווט מהדף הראשי.",
+    full_en: "Access via Actions ← Pre-Flight ← Pre-Flight Checklist. The progress bar at the top shows completion percent (the shopping list is excluded, and flight packing is capped at 30% of total progress). Mark any item complete, attach a document (except for packing items), and add new items in any category. Packing and shopping are separate pages, navigated to from the main page.",
   },
   views: {
     icon: "LayoutGrid",
@@ -196,7 +204,7 @@ const DEFAULT_COLUMNS = [
 const T_DICT = {
   he: {
     appName: "MyTrip Builder", addRow: "הוסף רשומה", addDay: "הוסף יום", newFrame: "מסגרת חדשה",
-    catNewFrame: "מסגרות", catSaveExport: "שמירה, ייבוא וייצוא", catSharing: "שיתוף", catTools: "כלים", catViews: "תצוגות", catGeneral: "כללי",
+    catNewFrame: "ארגון הטיול שלי", catSaveExport: "שמירה, ייבוא וייצוא", catSharing: "שיתוף", catTools: "כלים", catViews: "תצוגות", catGeneral: "כללי",
     catPreFlight: "קדם טיסה", catManagement: "ניהול",
     showHeader: "הצג את התפריט העליון", hideHeader: "הסתר את התפריט העליון",
     columns: "עמודות", addColumn: "הוסף עמודה", addType: "הוסף תיאור", resetColumnWidths: "איפוס רוחב עמודות (גרור את קצה כותרת העמודה לשינוי ידני)", actions: "פעולות", on: "פעיל", settings: "הגדרות", manageColumns: "ניהול עמודות", undo: "בטל פעולה אחרונה", redo: "חזור על פעולה", disableIntro: "בטל הצגת אנימציית פתיחה",
@@ -364,6 +372,10 @@ const T_DICT = {
     tripSummary: "סיכום הטיול", summaryFlights: "טיסות", summaryHotels: "מלונות", summaryPois: "נק׳ עניין", summaryRestaurants: "מסעדות", summaryAvgRating: "דירוג ממוצע",
     summaryTotal: "סה״כ", summaryKmNoFlights: "ללא טיסות", summaryNights: "לילות", summaryAttractions: "אטרקציות", summaryDayTours: "טיולי יום", summaryGuidedTours: "טיולים מודרכים",
     generateJournal: "הפק יומן מסע", viewFullRouteMap: "הצג מפת מסלול מלאה (ללא טיסות)", noJournalEntries: "אין עדיין רשומות עם \"חוויה אישית\" בטיול הזה.",
+    journalCostBreakdown: "פירוט עלויות", tripCostTotal: "עלות כוללת",
+    category_publicTransport: "תחבורה ציבורית", "category_public-transport": "תחבורה ציבורית", "category_road-transport": "תחבורה יבשתית",
+    "category_sea-transport": "תחבורה ימית", "category_air-transport": "תחבורה אווירית", category_accommodation: "לינה",
+    category_activities: "פעילויות", category_other: "אחר", category_culinary: "אוכל", category_entertainment: "בילויים",
     saveTripByName: "שמור טיול בשם", loadSavedTrip: "טען טיול שמור", tripName: "שם הטיול",
     saveTripNote: "כרגע נשמר בדפדפן הזה בלבד (לצורך בדיקות) — בעתיד יישמר לפי משתמש מחובר, נגיש מכל מכשיר.",
     saveTripSuccess: "נשמר בהצלחה", saveTripError: "השמירה נכשלה — ייתכן שאין מספיק מקום אחסון בדפדפן.",
@@ -387,7 +399,7 @@ const T_DICT = {
   },
   en: {
     appName: "MyTrip Builder", addRow: "Add record", addDay: "Add day", newFrame: "New frame",
-    catNewFrame: "Frames", catSaveExport: "Save, Import & Export", catSharing: "Sharing", catTools: "Tools", catViews: "Views", catGeneral: "General",
+    catNewFrame: "Organize My Trip", catSaveExport: "Save, Import & Export", catSharing: "Sharing", catTools: "Tools", catViews: "Views", catGeneral: "General",
     catPreFlight: "Pre-Flight", catManagement: "Management",
     showHeader: "Show top menu", hideHeader: "Hide top menu",
     columns: "Columns", addColumn: "Add column", addType: "Add description", resetColumnWidths: "Reset column widths (drag a header's edge to resize manually)", actions: "Actions", on: "On", settings: "Settings", manageColumns: "Manage columns", undo: "Undo last action", redo: "Redo action", disableIntro: "Disable the opening animation",
@@ -555,6 +567,10 @@ const T_DICT = {
     tripSummary: "Trip summary", summaryFlights: "Flights", summaryHotels: "Hotels", summaryPois: "Points of interest", summaryRestaurants: "Restaurants", summaryAvgRating: "Average rating",
     summaryTotal: "total", summaryKmNoFlights: "excluding flights", summaryNights: "nights", summaryAttractions: "attractions", summaryDayTours: "day tours", summaryGuidedTours: "guided tours",
     generateJournal: "Generate travel journal", viewFullRouteMap: "View full route map (excluding flights)", noJournalEntries: "No records with \"personal experience\" yet in this trip.",
+    journalCostBreakdown: "Cost breakdown", tripCostTotal: "Total cost",
+    "category_public-transport": "Public transport", "category_road-transport": "Road transport",
+    "category_sea-transport": "Sea transport", "category_air-transport": "Air transport", category_accommodation: "Accommodation",
+    category_activities: "Activities", category_other: "Other", category_culinary: "Food", category_entertainment: "Entertainment",
     saveTripByName: "Save trip by name", loadSavedTrip: "Load saved trip", tripName: "Trip name",
     saveTripNote: "Currently saved in this browser only (for testing) — in the future it will save per logged-in user, accessible from any device.",
     saveTripSuccess: "Saved successfully", saveTripError: "Save failed — the browser may be out of storage space.",
@@ -2387,7 +2403,7 @@ function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
       <div className="mt-card-divider" />
       <div className="mt-card-times-row" dir="ltr">
         <div className="mt-card-time-block">
-          <div className="mt-card-time-big" style={{ ...(r.startTime && Number(r.startTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "start") ? { borderBottom: `2px dashed ${timeFieldColor(r, "start")}` } : {}) }} title={timeFieldHint(r, "start", T)}>{r.startTime || "—"}</div>
+          <div className="mt-card-time-big" style={{ ...(r.startTime && Number(r.startTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "start") ? { borderBottom: `2px dashed ${timeFieldColor(r, "start")}` } : {}) }} data-tooltip={timeFieldHint(r, "start", T) || undefined}>{r.startTime || "—"}</div>
           {fromLabel && <div className="mt-card-time-sub" dir="auto" title={fromLabel}>{truncateChars(fromLabel, 13)}</div>}
         </div>
         <div className="mt-card-connector">
@@ -2397,7 +2413,7 @@ function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
           <div className="mt-card-connector-sub">{rowDuration && <span className="mt-card-duration-text">{rowDuration}</span>}</div>
         </div>
         <div className="mt-card-time-block end">
-          <div className="mt-card-time-big" style={{ ...(r.endTime && Number(r.endTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "end") ? { borderBottom: `2px dashed ${timeFieldColor(r, "end")}` } : {}) }} title={timeFieldHint(r, "end", T)}>{r.endTime || "—"}</div>
+          <div className="mt-card-time-big" style={{ ...(r.endTime && Number(r.endTime.split(":")[0]) < 6 ? { color: "#C1543A" } : {}), ...(timeFieldColor(r, "end") ? { borderBottom: `2px dashed ${timeFieldColor(r, "end")}` } : {}) }} data-tooltip={timeFieldHint(r, "end", T) || undefined}>{r.endTime || "—"}</div>
           {toLabel && <div className="mt-card-time-sub" dir="auto" title={toLabel}>{truncateChars(toLabel, 13)}</div>}
         </div>
       </div>
@@ -2706,7 +2722,7 @@ function TimeField({ value, onChange, T, className, title, style, disabled }) {
   const marks = mode === "hour" ? hourMarks : minMarks;
   return (
     <span style={{ position: "relative", display: "block" }}>
-      <button type="button" disabled={disabled} className={"mt-type-field-btn" + (className ? " " + className : "")} style={{ ...style, ...(disabled ? { opacity: 0.6, cursor: "not-allowed" } : {}) }} title={title} onClick={openPicker}>
+      <button type="button" disabled={disabled} className={"mt-type-field-btn" + (className ? " " + className : "")} style={{ ...style, ...(disabled ? { opacity: 0.6, cursor: "not-allowed" } : {}) }} data-tooltip={title || undefined} onClick={openPicker}>
         <Clock size={14} />
         <span className="mt-type-text" dir="ltr" style={value && Number(value.split(":")[0]) < 6 ? { color: "#C1543A", fontWeight: 700 } : undefined}>{value || "--:--"}</span>
       </button>
@@ -2970,7 +2986,7 @@ function FrameBlock({ frame, depth, ctx, renderContext }) {
                 ) : (
                   dayCount > 0 && <span className="mt-frame-daycount">{formatDayCount(dayCount, lang)}</span>
                 )}
-                {convertedTotal > 0 && effectiveFrameType !== "trip" && (
+                {convertedTotal > 0 && effectiveFrameType !== "trip" && effectiveFrameType !== "flight" && (
                   <span className="mt-frame-cost-inline">{displayCurrency} {convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                 )}
               </div>
@@ -4139,61 +4155,156 @@ export default function MyTripApp() {
     const convertedTotal = Object.entries(totals).reduce((sum, [cur, amt]) => sum + convertAmount(amt, cur, displayCurrency), 0);
     const routeUrl = frameRouteUrl(rows, frames, fid, true);
 
+    function collectFrameIds(id) {
+      let ids = [id];
+      frames.filter((f) => f.parentFrameId === id).forEach((f) => { ids = ids.concat(collectFrameIds(f.id)); });
+      return ids;
+    }
+    const frameIdSet = new Set(collectFrameIds(fid));
+    const allRelevantRows = rows.filter((r) => frameIdSet.has(r.frameId || null));
+
+    // Cost breakdown by category — sums each record's own cost plus, for hotel frames, the frame's
+    // own booking cost (bucketed under "accommodation"), giving a fuller picture than record costs
+    // alone would.
+    const costByCategory = {};
+    const addCost = (category, amount, currency) => {
+      if (!amount) return;
+      const converted = convertAmount(Number(amount), currency, displayCurrency);
+      costByCategory[category] = (costByCategory[category] || 0) + converted;
+    };
+    allRelevantRows.forEach((r) => {
+      if (!Number(r.costAmount)) return;
+      const tm = typeMeta(r.typeId, types, T, lang);
+      addCost(tm.category || "other", r.costAmount, r.costCurrency);
+    });
+    frames.filter((f) => frameIdSet.has(f.id)).forEach((f) => { if (Number(f.costAmount)) addCost("accommodation", f.costAmount, f.costCurrency); });
+    const costEntries = Object.entries(costByCategory).sort((a, b) => b[1] - a[1]);
+    const categoryLabel = (cat) => T["category_" + cat] || cat;
+
     function journalRowHtml(r, depth, prevRow) {
       const tm = typeMeta(r.typeId, types, T, lang);
       const from = noOriginNeeded(r.typeId) ? (prevRow ? (prevRow.toAlias || prevRow.to || "") : "") : (r.fromAlias || r.from || "");
       const to = r.toAlias || r.to || "";
-      const starsHtml = r.personalRating ? `<div style="color:#D9A23D;font-size:13px;margin-top:2px;">${"★".repeat(r.personalRating)}${"☆".repeat(5 - r.personalRating)}</div>` : "";
+      const starsHtml = r.personalRating ? `<div class="jn-stars">${"★".repeat(r.personalRating)}${"☆".repeat(5 - r.personalRating)}</div>` : "";
       const experienceHtml = r.personalExperience && r.personalExperience.trim()
-        ? `<div style="margin-top:6px;line-height:1.7;white-space:pre-wrap;color:#333;">${esc(r.personalExperience)}</div>` : "";
-      return `<div style="padding:9px 0;padding-inline-start:${depth * 16}px;border-bottom:1px solid #eee;">
-        <div style="display:flex;justify-content:space-between;gap:10px;">
-          <div><strong>${esc(tm.name)}</strong> — ${esc(from)}${from && to ? " → " : ""}${esc(to)}${r.notes ? `<br><span style="color:#888;font-size:12px;">${esc(r.notes)}</span>` : ""}</div>
-          <div style="color:#666;font-size:12px;white-space:nowrap;">${r.startTime || ""}${r.endTime ? " – " + r.endTime : ""}${Number(r.costAmount) > 0 ? ` · ${esc(r.costCurrency)}${r.costAmount}` : ""}</div>
+        ? `<div class="jn-experience">${esc(r.personalExperience)}</div>` : "";
+      return `<div class="jn-row" style="padding-inline-start:${depth * 18}px;border-inline-start:${depth ? "2px solid #E4EAE8" : "none"}">
+        <div class="jn-row-top">
+          <div class="jn-row-main"><span class="jn-row-dot" style="background:${tm.color || "#256D64"}"></span><strong>${esc(tm.name)}</strong>${from || to ? ` — ${esc(from)}${from && to ? " → " : ""}${esc(to)}` : ""}</div>
+          <div class="jn-row-meta">${r.startTime || ""}${r.endTime && r.endTime !== r.startTime ? " – " + r.endTime : ""}${Number(r.costAmount) > 0 ? ` · ${esc(r.costCurrency)}${r.costAmount}` : ""}</div>
         </div>
+        ${r.notes ? `<div class="jn-notes">${esc(r.notes)}</div>` : ""}
         ${starsHtml}${experienceHtml}
       </div>`;
     }
     function journalDayHtml(dfid) {
       return dayGroupsAt(dfid).map((g) => {
         const rowsHtml = g.rows.map((r, i) => journalRowHtml(r, 0, i > 0 ? g.rows[i - 1] : null) + childrenOf(r.id).map((c) => journalRowHtml(c, 1, r)).join("")).join("");
-        return `<div style="margin-top:16px;"><div style="font-weight:700;margin-bottom:4px;">${fmtDate(g.date, lang)} — ${heDay(g.date, lang)}</div>${rowsHtml}</div>`;
+        return `<div class="jn-day"><div class="jn-day-head">${fmtDate(g.date, lang)} <span class="jn-day-dow">${heDay(g.date, lang)}</span></div>${rowsHtml}</div>`;
       }).join("");
+    }
+    function frameMiniStats(dfid) {
+      const isHotel = effectiveFrameTypeOf(frames.find((f) => f.id === dfid), rows) === "hotel";
+      if (!isHotel) return "";
+      const fStats = frameSummaryStats(rows, frames, dfid);
+      const fTotals = frameTotals(dfid);
+      const fConverted = Object.entries(fTotals).reduce((sum, [cur, amt]) => sum + convertAmount(amt, cur, displayCurrency), 0);
+      const parts = [];
+      if (fStats.totalNights) parts.push(`${fStats.totalNights} ${T.summaryNights}`);
+      if (fConverted > 0) parts.push(`${displayCurrency} ${fConverted.toLocaleString(undefined, { maximumFractionDigits: 0 })}`);
+      return parts.length ? `<div class="jn-frame-mini">${parts.join(" · ")}</div>` : "";
     }
     function journalFrameHtml(dfid) {
       let out = journalDayHtml(dfid);
       childFrames(dfid).forEach((f) => {
-        out += `<div style="border:1px solid #ddd;border-radius:10px;padding:12px;margin-top:16px;">
-          <div style="font-weight:700;font-size:15px;">${esc(f.name)} <span style="font-weight:400;color:#888;font-size:12px;">(${fmtDate(f.startDate, lang)} – ${fmtDate(f.endDate, lang)})</span></div>
+        const city = hotelCityForFrame(f, rows);
+        out += `<div class="jn-frame">
+          <div class="jn-frame-head">
+            <div><span class="jn-frame-name">${esc(f.name)}</span>${city ? `<span class="jn-frame-city"> · ${esc(city)}</span>` : ""}</div>
+            <div class="jn-frame-dates">${fmtDate(f.startDate, lang)} – ${fmtDate(f.endDate, lang)}</div>
+          </div>
+          ${frameMiniStats(f.id)}
           ${journalFrameHtml(f.id)}
         </div>`;
       });
       return out;
     }
 
-    const statsHtml = `<div style="display:flex;flex-wrap:wrap;gap:14px;background:#F5F8F6;border-radius:10px;padding:14px 16px;margin:18px 0;font-size:13px;color:#3A4A46;">
-      ${convertedTotal > 0 ? `<span>${displayCurrency} ${convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>` : ""}
-      <span>${stats.totalKm.toLocaleString(undefined, { maximumFractionDigits: 0 })} ${T.km}</span>
-      ${stats.flights ? `<span>${stats.flights} ${T.summaryFlights}</span>` : ""}
-      ${stats.distinctHotels ? `<span>${stats.distinctHotels} ${T.summaryHotels} · ${stats.totalNights} ${T.summaryNights}</span>` : ""}
-      ${stats.attractions ? `<span>${stats.attractions} ${T.summaryAttractions}</span>` : ""}
-      ${stats.dayTours ? `<span>${stats.dayTours} ${T.summaryDayTours}</span>` : ""}
-      ${stats.guidedTours ? `<span>${stats.guidedTours} ${T.summaryGuidedTours}</span>` : ""}
-      ${stats.restaurants ? `<span>${stats.restaurants} ${T.summaryRestaurants}</span>` : ""}
-      ${stats.avgRating != null ? `<span>★ ${stats.avgRating.toFixed(1)} ${T.summaryAvgRating}</span>` : ""}
-    </div>`;
+    const statCards = [
+      convertedTotal > 0 ? { label: T.tripCostTotal || T.cost, value: `${displayCurrency} ${convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}` } : null,
+      { label: T.km, value: stats.totalKm.toLocaleString(undefined, { maximumFractionDigits: 0 }) },
+      stats.flights ? { label: T.summaryFlights, value: stats.flights } : null,
+      stats.distinctHotels ? { label: T.summaryHotels, value: `${stats.distinctHotels} · ${stats.totalNights} ${T.summaryNights}` } : null,
+      stats.attractions ? { label: T.summaryAttractions, value: stats.attractions } : null,
+      stats.dayTours ? { label: T.summaryDayTours, value: stats.dayTours } : null,
+      stats.guidedTours ? { label: T.summaryGuidedTours, value: stats.guidedTours } : null,
+      stats.restaurants ? { label: T.summaryRestaurants, value: stats.restaurants } : null,
+      stats.avgRating != null ? { label: T.summaryAvgRating, value: `★ ${stats.avgRating.toFixed(1)}` } : null,
+    ].filter(Boolean);
+    const statsHtml = `<div class="jn-stats-grid">${statCards.map((c) => `<div class="jn-stat-card"><div class="jn-stat-value">${c.value}</div><div class="jn-stat-label">${esc(c.label)}</div></div>`).join("")}</div>`;
+
+    const costBreakdownHtml = costEntries.length ? `<div class="jn-section-title">${esc(T.journalCostBreakdown || "Cost breakdown")}</div>
+      <div class="jn-cost-bars">${costEntries.map(([cat, amt]) => {
+        const pct = convertedTotal > 0 ? Math.round((amt / costEntries.reduce((s, [, a]) => s + a, 0)) * 100) : 0;
+        return `<div class="jn-cost-row">
+          <div class="jn-cost-label"><span class="jn-cost-dot" style="background:${CATEGORY_COLORS[cat] || "#7A5C9E"}"></span>${esc(categoryLabel(cat))}</div>
+          <div class="jn-cost-bar-track"><div class="jn-cost-bar-fill" style="width:${pct}%;background:${CATEGORY_COLORS[cat] || "#7A5C9E"}"></div></div>
+          <div class="jn-cost-amt">${displayCurrency} ${amt.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+        </div>`;
+      }).join("")}</div>` : "";
 
     const html = `<!DOCTYPE html><html dir="${dir}" lang="${lang}"><head><meta charset="utf-8"><title>${esc((frame && frame.name) || "MyTrip Builder")}</title>
-    <style>body{font-family:Arial,Helvetica,sans-serif;max-width:720px;margin:32px auto;padding:0 18px;color:#1E2A28;}
-    h1{font-family:Georgia,serif;font-size:22px;margin-bottom:2px;}
-    h2{font-family:Georgia,serif;font-size:26px;margin-bottom:4px;}
-    a{color:#256D64;}</style></head><body>
-    <h1>MyTrip Builder</h1>
-    <h2>${esc((frame && frame.name) || T.generateJournal)}</h2>
-    ${frame ? `<div style="color:#888;font-size:13px;margin-bottom:6px;">(${fmtDate(frame.startDate, lang)} – ${fmtDate(frame.endDate, lang)})</div>` : ""}
+    <style>
+      body{font-family:'Segoe UI',Arial,Helvetica,sans-serif;max-width:760px;margin:0 auto;padding:0 0 40px;color:#1E2A28;background:#FAFBFA;}
+      .jn-cover{background:linear-gradient(135deg,#256D64,#3E9B8C);color:#fff;padding:38px 28px 30px;border-radius:0 0 20px 20px;margin-bottom:22px;}
+      .jn-brand{font-size:12px;letter-spacing:1px;opacity:.85;text-transform:uppercase;margin-bottom:10px;}
+      .jn-title{font-family:Georgia,serif;font-size:30px;margin:0 0 4px;}
+      .jn-dates{font-size:13.5px;opacity:.9;}
+      .jn-body{padding:0 20px;}
+      .jn-stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin:0 0 24px;}
+      .jn-stat-card{background:#fff;border:1px solid #E4EAE8;border-radius:12px;padding:12px 10px;text-align:center;}
+      .jn-stat-value{font-size:17px;font-weight:800;color:#1E2A28;}
+      .jn-stat-label{font-size:11px;color:#7A8B87;margin-top:2px;}
+      .jn-section-title{font-family:Georgia,serif;font-size:17px;font-weight:700;margin:26px 0 10px;color:#1E2A28;}
+      .jn-cost-bars{background:#fff;border:1px solid #E4EAE8;border-radius:12px;padding:14px 16px;margin-bottom:10px;}
+      .jn-cost-row{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:13px;}
+      .jn-cost-label{flex:0 0 130px;display:flex;align-items:center;gap:6px;color:#3A4A46;}
+      .jn-cost-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+      .jn-cost-bar-track{flex:1;height:8px;background:#F0F3F2;border-radius:4px;overflow:hidden;}
+      .jn-cost-bar-fill{height:100%;border-radius:4px;}
+      .jn-cost-amt{flex:0 0 auto;font-weight:700;color:#1E2A28;white-space:nowrap;}
+      .jn-route-link{display:inline-block;margin:4px 0 20px;font-size:13px;}
+      .jn-route-link a{color:#256D64;font-weight:600;}
+      .jn-frame{border:1px solid #E4EAE8;border-radius:14px;padding:16px 18px;margin-top:18px;background:#fff;}
+      .jn-frame-head{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px;}
+      .jn-frame-name{font-weight:800;font-size:15.5px;}
+      .jn-frame-city{color:#7A8B87;font-size:13px;}
+      .jn-frame-dates{color:#7A8B87;font-size:12px;}
+      .jn-frame-mini{font-size:12px;color:#256D64;font-weight:600;margin-top:2px;margin-bottom:8px;}
+      .jn-day{margin-top:18px;}
+      .jn-day-head{font-weight:800;font-size:13.5px;margin-bottom:6px;color:#1E2A28;border-bottom:2px solid #256D64;display:inline-block;padding-bottom:2px;}
+      .jn-day-dow{font-weight:400;color:#7A8B87;}
+      .jn-row{padding:8px 0;border-bottom:1px solid #EEF1F0;}
+      .jn-row-top{display:flex;justify-content:space-between;gap:10px;}
+      .jn-row-main{font-size:13.5px;}
+      .jn-row-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-inline-end:6px;}
+      .jn-row-meta{color:#7A8B87;font-size:12px;white-space:nowrap;}
+      .jn-notes{color:#7A8B87;font-size:12px;margin-top:3px;}
+      .jn-stars{color:#D9A23D;font-size:13px;margin-top:4px;}
+      .jn-experience{margin-top:6px;line-height:1.7;white-space:pre-wrap;color:#333;font-size:13px;background:#FAFBFA;border-radius:8px;padding:8px 10px;}
+      a{color:#256D64;}
+    </style></head><body>
+    <div class="jn-cover">
+      <div class="jn-brand">MyTrip Builder</div>
+      <div class="jn-title">${esc((frame && frame.name) || T.generateJournal)}</div>
+      ${frame ? `<div class="jn-dates">${fmtDate(frame.startDate, lang)} – ${fmtDate(frame.endDate, lang)}</div>` : ""}
+    </div>
+    <div class="jn-body">
     ${statsHtml}
-    ${routeUrl ? `<p><a href="${esc(routeUrl)}" target="_blank" rel="noreferrer">${esc(T.viewFullRouteMap)}</a></p>` : ""}
+    ${costBreakdownHtml}
+    ${routeUrl ? `<div class="jn-route-link"><a href="${esc(routeUrl)}" target="_blank" rel="noreferrer">${esc(T.viewFullRouteMap)}</a></div>` : ""}
     ${journalFrameHtml(fid)}
+    </div>
     </body></html>`;
 
     const blob = new Blob([html], { type: "text/html" });
@@ -5198,7 +5309,19 @@ export default function MyTripApp() {
         .mt-hotel-rating-demo .mt-hint { margin-inline-start:6px; color:var(--muted); }
         .mt-type-icon svg { width:12px; height:12px; color:#fff; }
         .mt-type-btn { border:none; background:none; padding:0; display:flex; align-items:center; gap:5px; font-size:12.8px; font-weight:500; color:var(--ink); max-width:100%; }
-        .mt-type-field-btn { display:flex; align-items:center; gap:7px; width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 10px; background:var(--surface); font-size:13px; font-weight:500; color:var(--ink); box-sizing:border-box; }
+        .mt-type-field-btn { display:flex; align-items:center; gap:7px; width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 10px; background:var(--surface); font-size:13px; font-weight:500; color:var(--ink); box-sizing:border-box; position:relative; }
+        [data-tooltip] { position:relative; }
+        [data-tooltip]::after {
+          content: attr(data-tooltip);
+          position: absolute; bottom: calc(100% + 6px); inset-inline-start: 0;
+          direction: rtl; text-align: start; white-space: normal; width: max-content; max-width: 220px;
+          background: #1E2A28; color: #fff; font-size: 11.5px; font-weight: 500; line-height: 1.5;
+          padding: 6px 9px; border-radius: 7px; box-shadow: 0 4px 12px rgba(0,0,0,.18);
+          opacity: 0; pointer-events: none; transform: translateY(3px); transition: opacity .12s, transform .12s;
+          z-index: 500;
+        }
+        [data-tooltip]:hover::after, [data-tooltip]:focus-visible::after { opacity: 1; transform: translateY(0); }
+        html[dir="ltr"] [data-tooltip]::after { direction: ltr; }
         .mt-type-field-btn:hover { border-color:var(--teal); }
         .mt-type-modal { max-width:340px; width:92vw; max-height:70vh; display:flex; flex-direction:column; padding:12px; }
         .mt-time-modal { max-width:240px; width:84vw; padding:18px; }
@@ -5705,16 +5828,16 @@ export default function MyTripApp() {
           <div ref={actionsMenu.refs.setFloating} style={{ ...actionsMenu.floatingStyles, maxWidth: "min(240px, 92vw)", zIndex: 400 }} {...actionsMenu.getFloatingProps()} className="mt-floating-menu mt-kebab-menu">
             <div className="mt-action-cat-label">{T.catPreFlight}</div>
             <button className="mt-share-opt" onClick={() => { setChecklistOpen(true); setActionsMenuOpen(false); }}><CheckSquare size={14} /> {T.preFlightChecklist}</button>
-            <div className="mt-action-cat-label">{T.catManagement}</div>
+            <div className="mt-action-cat-label"><span>{T.catNewFrame}</span><HelpButton topic="frames" lang={lang} T={T} onOpenFull={openHelpTopic} size={13} openTopic={helpPopoverOpen} setOpenTopic={setHelpPopoverOpen} /></div>
+            <button className="mt-share-opt" onClick={() => { openFrameModal(null, null); setActionsMenuOpen(false); }}><FolderPlus size={14} /> {T.newFrame}</button>
+            <button className="mt-share-opt" onClick={() => { openPreWizard(); setActionsMenuOpen(false); }}><Wand2 size={14} /> {T.tripWizard}</button>
+            <button className="mt-share-opt" onClick={() => { openEditTripDetails(); setActionsMenuOpen(false); }}><Pencil size={14} /> {T.editTripDetails}</button>
+            <div className="mt-action-cat-label"><span>{T.catManagement}</span><HelpButton topic="management" lang={lang} T={T} onOpenFull={openHelpTopic} size={13} openTopic={helpPopoverOpen} setOpenTopic={setHelpPopoverOpen} /></div>
             <button className="mt-share-opt" onClick={() => { recalculateAllRoutesAndTimes(); setActionsMenuOpen(false); }}><Route size={14} /> {T.recalculateAll}</button>
             <button className="mt-share-opt" onClick={() => { setFlightManagerOpen(true); setActionsMenuOpen(false); }}><RefreshCw size={14} /> {T.refreshAllFlights}</button>
             <button className="mt-share-opt" onClick={() => { setHotelManagerOpen(true); setActionsMenuOpen(false); }}><BedDouble size={14} /> {T.hotelManagerTitle}</button>
             <button className="mt-share-opt" onClick={() => { setFileManagerOpen(true); setFileManagerFolder(null); setActionsMenuOpen(false); }}><FileUp size={14} /> {T.fileManagerTitle}</button>
             <button className="mt-share-opt" onClick={() => { setRemindersManagerOpen(true); setActionsMenuOpen(false); }}><Bell size={14} /> {T.remindersManagerTitle}</button>
-            <div className="mt-action-cat-label"><span>{T.catNewFrame}</span><HelpButton topic="frames" lang={lang} T={T} onOpenFull={openHelpTopic} size={13} openTopic={helpPopoverOpen} setOpenTopic={setHelpPopoverOpen} /></div>
-            <button className="mt-share-opt" onClick={() => { openFrameModal(null, null); setActionsMenuOpen(false); }}><FolderPlus size={14} /> {T.newFrame}</button>
-            <button className="mt-share-opt" onClick={() => { openPreWizard(); setActionsMenuOpen(false); }}><Wand2 size={14} /> {T.tripWizard}</button>
-            <button className="mt-share-opt" onClick={() => { openEditTripDetails(); setActionsMenuOpen(false); }}><Pencil size={14} /> {T.editTripDetails}</button>
             <div className="mt-action-cat-label"><span>{T.catSaveExport}</span><HelpButton topic="sharing" lang={lang} T={T} onOpenFull={openHelpTopic} size={13} openTopic={helpPopoverOpen} setOpenTopic={setHelpPopoverOpen} /></div>
             <button className="mt-share-opt" onClick={openSaveTripModal}><Save size={14} /> {T.saveTripByName}</button>
             <button className="mt-share-opt" onClick={openLoadTripModal}><FolderOpen size={14} /> {T.loadSavedTrip}</button>
