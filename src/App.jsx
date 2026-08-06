@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.64.0";
+const APP_VERSION = "22.64.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -5628,7 +5628,7 @@ export default function MyTripApp() {
         .mt-card-header { display:flex; align-items:center; gap:9px; }
         .mt-card-title { font-size:13.5px; font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:right; }
         .mt-card-divider { height:1px; background:var(--border); margin:0 -16px; }
-        .mt-card-times-row { display:flex; align-items:flex-start; gap:8px; overflow:hidden; }
+        .mt-card-times-row { display:flex; align-items:flex-start; gap:8px; }
         .mt-card-time-block { display:flex; flex-direction:column; align-items:flex-start; gap:2px; min-width:0; flex:0 1 auto; }
         .mt-card-time-block.end { align-items:flex-end; }
         .mt-card-time-big { font-size:16px; font-weight:800; color:var(--ink); font-variant-numeric:tabular-nums; line-height:1.1; }
