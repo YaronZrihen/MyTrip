@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.66.0";
+const APP_VERSION = "22.67.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -4298,17 +4298,18 @@ export default function MyTripApp() {
       if (fConverted > 0) parts.push(`${displayCurrency} ${fConverted.toLocaleString(undefined, { maximumFractionDigits: 0 })}`);
       return parts.length ? `<div class="jn-frame-mini">${parts.join(" · ")}</div>` : "";
     }
-    function journalFrameHtml(dfid) {
+    function journalFrameHtml(dfid, depth) {
       let out = journalDayHtml(dfid);
       childFrames(dfid).forEach((f) => {
         const city = hotelCityForFrame(f, rows);
-        out += `<div class="jn-frame">
+        const color = FRAME_COLORS[depth % FRAME_COLORS.length];
+        out += `<div class="jn-frame" style="border-inline-start-color:${color}">
           <div class="jn-frame-head">
-            <div><span class="jn-frame-name">${esc(f.name)}</span>${city ? `<span class="jn-frame-city"> · ${esc(city)}</span>` : ""}</div>
+            <div><span class="jn-frame-name">${esc(f.name)}</span>${city ? ` <span class="jn-frame-city" style="color:${color}">(${esc(city)})</span>` : ""}</div>
             <div class="jn-frame-dates">${fmtDate(f.startDate, lang)} – ${fmtDate(f.endDate, lang)}</div>
           </div>
           ${frameMiniStats(f.id)}
-          ${journalFrameHtml(f.id)}
+          <div class="jn-frame-body">${journalFrameHtml(f.id, depth + 1)}</div>
         </div>`;
       });
       return out;
@@ -4339,59 +4340,58 @@ export default function MyTripApp() {
 
     const html = `<!DOCTYPE html><html dir="${dir}" lang="${lang}"><head><meta charset="utf-8"><title>${esc((frame && frame.name) || "MyTrip Builder")}</title>
     <style>
-      body{font-family:'Segoe UI',Arial,Helvetica,sans-serif;max-width:760px;margin:0 auto;padding:0 0 40px;color:#1E2A28;background:#FAFBFA;}
-      .jn-cover{background:linear-gradient(135deg,#256D64,#3E9B8C);color:#fff;padding:38px 28px 30px;border-radius:0 0 20px 20px;margin-bottom:22px;}
-      .jn-brand{font-size:12px;letter-spacing:1px;opacity:.85;text-transform:uppercase;margin-bottom:10px;}
-      .jn-title{font-family:Georgia,serif;font-size:30px;margin:0 0 4px;}
-      .jn-dates{font-size:13.5px;opacity:.9;}
-      .jn-body{padding:0 20px;}
-      .jn-stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin:0 0 24px;}
-      .jn-stat-card{background:#fff;border:1px solid #E4EAE8;border-radius:12px;padding:12px 10px;text-align:center;}
-      .jn-stat-value{font-size:17px;font-weight:800;color:#1E2A28;}
-      .jn-stat-label{font-size:11px;color:#7A8B87;margin-top:2px;}
-      .jn-section-title{font-family:Georgia,serif;font-size:17px;font-weight:700;margin:26px 0 10px;color:#1E2A28;}
-      .jn-cost-bars{background:#fff;border:1px solid #E4EAE8;border-radius:12px;padding:14px 16px;margin-bottom:10px;}
-      .jn-cost-row{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:13px;}
-      .jn-cost-label{flex:0 0 130px;display:flex;align-items:center;gap:6px;color:#3A4A46;}
-      .jn-cost-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
-      .jn-cost-bar-track{flex:1;height:8px;background:#F0F3F2;border-radius:4px;overflow:hidden;}
+      :root{--bg:#F5F8F6;--surface:#FFFFFF;--ink:#1E2A28;--muted:#6B7C76;--border:#DEE7E2;--teal:#256D64;--teal-dark:#174C45;--teal-tint:#E6F0EE;--amber:#D98E3F;}
+      body{font-family:'Segoe UI',Arial,Helvetica,sans-serif;max-width:760px;margin:0 auto;padding:20px 16px 40px;color:var(--ink);background:var(--surface);}
+      .jn-header{display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--teal-tint);border-radius:12px;margin-bottom:18px;}
+      .jn-header-icon{width:32px;height:32px;border-radius:10px;background:var(--teal);color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+      .jn-title{font-size:18px;font-weight:800;color:var(--ink);margin:0;}
+      .jn-dates{font-size:12.5px;color:var(--muted);margin-top:2px;}
+      .jn-stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin:0 0 18px;}
+      .jn-stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 8px;text-align:center;}
+      .jn-stat-value{font-size:15.5px;font-weight:800;color:var(--ink);}
+      .jn-stat-label{font-size:10.5px;color:var(--muted);margin-top:2px;}
+      .jn-section-title{font-size:14.5px;font-weight:800;margin:22px 0 8px;color:var(--ink);}
+      .jn-cost-bars{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;}
+      .jn-cost-row{display:flex;align-items:center;gap:10px;padding:5px 0;font-size:12.5px;}
+      .jn-cost-label{flex:0 0 120px;display:flex;align-items:center;gap:6px;color:var(--ink);}
+      .jn-cost-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+      .jn-cost-bar-track{flex:1;height:7px;background:var(--bg);border-radius:4px;overflow:hidden;}
       .jn-cost-bar-fill{height:100%;border-radius:4px;}
-      .jn-cost-amt{flex:0 0 auto;font-weight:700;color:#1E2A28;white-space:nowrap;}
-      .jn-route-link{display:inline-block;margin:4px 0 20px;font-size:13px;}
-      .jn-route-link a{color:#256D64;font-weight:600;}
-      .jn-frame{border:1px solid #E4EAE8;border-radius:14px;padding:16px 18px;margin-top:18px;background:#fff;}
-      .jn-frame-head{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px;}
-      .jn-frame-name{font-weight:800;font-size:15.5px;}
-      .jn-frame-city{color:#7A8B87;font-size:13px;}
-      .jn-frame-dates{color:#7A8B87;font-size:12px;}
-      .jn-frame-mini{font-size:12px;color:#256D64;font-weight:600;margin-top:2px;margin-bottom:8px;}
-      .jn-day{margin-top:18px;}
-      .jn-day-head{font-weight:800;font-size:13.5px;margin-bottom:8px;color:#1E2A28;border-bottom:2px solid #256D64;display:inline-block;padding-bottom:2px;}
-      .jn-day-dow{font-weight:400;color:#7A8B87;}
-      .jn-card{background:#fff;border:1px solid #CBD8D2;border-radius:12px;padding:11px 13px;margin-bottom:8px;box-shadow:0 1px 3px rgba(30,42,40,.06);}
+      .jn-cost-amt{flex:0 0 auto;font-weight:700;color:var(--ink);white-space:nowrap;}
+      .jn-route-link{display:inline-block;margin:2px 0 18px;font-size:12.5px;}
+      .jn-route-link a{color:var(--teal);font-weight:600;}
+      .jn-frame{border:1px solid var(--border);border-inline-start:4px solid var(--teal);border-radius:12px;margin-top:16px;background:var(--surface);}
+      .jn-frame-head{padding:10px 12px;background:#FBFDFC;border-radius:0 11px 0 0;display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px;}
+      .jn-frame-name{font-weight:800;font-size:14px;}
+      .jn-frame-city{font-size:12.5px;font-weight:700;}
+      .jn-frame-dates{color:var(--muted);font-size:11.5px;}
+      .jn-frame-mini{font-size:11.5px;color:var(--teal);font-weight:700;padding:0 12px;margin-top:-2px;margin-bottom:6px;}
+      .jn-frame-body{padding:0 10px 10px;}
+      .jn-day{margin-top:14px;}
+      .jn-day-head{font-weight:800;font-size:13px;margin-bottom:7px;color:var(--ink);border-bottom:2px solid var(--teal);display:inline-block;padding-bottom:2px;}
+      .jn-day-dow{font-weight:400;color:var(--muted);}
+      .jn-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:11px 13px;margin-bottom:8px;box-shadow:0 1px 3px rgba(30,42,40,.06);}
       .jn-card-head{display:flex;align-items:center;gap:9px;}
       .jn-card-icon{width:22px;height:22px;border-radius:8px;flex-shrink:0;display:inline-block;}
       .jn-card-title{font-weight:700;font-size:13.5px;flex:1;}
-      .jn-card-cost{font-size:12px;font-weight:700;color:#D9A23D;white-space:nowrap;}
-      .jn-card-route{font-size:12.5px;color:#3A4A46;margin-top:6px;}
-      .jn-card-time{font-size:13px;font-weight:700;color:#1E2A28;margin-top:5px;display:flex;align-items:center;gap:6px;}
-      .jn-card-time-sep{color:#7A8B87;font-weight:400;}
-      .jn-notes{color:#7A8B87;font-size:12px;margin-top:5px;}
-      .jn-stars{color:#D9A23D;font-size:13px;margin-top:5px;}
-      .jn-experience{margin-top:6px;line-height:1.7;white-space:pre-wrap;color:#333;font-size:13px;background:#FAFBFA;border-radius:8px;padding:8px 10px;}
-      a{color:#256D64;}
+      .jn-card-cost{font-size:12px;font-weight:700;color:var(--amber);white-space:nowrap;}
+      .jn-card-route{font-size:12.5px;color:var(--ink);margin-top:6px;}
+      .jn-card-time{font-size:13px;font-weight:700;color:var(--ink);margin-top:5px;display:flex;align-items:center;gap:6px;}
+      .jn-card-time-sep{color:var(--muted);font-weight:400;}
+      .jn-notes{color:var(--muted);font-size:12px;margin-top:5px;}
+      .jn-stars{color:var(--amber);font-size:13px;margin-top:5px;}
+      .jn-experience{margin-top:6px;line-height:1.7;white-space:pre-wrap;color:var(--ink);font-size:13px;background:var(--bg);border-radius:8px;padding:8px 10px;}
+      a{color:var(--teal);}
     </style></head><body>
-    <div class="jn-cover">
-      <div class="jn-brand">MyTrip Builder</div>
-      <div class="jn-title">${esc((frame && frame.name) || T.generateJournal)}</div>
-      ${frame ? `<div class="jn-dates">${fmtDate(frame.startDate, lang)} – ${fmtDate(frame.endDate, lang)}</div>` : ""}
+    <div class="jn-header">
+      <span class="jn-header-icon">✈</span>
+      <div><div class="jn-title">${esc((frame && frame.name) || T.generateJournal)}</div>
+      ${frame ? `<div class="jn-dates">${fmtDate(frame.startDate, lang)} – ${fmtDate(frame.endDate, lang)}</div>` : ""}</div>
     </div>
-    <div class="jn-body">
     ${statsHtml}
     ${costBreakdownHtml}
     ${routeUrl ? `<div class="jn-route-link"><a href="${esc(routeUrl)}" target="_blank" rel="noreferrer">${esc(T.viewFullRouteMap)}</a></div>` : ""}
-    ${journalFrameHtml(fid)}
-    </div>
+    ${journalFrameHtml(fid, 0)}
     </body></html>`;
 
     const blob = new Blob([html], { type: "text/html" });
