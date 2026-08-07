@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.71.0";
+const APP_VERSION = "22.72.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -370,7 +370,7 @@ const T_DICT = {
     noOriginHint: "אין צורך בשדה מוצא עבור סוג רשומה זה.",
     dragDayHint: "גרור להעברת היום למסגרת אחרת", dropDayToRoot: "שחרר כאן כדי להוציא את היום מהמסגרת", showOverallRoute: "הצג מסלול טיול כולל",
     tripSummary: "סיכום הטיול", summaryFlights: "טיסות", summaryHotels: "מלונות", summaryPois: "נק׳ עניין", summaryRestaurants: "מסעדות", summaryAvgRating: "דירוג ממוצע",
-    summaryFlightKm: "ק\"מ טיסה", summaryTripKm: "ק\"מ בטיול", summaryOther: "רשומות נוספות",
+    summaryFlightKm: "ק\"מ טיסה", summaryTripKm: "ק\"מ בטיול", summaryOther: "רשומות נוספות", myRatingLabel: "הדירוג שלי",
     category_flights: "טיסות", "category_other-transport": "תחבורה", category_transfers: "העברות",
     summaryTotal: "סה״כ", summaryKmNoFlights: "ללא טיסות", summaryNights: "לילות", summaryAttractions: "אטרקציות", summaryDayTours: "טיולי יום", summaryGuidedTours: "טיולים מודרכים",
     generateJournal: "הפק יומן מסע", viewFullRouteMap: "הצג מפת מסלול מלאה (ללא טיסות)", viewDayRoute: "הצג מסלול היום במפה", noJournalEntries: "אין עדיין רשומות עם \"חוויה אישית\" בטיול הזה.",
@@ -567,7 +567,7 @@ const T_DICT = {
     noOriginHint: "No origin field is needed for this record type.",
     dragDayHint: "Drag to move this day to another frame", dropDayToRoot: "Drop here to take this day out of its frame", showOverallRoute: "Show overall trip route",
     tripSummary: "Trip summary", summaryFlights: "Flights", summaryHotels: "Hotels", summaryPois: "Points of interest", summaryRestaurants: "Restaurants", summaryAvgRating: "Average rating",
-    summaryFlightKm: "Flight km", summaryTripKm: "Trip km", summaryOther: "Other records",
+    summaryFlightKm: "Flight km", summaryTripKm: "Trip km", summaryOther: "Other records", myRatingLabel: "My rating",
     category_flights: "Flights", "category_other-transport": "Transport", category_transfers: "Transfers",
     summaryTotal: "total", summaryKmNoFlights: "excluding flights", summaryNights: "nights", summaryAttractions: "attractions", summaryDayTours: "day tours", summaryGuidedTours: "guided tours",
     generateJournal: "Generate travel journal", viewFullRouteMap: "View full route map (excluding flights)", viewDayRoute: "View today's route on map", noJournalEntries: "No records with \"personal experience\" yet in this trip.",
@@ -4294,11 +4294,18 @@ function journalShortLocation(text) { return (text || "").split(",")[0].trim(); 
       const isDestOnly = JOURNAL_DEST_ONLY_TYPES.includes(r.typeId);
       const from = isDestOnly ? "" : journalShortLocation(noOriginNeeded(r.typeId) ? (prevRow ? (prevRow.toAlias || prevRow.to || "") : "") : (r.fromAlias || r.from || ""));
       const to = journalShortLocation(r.toAlias || r.to || "");
-      const starsHtml = r.personalRating ? `<div class="jn-stars">${"★".repeat(r.personalRating)}${"☆".repeat(5 - r.personalRating)}</div>` : "";
+      const starsHtml = r.personalRating ? `<div class="jn-stars">${T.myRatingLabel}: ${"★".repeat(r.personalRating)}${"☆".repeat(5 - r.personalRating)}</div>` : "";
       const experienceHtml = r.personalExperience && r.personalExperience.trim()
-        ? `<div class="jn-experience">${esc(r.personalExperience)}</div>` : "";
+        ? `<div class="jn-experience-title">${T.personalExperience}</div><div class="jn-experience">${esc(r.personalExperience)}</div>` : "";
       const timeHtml = (r.startTime || r.endTime)
-        ? `<div class="jn-card-time" dir="ltr">${r.startTime ? `<span>${r.startTime}</span>` : ""}${r.startTime && r.endTime && r.endTime !== r.startTime ? `<span class="jn-card-time-sep">→</span>` : ""}${r.endTime && r.endTime !== r.startTime ? `<span>${r.endTime}</span>` : ""}</div>` : "";
+        ? `<span class="jn-card-time" dir="ltr">${r.startTime ? `<span>${r.startTime}</span>` : ""}${r.startTime && r.endTime && r.endTime !== r.startTime ? `<span class="jn-card-time-sep">→</span>` : ""}${r.endTime && r.endTime !== r.startTime ? `<span>${r.endTime}</span>` : ""}</span>` : "";
+      // Arrival method icon + stay duration at destination, matching what the app itself shows on
+      // each record when an origin is meaningful for that type.
+      const arrivalMeta = noOriginNeeded(r.typeId) ? typeMeta(r.arrivalTypeId || "walking", types, T, lang) : null;
+      const stayMinutes = r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId);
+      const stayText = formatStayAnnotation(stayMinutes, T);
+      const metaHtml = (arrivalMeta || stayText)
+        ? `<div class="jn-card-meta">${arrivalMeta ? `<span class="jn-card-arrival">${journalRowEmoji(arrivalMeta)}</span>` : ""}${stayText ? `<span class="jn-card-stay">${esc(stayText)}</span>` : ""}</div>` : "";
       const images = journalRowImages(r);
       const imagesHtml = images.length
         ? `<div class="jn-card-images">${images.map((img, i) => {
@@ -4312,8 +4319,8 @@ function journalShortLocation(text) { return (text || "").split(",")[0].trim(); 
           <span class="jn-card-title">${esc(tm.name)}</span>
           ${Number(r.costAmount) > 0 ? `<span class="jn-card-cost">${esc(r.costCurrency)}${r.costAmount}</span>` : ""}
         </div>
-        ${from || to ? `<div class="jn-card-route">${esc(from)}${from && to ? " ← " : ""}${esc(to)}</div>` : ""}
-        ${timeHtml}
+        ${(from || to || timeHtml) ? `<div class="jn-card-route-row">${from || to ? `<span class="jn-card-route">${esc(from)}${from && to ? " ← " : ""}${esc(to)}</span>` : ""}${timeHtml}</div>` : ""}
+        ${metaHtml}
         ${r.notes ? `<div class="jn-notes">${esc(r.notes)}</div>` : ""}
         ${starsHtml}${experienceHtml}${imagesHtml}
       </div>`;
@@ -4324,10 +4331,11 @@ function journalShortLocation(text) { return (text || "").split(",")[0].trim(); 
       const fStats = frameSummaryStats(rows, frames, dfid);
       const fTotals = frameTotals(dfid);
       const fConverted = Object.entries(fTotals).reduce((sum, [cur, amt]) => sum + convertAmount(amt, cur, displayCurrency), 0);
-      const parts = [];
-      if (fStats.totalNights) parts.push(`${fStats.totalNights} ${T.summaryNights}`);
-      if (fConverted > 0) parts.push(`${displayCurrency} ${fConverted.toLocaleString(undefined, { maximumFractionDigits: 0 })}`);
-      return parts.length ? `<div class="jn-frame-mini">${parts.join(" · ")}</div>` : "";
+      if (!fStats.totalNights && !fConverted) return "";
+      return `<div class="jn-frame-mini">
+        ${fStats.totalNights ? `<span>${fStats.totalNights} ${T.summaryNights}</span>` : "<span></span>"}
+        ${fConverted > 0 ? `<span class="jn-card-cost">${displayCurrency} ${fConverted.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>` : ""}
+      </div>`;
     }
     function journalFrameHtml(dfid, depth) {
       const cf = childFrames(dfid);
@@ -4424,7 +4432,7 @@ function journalShortLocation(text) { return (text || "").split(",")[0].trim(); 
       .jn-frame-name{font-weight:800;font-size:14px;}
       .jn-frame-city{font-size:14px;font-weight:700;}
       .jn-frame-dates{color:var(--muted);font-size:11.5px;}
-      .jn-frame-mini{font-size:11.5px;color:var(--teal);font-weight:700;padding:0 12px;margin-top:-2px;margin-bottom:6px;}
+      .jn-frame-mini{display:flex;align-items:center;justify-content:space-between;font-size:11.5px;color:var(--teal);font-weight:700;padding:0 12px;margin-top:-2px;margin-bottom:6px;}
       .jn-frame-body{padding:0 10px 10px;}
       .jn-day{margin-top:14px;}
       .jn-day-head{font-weight:800;font-size:13px;margin-bottom:7px;color:var(--ink);border-bottom:2px solid var(--teal);display:inline-block;padding-bottom:2px;}
@@ -4441,15 +4449,20 @@ function journalShortLocation(text) { return (text || "").split(",")[0].trim(); 
       .jn-lightbox-close{position:absolute;top:16px;inset-inline-end:20px;color:#fff;font-size:22px;text-decoration:none;font-weight:700;width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.15);border-radius:50%;}
       .jn-card-title{font-weight:700;font-size:13.5px;flex:1;}
       .jn-card-cost{font-size:12px;font-weight:700;color:var(--amber);white-space:nowrap;}
-      .jn-card-route{font-size:14.5px;font-weight:600;color:var(--ink);margin-top:6px;}
-      .jn-card-time{font-size:13px;font-weight:700;color:var(--ink);margin-top:5px;display:flex;align-items:center;gap:6px;}
+      .jn-card-route-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;flex-wrap:wrap;}
+      .jn-card-route{font-size:14.5px;font-weight:600;color:var(--ink);}
+      .jn-card-time{font-size:13px;font-weight:700;color:var(--ink);display:flex;align-items:center;gap:6px;white-space:nowrap;}
       .jn-card-time-sep{color:var(--muted);font-weight:400;}
+      .jn-card-meta{display:flex;align-items:center;gap:8px;margin-top:5px;font-size:12px;color:var(--muted);}
+      .jn-card-arrival{font-size:14px;}
+      .jn-card-stay{color:var(--teal);font-weight:600;}
       .jn-notes{color:var(--muted);font-size:12px;margin-top:5px;}
       .jn-stars{color:var(--amber);font-size:13px;margin-top:5px;}
-      .jn-experience{margin-top:6px;line-height:1.7;white-space:pre-wrap;color:var(--ink);font-size:13px;background:var(--bg);border-radius:8px;padding:8px 10px;}
+      .jn-experience-title{font-weight:700;font-size:12.5px;margin-top:8px;color:var(--ink);}
+      .jn-experience{margin-top:4px;line-height:1.7;white-space:pre-wrap;color:var(--ink);font-size:13px;background:var(--bg);border-radius:8px;padding:8px 10px;}
       a{color:var(--teal);}
     </style></head><body>
-    <div class="jn-brand"><span class="jn-brand-logo"><span class="jn-brand-my">My</span><span class="jn-brand-trip">Trip</span><br/><span class="jn-brand-my">Builder</span></span><span class="jn-brand-version">v${APP_VERSION}</span></div>
+    <div class="jn-brand" dir="ltr"><span class="jn-brand-logo"><span class="jn-brand-my">My</span><span class="jn-brand-trip">Trip</span><br/><span class="jn-brand-my">Builder</span></span><span class="jn-brand-version">v${APP_VERSION}</span></div>
     <div class="jn-frame" style="border-inline-start-color:${FRAME_COLORS[0]};margin-top:0">
       <div class="jn-frame-head" style="background:var(--teal-tint);border-radius:11px 11px 0 0;">
         <div style="display:flex;align-items:center;gap:9px;">
