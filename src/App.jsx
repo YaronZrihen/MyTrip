@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.68.0";
+const APP_VERSION = "22.69.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -371,13 +371,13 @@ const T_DICT = {
     dragDayHint: "גרור להעברת היום למסגרת אחרת", dropDayToRoot: "שחרר כאן כדי להוציא את היום מהמסגרת", showOverallRoute: "הצג מסלול טיול כולל",
     tripSummary: "סיכום הטיול", summaryFlights: "טיסות", summaryHotels: "מלונות", summaryPois: "נק׳ עניין", summaryRestaurants: "מסעדות", summaryAvgRating: "דירוג ממוצע",
     summaryFlightKm: "ק\"מ טיסה", summaryTripKm: "ק\"מ בטיול", summaryOther: "רשומות נוספות",
-    category_flights: "טיסות", "category_other-transport": "שאר התחבורה",
+    category_flights: "טיסות", "category_other-transport": "שאר התחבורה", category_transfers: "העברות",
     summaryTotal: "סה״כ", summaryKmNoFlights: "ללא טיסות", summaryNights: "לילות", summaryAttractions: "אטרקציות", summaryDayTours: "טיולי יום", summaryGuidedTours: "טיולים מודרכים",
     generateJournal: "הפק יומן מסע", viewFullRouteMap: "הצג מפת מסלול מלאה (ללא טיסות)", noJournalEntries: "אין עדיין רשומות עם \"חוויה אישית\" בטיול הזה.",
     journalCostBreakdown: "פירוט עלויות", tripCostTotal: "עלות כוללת",
     category_publicTransport: "תחבורה ציבורית", "category_public-transport": "תחבורה ציבורית", "category_road-transport": "תחבורה יבשתית",
     "category_sea-transport": "תחבורה ימית", "category_air-transport": "תחבורה אווירית", category_accommodation: "לינה",
-    category_activities: "פעילויות", category_other: "אחר", category_culinary: "אוכל", category_entertainment: "בילויים",
+    category_activities: "פעילויות", category_other: "אחר", category_culinary: "קולינריה", category_entertainment: "בילויים",
     saveTripByName: "שמור טיול בשם", loadSavedTrip: "טען טיול שמור", tripName: "שם הטיול",
     saveTripNote: "כרגע נשמר בדפדפן הזה בלבד (לצורך בדיקות) — בעתיד יישמר לפי משתמש מחובר, נגיש מכל מכשיר.",
     saveTripSuccess: "נשמר בהצלחה", saveTripError: "השמירה נכשלה — ייתכן שאין מספיק מקום אחסון בדפדפן.",
@@ -568,7 +568,7 @@ const T_DICT = {
     dragDayHint: "Drag to move this day to another frame", dropDayToRoot: "Drop here to take this day out of its frame", showOverallRoute: "Show overall trip route",
     tripSummary: "Trip summary", summaryFlights: "Flights", summaryHotels: "Hotels", summaryPois: "Points of interest", summaryRestaurants: "Restaurants", summaryAvgRating: "Average rating",
     summaryFlightKm: "Flight km", summaryTripKm: "Trip km", summaryOther: "Other records",
-    category_flights: "Flights", "category_other-transport": "Other transport",
+    category_flights: "Flights", "category_other-transport": "Other transport", category_transfers: "Transfers",
     summaryTotal: "total", summaryKmNoFlights: "excluding flights", summaryNights: "nights", summaryAttractions: "attractions", summaryDayTours: "day tours", summaryGuidedTours: "guided tours",
     generateJournal: "Generate travel journal", viewFullRouteMap: "View full route map (excluding flights)", noJournalEntries: "No records with \"personal experience\" yet in this trip.",
     journalCostBreakdown: "Cost breakdown", tripCostTotal: "Total cost",
@@ -4241,6 +4241,7 @@ const JOURNAL_EMOJI_MAP = {
 };
 function journalRowEmoji(tm) { return JOURNAL_EMOJI_MAP[tm.icon] || "📌"; }
 function journalRowImages(r) { return (r.attachments || []).filter((a) => a.type === "image" && a.url); }
+function journalShortLocation(text) { return (text || "").split(",")[0].trim(); }
   function generateTravelJournal(fid) {
     function esc(s) { return (s || "").toString().replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
     const frame = frames.find((f) => f.id === fid);
@@ -4268,6 +4269,7 @@ function journalRowImages(r) { return (r.attachments || []).filter((a) => a.type
     // transport (road/sea/public) is consolidated into one combined bucket rather than split three ways.
     function journalCategoryKey(rawCategory, typeId) {
       if (isFlightType(typeId) || rawCategory === "air-transport") return "flights";
+      if (typeId === "transfer") return "transfers";
       if (["road-transport", "sea-transport", "public-transport"].includes(rawCategory)) return "other-transport";
       return rawCategory || "other";
     }
@@ -4286,10 +4288,12 @@ function journalRowImages(r) { return (r.attachments || []).filter((a) => a.type
     const costEntries = Object.entries(costByCategory).sort((a, b) => b[1] - a[1]);
     const categoryLabel = (cat) => T["category_" + cat] || cat;
 
+    const JOURNAL_DEST_ONLY_TYPES = ["poi", "attraction", "restaurant", "bar", "pub", "club", "party", "show", "festival"];
     function journalRowHtml(r, depth, prevRow) {
       const tm = typeMeta(r.typeId, types, T, lang);
-      const from = noOriginNeeded(r.typeId) ? (prevRow ? (prevRow.toAlias || prevRow.to || "") : "") : (r.fromAlias || r.from || "");
-      const to = r.toAlias || r.to || "";
+      const isDestOnly = JOURNAL_DEST_ONLY_TYPES.includes(r.typeId);
+      const from = isDestOnly ? "" : journalShortLocation(noOriginNeeded(r.typeId) ? (prevRow ? (prevRow.toAlias || prevRow.to || "") : "") : (r.fromAlias || r.from || ""));
+      const to = journalShortLocation(r.toAlias || r.to || "");
       const starsHtml = r.personalRating ? `<div class="jn-stars">${"★".repeat(r.personalRating)}${"☆".repeat(5 - r.personalRating)}</div>` : "";
       const experienceHtml = r.personalExperience && r.personalExperience.trim()
         ? `<div class="jn-experience">${esc(r.personalExperience)}</div>` : "";
@@ -4300,7 +4304,7 @@ function journalRowImages(r) { return (r.attachments || []).filter((a) => a.type
         ? `<div class="jn-card-images">${images.map((img) => `<img src="${esc(img.url)}" alt="${esc(img.name || "")}" loading="lazy" />`).join("")}</div>` : "";
       return `<div class="jn-card" style="margin-inline-start:${depth * 16}px">
         <div class="jn-card-head">
-          <span class="jn-card-icon" style="background:${tm.color || "#256D64"}">${journalRowEmoji(tm)}</span>
+          <span class="jn-card-icon">${journalRowEmoji(tm)}</span>
           <span class="jn-card-title">${esc(tm.name)}</span>
           ${Number(r.costAmount) > 0 ? `<span class="jn-card-cost">${esc(r.costCurrency)}${r.costAmount}</span>` : ""}
         </div>
@@ -4352,21 +4356,22 @@ function journalRowImages(r) { return (r.attachments || []).filter((a) => a.type
       }).join("");
     }
 
+    const culinaryCount = allRelevantRows.filter((r) => !r.parentId && typeMeta(r.typeId, types, T, lang).category === "culinary").length;
     const statCards = [
       convertedTotal > 0 ? { label: T.tripCostTotal || T.cost, value: `${displayCurrency} ${convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}` } : null,
       flightKm > 0 ? { label: T.summaryFlightKm || T.km, value: flightKm.toLocaleString(undefined, { maximumFractionDigits: 0 }) } : null,
       stats.totalKmNoFlights > 0 ? { label: T.summaryTripKm || T.km, value: stats.totalKmNoFlights.toLocaleString(undefined, { maximumFractionDigits: 0 }) } : null,
       stats.flights ? { label: T.summaryFlights, value: stats.flights } : null,
-      stats.distinctHotels ? { label: T.summaryHotels, value: `${stats.distinctHotels} · ${stats.totalNights} ${T.summaryNights}` } : null,
+      stats.distinctHotels ? { label: T.summaryHotels, value: stats.distinctHotels, sub: stats.totalNights ? `${stats.totalNights} ${T.summaryNights}` : null } : null,
       stats.pois ? { label: T.summaryPois || T.summaryAttractions, value: stats.pois } : null,
       stats.attractions ? { label: T.summaryAttractions, value: stats.attractions } : null,
       stats.dayTours ? { label: T.summaryDayTours, value: stats.dayTours } : null,
       stats.guidedTours ? { label: T.summaryGuidedTours, value: stats.guidedTours } : null,
-      stats.restaurants ? { label: T.summaryRestaurants, value: stats.restaurants } : null,
+      culinaryCount ? { label: T.category_culinary, value: culinaryCount } : null,
       otherCount ? { label: T.summaryOther || T.other, value: otherCount } : null,
       stats.avgRating != null ? { label: T.summaryAvgRating, value: `★ ${stats.avgRating.toFixed(1)}` } : null,
     ].filter(Boolean);
-    const statsHtml = `<div class="jn-stats-grid">${statCards.map((c) => `<div class="jn-stat-card"><div class="jn-stat-value">${c.value}</div><div class="jn-stat-label">${esc(c.label)}</div></div>`).join("")}</div>`;
+    const statsHtml = `<div class="jn-stats-grid">${statCards.map((c) => `<div class="jn-stat-card"><div class="jn-stat-value">${c.value}</div>${c.sub ? `<div class="jn-stat-sub">${esc(c.sub)}</div>` : ""}<div class="jn-stat-label">${esc(c.label)}</div></div>`).join("")}</div>`;
 
     const costBreakdownHtml = costEntries.length ? `<div class="jn-section-title">${esc(T.journalCostBreakdown || "Cost breakdown")}</div>
       <div class="jn-cost-bars">${costEntries.map(([cat, amt]) => {
@@ -4379,9 +4384,12 @@ function journalRowImages(r) { return (r.attachments || []).filter((a) => a.type
       }).join("")}</div>` : "";
 
     const html = `<!DOCTYPE html><html dir="${dir}" lang="${lang}"><head><meta charset="utf-8"><title>${esc((frame && frame.name) || "MyTrip Builder")}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800&display=swap" rel="stylesheet">
     <style>
       :root{--bg:#F5F8F6;--surface:#FFFFFF;--ink:#1E2A28;--muted:#6B7C76;--border:#DEE7E2;--teal:#256D64;--teal-dark:#174C45;--teal-tint:#E6F0EE;--amber:#D98E3F;}
-      body{font-family:'Segoe UI',Arial,Helvetica,sans-serif;max-width:760px;margin:0 auto;padding:20px 16px 40px;color:var(--ink);background:var(--surface);}
+      body{font-family:'Heebo',Arial,Helvetica,sans-serif;max-width:760px;margin:0 auto;padding:20px 16px 40px;color:var(--ink);background:var(--surface);}
+      .jn-brand{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.3px;text-align:left;margin-bottom:6px;}
       .jn-header{display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--teal-tint);border-radius:12px;margin-bottom:18px;}
       .jn-header-icon{width:32px;height:32px;border-radius:10px;background:var(--teal);color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
       .jn-title{font-size:18px;font-weight:800;color:var(--ink);margin:0;}
@@ -4389,6 +4397,7 @@ function journalRowImages(r) { return (r.attachments || []).filter((a) => a.type
       .jn-stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin:0 0 18px;}
       .jn-stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 8px;text-align:center;}
       .jn-stat-value{font-size:15.5px;font-weight:800;color:var(--ink);}
+      .jn-stat-sub{font-size:11px;font-weight:600;color:var(--teal);margin-top:1px;}
       .jn-stat-label{font-size:10.5px;color:var(--muted);margin-top:2px;}
       .jn-section-title{font-size:14.5px;font-weight:800;margin:22px 0 8px;color:var(--ink);}
       .jn-cost-bars{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;}
@@ -4412,7 +4421,7 @@ function journalRowImages(r) { return (r.attachments || []).filter((a) => a.type
       .jn-day-dow{font-weight:400;color:var(--muted);}
       .jn-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:11px 13px;margin-bottom:8px;box-shadow:0 1px 3px rgba(30,42,40,.06);}
       .jn-card-head{display:flex;align-items:center;gap:9px;}
-      .jn-card-icon{width:24px;height:24px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;line-height:1;}
+      .jn-card-icon{flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:17px;line-height:1;}
       .jn-card-images{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
       .jn-card-images img{width:84px;height:84px;object-fit:cover;border-radius:8px;border:1px solid var(--border);}
       .jn-card-title{font-weight:700;font-size:13.5px;flex:1;}
@@ -4425,6 +4434,7 @@ function journalRowImages(r) { return (r.attachments || []).filter((a) => a.type
       .jn-experience{margin-top:6px;line-height:1.7;white-space:pre-wrap;color:var(--ink);font-size:13px;background:var(--bg);border-radius:8px;padding:8px 10px;}
       a{color:var(--teal);}
     </style></head><body>
+    <div class="jn-brand">MyTripBuilder</div>
     <div class="jn-frame" style="border-inline-start-color:${FRAME_COLORS[0]};margin-top:0">
       <div class="jn-frame-head" style="background:var(--teal-tint);border-radius:11px 11px 0 0;">
         <div style="display:flex;align-items:center;gap:9px;">
