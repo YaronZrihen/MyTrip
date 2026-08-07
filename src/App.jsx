@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.70.0";
+const APP_VERSION = "22.71.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -4395,7 +4395,11 @@ function journalShortLocation(text) { return (text || "").split(",")[0].trim(); 
     <style>
       :root{--bg:#F5F8F6;--surface:#FFFFFF;--ink:#1E2A28;--muted:#6B7C76;--border:#DEE7E2;--teal:#256D64;--teal-dark:#174C45;--teal-tint:#E6F0EE;--amber:#D98E3F;}
       body{font-family:'Heebo',Arial,Helvetica,sans-serif;max-width:760px;margin:0 auto;padding:20px 16px 40px;color:var(--ink);background:var(--surface);}
-      .jn-brand{font-size:24px;font-weight:700;color:#174C45;letter-spacing:.02em;text-align:left;margin-bottom:10px;}
+      .jn-brand{display:flex;align-items:flex-end;justify-content:flex-start;gap:10px;margin-bottom:14px;}
+      .jn-brand-logo{font-family:Georgia,'Times New Roman',serif;font-size:26px;line-height:1.05;text-align:left;}
+      .jn-brand-my{color:#1E2A28;}
+      .jn-brand-trip{color:#29B6F6;}
+      .jn-brand-version{font-family:'Heebo',Arial,sans-serif;font-size:11px;font-weight:700;color:var(--muted);background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:2px 9px;margin-bottom:3px;}
       .jn-header{display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--teal-tint);border-radius:12px;margin-bottom:18px;}
       .jn-header-icon{width:32px;height:32px;border-radius:10px;background:var(--teal);color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
       .jn-title{font-size:18px;font-weight:800;color:var(--ink);margin:0;}
@@ -4445,7 +4449,7 @@ function journalShortLocation(text) { return (text || "").split(",")[0].trim(); 
       .jn-experience{margin-top:6px;line-height:1.7;white-space:pre-wrap;color:var(--ink);font-size:13px;background:var(--bg);border-radius:8px;padding:8px 10px;}
       a{color:var(--teal);}
     </style></head><body>
-    <div class="jn-brand">MyTrip Builder</div>
+    <div class="jn-brand"><span class="jn-brand-logo"><span class="jn-brand-my">My</span><span class="jn-brand-trip">Trip</span><br/><span class="jn-brand-my">Builder</span></span><span class="jn-brand-version">v${APP_VERSION}</span></div>
     <div class="jn-frame" style="border-inline-start-color:${FRAME_COLORS[0]};margin-top:0">
       <div class="jn-frame-head" style="background:var(--teal-tint);border-radius:11px 11px 0 0;">
         <div style="display:flex;align-items:center;gap:9px;">
