@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.67.3";
+const APP_VERSION = "22.68.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -370,6 +370,8 @@ const T_DICT = {
     noOriginHint: "אין צורך בשדה מוצא עבור סוג רשומה זה.",
     dragDayHint: "גרור להעברת היום למסגרת אחרת", dropDayToRoot: "שחרר כאן כדי להוציא את היום מהמסגרת", showOverallRoute: "הצג מסלול טיול כולל",
     tripSummary: "סיכום הטיול", summaryFlights: "טיסות", summaryHotels: "מלונות", summaryPois: "נק׳ עניין", summaryRestaurants: "מסעדות", summaryAvgRating: "דירוג ממוצע",
+    summaryFlightKm: "ק\"מ טיסה", summaryTripKm: "ק\"מ בטיול", summaryOther: "רשומות נוספות",
+    category_flights: "טיסות", "category_other-transport": "שאר התחבורה",
     summaryTotal: "סה״כ", summaryKmNoFlights: "ללא טיסות", summaryNights: "לילות", summaryAttractions: "אטרקציות", summaryDayTours: "טיולי יום", summaryGuidedTours: "טיולים מודרכים",
     generateJournal: "הפק יומן מסע", viewFullRouteMap: "הצג מפת מסלול מלאה (ללא טיסות)", noJournalEntries: "אין עדיין רשומות עם \"חוויה אישית\" בטיול הזה.",
     journalCostBreakdown: "פירוט עלויות", tripCostTotal: "עלות כוללת",
@@ -565,6 +567,8 @@ const T_DICT = {
     noOriginHint: "No origin field is needed for this record type.",
     dragDayHint: "Drag to move this day to another frame", dropDayToRoot: "Drop here to take this day out of its frame", showOverallRoute: "Show overall trip route",
     tripSummary: "Trip summary", summaryFlights: "Flights", summaryHotels: "Hotels", summaryPois: "Points of interest", summaryRestaurants: "Restaurants", summaryAvgRating: "Average rating",
+    summaryFlightKm: "Flight km", summaryTripKm: "Trip km", summaryOther: "Other records",
+    category_flights: "Flights", "category_other-transport": "Other transport",
     summaryTotal: "total", summaryKmNoFlights: "excluding flights", summaryNights: "nights", summaryAttractions: "attractions", summaryDayTours: "day tours", summaryGuidedTours: "guided tours",
     generateJournal: "Generate travel journal", viewFullRouteMap: "View full route map (excluding flights)", noJournalEntries: "No records with \"personal experience\" yet in this trip.",
     journalCostBreakdown: "Cost breakdown", tripCostTotal: "Total cost",
@@ -4226,6 +4230,17 @@ export default function MyTripApp() {
     <style>body{font-family:Arial,Helvetica,sans-serif;max-width:720px;margin:24px auto;padding:0 16px;color:#1E2A28;}
     h1{font-family:Georgia,serif;}</style></head><body><h1>MyTrip Builder</h1>${frameHtml(null)}</body></html>`;
   }
+const JOURNAL_EMOJI_MAP = {
+  Plane: "✈️", PlaneTakeoff: "🛫", Car: "🚗", BedDouble: "🛏️", Footprints: "🚶", Users: "👥", Sun: "☀️",
+  Ship: "🚢", KeySquare: "🔑", Tag: "🏷️", Star: "⭐", Flag: "🚩", Camera: "📷", Utensils: "🍽️",
+  ShoppingBag: "🛍️", Music: "🎵", TrainFront: "🚄", Bus: "🚌", Motorbike: "🏍️", Bike: "🚲", Scooter: "🛵",
+  Sailboat: "⛵", ShipWheel: "☸️", Anchor: "⚓", Kayak: "🛶", Helicopter: "🚁", Caravan: "🚐", Building2: "🏢",
+  Building: "🏢", Landmark: "🏛️", Home: "🏠", MapPin: "📍", Compass: "🧭", FolderTree: "📁", Wand2: "🪄",
+  Wand: "🪄", CheckSquare: "☑️", LayoutGrid: "🔲", Share2: "🔗", Share: "🔗", Wine: "🍷", Beer: "🍺",
+  PartyPopper: "🎉", Mic2: "🎤", Mic: "🎤", Route: "🗺️",
+};
+function journalRowEmoji(tm) { return JOURNAL_EMOJI_MAP[tm.icon] || "📌"; }
+function journalRowImages(r) { return (r.attachments || []).filter((a) => a.type === "image" && a.url); }
   function generateTravelJournal(fid) {
     function esc(s) { return (s || "").toString().replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
     const frame = frames.find((f) => f.id === fid);
@@ -4233,6 +4248,7 @@ export default function MyTripApp() {
     const totals = frameTotals(fid);
     const convertedTotal = Object.entries(totals).reduce((sum, [cur, amt]) => sum + convertAmount(amt, cur, displayCurrency), 0);
     const routeUrl = frameRouteUrl(rows, frames, fid, true);
+    const flightKm = stats.totalKm - stats.totalKmNoFlights;
 
     function collectFrameIds(id) {
       let ids = [id];
@@ -4241,10 +4257,20 @@ export default function MyTripApp() {
     }
     const frameIdSet = new Set(collectFrameIds(fid));
     const allRelevantRows = rows.filter((r) => frameIdSet.has(r.frameId || null));
+    // Counted specifically in the stat cards; everything else in the trip still gets tallied under
+    // a catch-all "other" count so nothing is silently left out of the summary.
+    const SPECIFICALLY_COUNTED_TYPES = ["flight", "domestic-flight", "checkin", "checkout", "hostel", "apartment", "poi", "attraction", "day-tour", "guided-tour", "restaurant"];
+    const otherCount = allRelevantRows.filter((r) => !r.parentId && !SPECIFICALLY_COUNTED_TYPES.includes(r.typeId)).length;
 
     // Cost breakdown by category — sums each record's own cost plus, for hotel frames, the frame's
     // own booking cost (bucketed under "accommodation"), giving a fuller picture than record costs
-    // alone would.
+    // alone would. Flights get their own bucket (renamed from "air-transport"); every other mode of
+    // transport (road/sea/public) is consolidated into one combined bucket rather than split three ways.
+    function journalCategoryKey(rawCategory, typeId) {
+      if (isFlightType(typeId) || rawCategory === "air-transport") return "flights";
+      if (["road-transport", "sea-transport", "public-transport"].includes(rawCategory)) return "other-transport";
+      return rawCategory || "other";
+    }
     const costByCategory = {};
     const addCost = (category, amount, currency) => {
       if (!amount) return;
@@ -4254,7 +4280,7 @@ export default function MyTripApp() {
     allRelevantRows.forEach((r) => {
       if (!Number(r.costAmount)) return;
       const tm = typeMeta(r.typeId, types, T, lang);
-      addCost(tm.category || "other", r.costAmount, r.costCurrency);
+      addCost(journalCategoryKey(tm.category, r.typeId), r.costAmount, r.costCurrency);
     });
     frames.filter((f) => frameIdSet.has(f.id)).forEach((f) => { if (Number(f.costAmount)) addCost("accommodation", f.costAmount, f.costCurrency); });
     const costEntries = Object.entries(costByCategory).sort((a, b) => b[1] - a[1]);
@@ -4269,16 +4295,19 @@ export default function MyTripApp() {
         ? `<div class="jn-experience">${esc(r.personalExperience)}</div>` : "";
       const timeHtml = (r.startTime || r.endTime)
         ? `<div class="jn-card-time" dir="ltr">${r.startTime ? `<span>${r.startTime}</span>` : ""}${r.startTime && r.endTime && r.endTime !== r.startTime ? `<span class="jn-card-time-sep">→</span>` : ""}${r.endTime && r.endTime !== r.startTime ? `<span>${r.endTime}</span>` : ""}</div>` : "";
+      const images = journalRowImages(r);
+      const imagesHtml = images.length
+        ? `<div class="jn-card-images">${images.map((img) => `<img src="${esc(img.url)}" alt="${esc(img.name || "")}" loading="lazy" />`).join("")}</div>` : "";
       return `<div class="jn-card" style="margin-inline-start:${depth * 16}px">
         <div class="jn-card-head">
-          <span class="jn-card-icon" style="background:${tm.color || "#256D64"}"></span>
+          <span class="jn-card-icon" style="background:${tm.color || "#256D64"}">${journalRowEmoji(tm)}</span>
           <span class="jn-card-title">${esc(tm.name)}</span>
           ${Number(r.costAmount) > 0 ? `<span class="jn-card-cost">${esc(r.costCurrency)}${r.costAmount}</span>` : ""}
         </div>
         ${from || to ? `<div class="jn-card-route">${esc(from)}${from && to ? " ← " : ""}${esc(to)}</div>` : ""}
         ${timeHtml}
         ${r.notes ? `<div class="jn-notes">${esc(r.notes)}</div>` : ""}
-        ${starsHtml}${experienceHtml}
+        ${starsHtml}${experienceHtml}${imagesHtml}
       </div>`;
     }
     function frameMiniStats(dfid) {
@@ -4325,13 +4354,16 @@ export default function MyTripApp() {
 
     const statCards = [
       convertedTotal > 0 ? { label: T.tripCostTotal || T.cost, value: `${displayCurrency} ${convertedTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}` } : null,
-      { label: T.km, value: stats.totalKm.toLocaleString(undefined, { maximumFractionDigits: 0 }) },
+      flightKm > 0 ? { label: T.summaryFlightKm || T.km, value: flightKm.toLocaleString(undefined, { maximumFractionDigits: 0 }) } : null,
+      stats.totalKmNoFlights > 0 ? { label: T.summaryTripKm || T.km, value: stats.totalKmNoFlights.toLocaleString(undefined, { maximumFractionDigits: 0 }) } : null,
       stats.flights ? { label: T.summaryFlights, value: stats.flights } : null,
       stats.distinctHotels ? { label: T.summaryHotels, value: `${stats.distinctHotels} · ${stats.totalNights} ${T.summaryNights}` } : null,
+      stats.pois ? { label: T.summaryPois || T.summaryAttractions, value: stats.pois } : null,
       stats.attractions ? { label: T.summaryAttractions, value: stats.attractions } : null,
       stats.dayTours ? { label: T.summaryDayTours, value: stats.dayTours } : null,
       stats.guidedTours ? { label: T.summaryGuidedTours, value: stats.guidedTours } : null,
       stats.restaurants ? { label: T.summaryRestaurants, value: stats.restaurants } : null,
+      otherCount ? { label: T.summaryOther || T.other, value: otherCount } : null,
       stats.avgRating != null ? { label: T.summaryAvgRating, value: `★ ${stats.avgRating.toFixed(1)}` } : null,
     ].filter(Boolean);
     const statsHtml = `<div class="jn-stats-grid">${statCards.map((c) => `<div class="jn-stat-card"><div class="jn-stat-value">${c.value}</div><div class="jn-stat-label">${esc(c.label)}</div></div>`).join("")}</div>`;
@@ -4380,7 +4412,9 @@ export default function MyTripApp() {
       .jn-day-dow{font-weight:400;color:var(--muted);}
       .jn-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:11px 13px;margin-bottom:8px;box-shadow:0 1px 3px rgba(30,42,40,.06);}
       .jn-card-head{display:flex;align-items:center;gap:9px;}
-      .jn-card-icon{width:22px;height:22px;border-radius:8px;flex-shrink:0;display:inline-block;}
+      .jn-card-icon{width:24px;height:24px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;line-height:1;}
+      .jn-card-images{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+      .jn-card-images img{width:84px;height:84px;object-fit:cover;border-radius:8px;border:1px solid var(--border);}
       .jn-card-title{font-weight:700;font-size:13.5px;flex:1;}
       .jn-card-cost{font-size:12px;font-weight:700;color:var(--amber);white-space:nowrap;}
       .jn-card-route{font-size:12.5px;color:var(--ink);margin-top:6px;}
