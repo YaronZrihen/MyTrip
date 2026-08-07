@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.67.0";
+const APP_VERSION = "22.67.3";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -4268,7 +4268,7 @@ export default function MyTripApp() {
       const experienceHtml = r.personalExperience && r.personalExperience.trim()
         ? `<div class="jn-experience">${esc(r.personalExperience)}</div>` : "";
       const timeHtml = (r.startTime || r.endTime)
-        ? `<div class="jn-card-time">${r.startTime ? `<span>${r.startTime}</span>` : ""}${r.startTime && r.endTime && r.endTime !== r.startTime ? `<span class="jn-card-time-sep">→</span>` : ""}${r.endTime && r.endTime !== r.startTime ? `<span>${r.endTime}</span>` : ""}</div>` : "";
+        ? `<div class="jn-card-time" dir="ltr">${r.startTime ? `<span>${r.startTime}</span>` : ""}${r.startTime && r.endTime && r.endTime !== r.startTime ? `<span class="jn-card-time-sep">→</span>` : ""}${r.endTime && r.endTime !== r.startTime ? `<span>${r.endTime}</span>` : ""}</div>` : "";
       return `<div class="jn-card" style="margin-inline-start:${depth * 16}px">
         <div class="jn-card-head">
           <span class="jn-card-icon" style="background:${tm.color || "#256D64"}"></span>
@@ -4280,12 +4280,6 @@ export default function MyTripApp() {
         ${r.notes ? `<div class="jn-notes">${esc(r.notes)}</div>` : ""}
         ${starsHtml}${experienceHtml}
       </div>`;
-    }
-    function journalDayHtml(dfid) {
-      return dayGroupsAt(dfid).map((g) => {
-        const rowsHtml = g.rows.map((r, i) => journalRowHtml(r, 0, i > 0 ? g.rows[i - 1] : null) + childrenOf(r.id).map((c) => journalRowHtml(c, 1, r)).join("")).join("");
-        return `<div class="jn-day"><div class="jn-day-head">${fmtDate(g.date, lang)} <span class="jn-day-dow">${heDay(g.date, lang)}</span></div>${rowsHtml}</div>`;
-      }).join("");
     }
     function frameMiniStats(dfid) {
       const isHotel = effectiveFrameTypeOf(frames.find((f) => f.id === dfid), rows) === "hotel";
@@ -4299,11 +4293,26 @@ export default function MyTripApp() {
       return parts.length ? `<div class="jn-frame-mini">${parts.join(" · ")}</div>` : "";
     }
     function journalFrameHtml(dfid, depth) {
-      let out = journalDayHtml(dfid);
-      childFrames(dfid).forEach((f) => {
+      const cf = childFrames(dfid);
+      const dg = dayGroupsAt(dfid);
+      const nodes = [
+        ...cf.map((f) => ({ type: "frame", sort: f.startDate || "", frame: f })),
+        ...dg.map((g) => ({ type: "day", sort: g.date, group: g })),
+      ].sort((a, b) => {
+        if (a.sort !== b.sort) return a.sort.localeCompare(b.sort);
+        if (a.type !== b.type) return a.type === "day" ? -1 : 1;
+        return 0;
+      });
+      return nodes.map((n) => {
+        if (n.type === "day") {
+          const g = n.group;
+          const rowsHtml = g.rows.map((r, i) => journalRowHtml(r, 0, i > 0 ? g.rows[i - 1] : null) + childrenOf(r.id).map((c) => journalRowHtml(c, 1, r)).join("")).join("");
+          return `<div class="jn-day"><div class="jn-day-head">${fmtDate(g.date, lang)} <span class="jn-day-dow">${heDay(g.date, lang)}</span></div>${rowsHtml}</div>`;
+        }
+        const f = n.frame;
         const city = hotelCityForFrame(f, rows);
         const color = FRAME_COLORS[depth % FRAME_COLORS.length];
-        out += `<div class="jn-frame" style="border-inline-start-color:${color}">
+        return `<div class="jn-frame" style="border-inline-start-color:${color}">
           <div class="jn-frame-head">
             <div><span class="jn-frame-name">${esc(f.name)}</span>${city ? ` <span class="jn-frame-city" style="color:${color}">(${esc(city)})</span>` : ""}</div>
             <div class="jn-frame-dates">${fmtDate(f.startDate, lang)} – ${fmtDate(f.endDate, lang)}</div>
@@ -4311,8 +4320,7 @@ export default function MyTripApp() {
           ${frameMiniStats(f.id)}
           <div class="jn-frame-body">${journalFrameHtml(f.id, depth + 1)}</div>
         </div>`;
-      });
-      return out;
+      }).join("");
     }
 
     const statCards = [
@@ -4383,15 +4391,22 @@ export default function MyTripApp() {
       .jn-experience{margin-top:6px;line-height:1.7;white-space:pre-wrap;color:var(--ink);font-size:13px;background:var(--bg);border-radius:8px;padding:8px 10px;}
       a{color:var(--teal);}
     </style></head><body>
-    <div class="jn-header">
-      <span class="jn-header-icon">✈</span>
-      <div><div class="jn-title">${esc((frame && frame.name) || T.generateJournal)}</div>
-      ${frame ? `<div class="jn-dates">${fmtDate(frame.startDate, lang)} – ${fmtDate(frame.endDate, lang)}</div>` : ""}</div>
+    <div class="jn-frame" style="border-inline-start-color:${FRAME_COLORS[0]};margin-top:0">
+      <div class="jn-frame-head" style="background:var(--teal-tint);border-radius:11px 11px 0 0;">
+        <div style="display:flex;align-items:center;gap:9px;">
+          <span class="jn-header-icon">✈</span>
+          <div><div class="jn-title">${esc((frame && frame.name) || T.generateJournal)}</div>
+          ${frame ? `<div class="jn-dates">${fmtDate(frame.startDate, lang)} – ${fmtDate(frame.endDate, lang)}</div>` : ""}</div>
+        </div>
+      </div>
+      <div class="jn-frame-body">
+      ${statsHtml}
+      ${costBreakdownHtml}
+      ${routeUrl ? `<div class="jn-route-link"><a href="${esc(routeUrl)}" target="_blank" rel="noreferrer">${esc(T.viewFullRouteMap)}</a></div>` : ""}
+      ${journalFrameHtml(fid, 1)}
+      </div>
     </div>
-    ${statsHtml}
-    ${costBreakdownHtml}
-    ${routeUrl ? `<div class="jn-route-link"><a href="${esc(routeUrl)}" target="_blank" rel="noreferrer">${esc(T.viewFullRouteMap)}</a></div>` : ""}
-    ${journalFrameHtml(fid, 0)}
+
     </body></html>`;
 
     const blob = new Blob([html], { type: "text/html" });
@@ -6654,7 +6669,7 @@ export default function MyTripApp() {
                   {fileUploadMsg.uploading ? T.fileUploading : fileUploadMsg.ok ? T.fileUploadSuccess : fileUploadMsg.reason === "not-signed-in" ? T.fileUploadNeedsSignIn : T.fileUploadError}
                 </p>
               )}
-              {(cardDraft.attachments || []).length > 0 && (
+              {cardDraft && (cardDraft.attachments || []).length > 0 && (
                 <div className="mt-attachments-dropdown">
                   <button type="button" className="mt-attachments-summary" onClick={() => setAttachmentsExpanded((v) => !v)}>
                     <Paperclip size={14} />
