@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.69.1";
+const APP_VERSION = "22.70.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -371,9 +371,9 @@ const T_DICT = {
     dragDayHint: "גרור להעברת היום למסגרת אחרת", dropDayToRoot: "שחרר כאן כדי להוציא את היום מהמסגרת", showOverallRoute: "הצג מסלול טיול כולל",
     tripSummary: "סיכום הטיול", summaryFlights: "טיסות", summaryHotels: "מלונות", summaryPois: "נק׳ עניין", summaryRestaurants: "מסעדות", summaryAvgRating: "דירוג ממוצע",
     summaryFlightKm: "ק\"מ טיסה", summaryTripKm: "ק\"מ בטיול", summaryOther: "רשומות נוספות",
-    category_flights: "טיסות", "category_other-transport": "שאר התחבורה", category_transfers: "העברות",
+    category_flights: "טיסות", "category_other-transport": "תחבורה", category_transfers: "העברות",
     summaryTotal: "סה״כ", summaryKmNoFlights: "ללא טיסות", summaryNights: "לילות", summaryAttractions: "אטרקציות", summaryDayTours: "טיולי יום", summaryGuidedTours: "טיולים מודרכים",
-    generateJournal: "הפק יומן מסע", viewFullRouteMap: "הצג מפת מסלול מלאה (ללא טיסות)", noJournalEntries: "אין עדיין רשומות עם \"חוויה אישית\" בטיול הזה.",
+    generateJournal: "הפק יומן מסע", viewFullRouteMap: "הצג מפת מסלול מלאה (ללא טיסות)", viewDayRoute: "הצג מסלול היום במפה", noJournalEntries: "אין עדיין רשומות עם \"חוויה אישית\" בטיול הזה.",
     journalCostBreakdown: "פירוט עלויות", tripCostTotal: "עלות כוללת",
     category_publicTransport: "תחבורה ציבורית", "category_public-transport": "תחבורה ציבורית", "category_road-transport": "תחבורה יבשתית",
     "category_sea-transport": "תחבורה ימית", "category_air-transport": "תחבורה אווירית", category_accommodation: "לינה",
@@ -568,9 +568,9 @@ const T_DICT = {
     dragDayHint: "Drag to move this day to another frame", dropDayToRoot: "Drop here to take this day out of its frame", showOverallRoute: "Show overall trip route",
     tripSummary: "Trip summary", summaryFlights: "Flights", summaryHotels: "Hotels", summaryPois: "Points of interest", summaryRestaurants: "Restaurants", summaryAvgRating: "Average rating",
     summaryFlightKm: "Flight km", summaryTripKm: "Trip km", summaryOther: "Other records",
-    category_flights: "Flights", "category_other-transport": "Other transport", category_transfers: "Transfers",
+    category_flights: "Flights", "category_other-transport": "Transport", category_transfers: "Transfers",
     summaryTotal: "total", summaryKmNoFlights: "excluding flights", summaryNights: "nights", summaryAttractions: "attractions", summaryDayTours: "day tours", summaryGuidedTours: "guided tours",
-    generateJournal: "Generate travel journal", viewFullRouteMap: "View full route map (excluding flights)", noJournalEntries: "No records with \"personal experience\" yet in this trip.",
+    generateJournal: "Generate travel journal", viewFullRouteMap: "View full route map (excluding flights)", viewDayRoute: "View today's route on map", noJournalEntries: "No records with \"personal experience\" yet in this trip.",
     journalCostBreakdown: "Cost breakdown", tripCostTotal: "Total cost",
     "category_public-transport": "Public transport", "category_road-transport": "Road transport",
     "category_sea-transport": "Sea transport", "category_air-transport": "Air transport", category_accommodation: "Accommodation",
@@ -4301,7 +4301,11 @@ function journalShortLocation(text) { return (text || "").split(",")[0].trim(); 
         ? `<div class="jn-card-time" dir="ltr">${r.startTime ? `<span>${r.startTime}</span>` : ""}${r.startTime && r.endTime && r.endTime !== r.startTime ? `<span class="jn-card-time-sep">→</span>` : ""}${r.endTime && r.endTime !== r.startTime ? `<span>${r.endTime}</span>` : ""}</div>` : "";
       const images = journalRowImages(r);
       const imagesHtml = images.length
-        ? `<div class="jn-card-images">${images.map((img) => `<img src="${esc(img.url)}" alt="${esc(img.name || "")}" loading="lazy" />`).join("")}</div>` : "";
+        ? `<div class="jn-card-images">${images.map((img, i) => {
+            const lbId = `lb-${r.id}-${i}`;
+            return `<a href="#${lbId}" class="jn-img-link"><img src="${esc(img.url)}" alt="${esc(img.name || "")}" loading="lazy" /></a>
+            <div class="jn-lightbox" id="${lbId}"><a href="#" class="jn-lightbox-close">✕</a><img src="${esc(img.url)}" alt="${esc(img.name || "")}" /></div>`;
+          }).join("")}</div>` : "";
       return `<div class="jn-card" style="margin-inline-start:${depth * 16}px">
         <div class="jn-card-head">
           <span class="jn-card-icon">${journalRowEmoji(tm)}</span>
@@ -4340,7 +4344,9 @@ function journalShortLocation(text) { return (text || "").split(",")[0].trim(); 
         if (n.type === "day") {
           const g = n.group;
           const rowsHtml = g.rows.map((r, i) => journalRowHtml(r, 0, i > 0 ? g.rows[i - 1] : null) + childrenOf(r.id).map((c) => journalRowHtml(c, 1, r)).join("")).join("");
-          return `<div class="jn-day"><div class="jn-day-head">${fmtDate(g.date, lang)} <span class="jn-day-dow">${heDay(g.date, lang)}</span></div>${rowsHtml}</div>`;
+          const dayUrl = dayRouteUrl(g.rows.filter((r) => !isFlightType(r.typeId)));
+          const dayLinkHtml = dayUrl ? `<div class="jn-route-link"><a href="${esc(dayUrl)}" target="_blank" rel="noreferrer">${esc(T.viewDayRoute || T.viewFullRouteMap)}</a></div>` : "";
+          return `<div class="jn-day"><div class="jn-day-head">${fmtDate(g.date, lang)} <span class="jn-day-dow">${heDay(g.date, lang)}</span></div>${rowsHtml}${dayLinkHtml}</div>`;
         }
         const f = n.frame;
         const city = hotelCityForFrame(f, rows);
@@ -4412,7 +4418,7 @@ function journalShortLocation(text) { return (text || "").split(",")[0].trim(); 
       .jn-frame{border:1px solid var(--border);border-inline-start:4px solid var(--teal);border-radius:12px;margin-top:16px;background:var(--surface);}
       .jn-frame-head{padding:10px 12px;background:#FBFDFC;border-radius:0 11px 0 0;display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px;}
       .jn-frame-name{font-weight:800;font-size:14px;}
-      .jn-frame-city{font-size:12.5px;font-weight:700;}
+      .jn-frame-city{font-size:14px;font-weight:700;}
       .jn-frame-dates{color:var(--muted);font-size:11.5px;}
       .jn-frame-mini{font-size:11.5px;color:var(--teal);font-weight:700;padding:0 12px;margin-top:-2px;margin-bottom:6px;}
       .jn-frame-body{padding:0 10px 10px;}
@@ -4424,9 +4430,14 @@ function journalShortLocation(text) { return (text || "").split(",")[0].trim(); 
       .jn-card-icon{flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:17px;line-height:1;}
       .jn-card-images{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
       .jn-card-images img{width:84px;height:84px;object-fit:cover;border-radius:8px;border:1px solid var(--border);}
+      .jn-img-link{display:block;cursor:zoom-in;}
+      .jn-lightbox{display:none;position:fixed;inset:0;background:rgba(10,15,14,.9);z-index:1000;align-items:center;justify-content:center;padding:24px;}
+      .jn-lightbox:target{display:flex;}
+      .jn-lightbox img{max-width:92vw;max-height:90vh;border-radius:10px;}
+      .jn-lightbox-close{position:absolute;top:16px;inset-inline-end:20px;color:#fff;font-size:22px;text-decoration:none;font-weight:700;width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.15);border-radius:50%;}
       .jn-card-title{font-weight:700;font-size:13.5px;flex:1;}
       .jn-card-cost{font-size:12px;font-weight:700;color:var(--amber);white-space:nowrap;}
-      .jn-card-route{font-size:12.5px;color:var(--ink);margin-top:6px;}
+      .jn-card-route{font-size:14.5px;font-weight:600;color:var(--ink);margin-top:6px;}
       .jn-card-time{font-size:13px;font-weight:700;color:var(--ink);margin-top:5px;display:flex;align-items:center;gap:6px;}
       .jn-card-time-sep{color:var(--muted);font-weight:400;}
       .jn-notes{color:var(--muted);font-size:12px;margin-top:5px;}
