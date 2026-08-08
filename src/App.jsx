@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.73.0";
+const APP_VERSION = "22.73.1";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -2434,7 +2434,7 @@ function computeFlightDurationLabel(row) {
   return `${h}:${String(m).padStart(2, "0")}`;
 }
 function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
-  const { openCard, openHotelInfo, dragId } = ctx;
+  const { openCard, openHotelInfo, dragId, updateRow } = ctx;
   const tm = typeMeta(r.typeId, types, T, lang); const Icon = ICONS[tm.icon] || Tag;
   const fromLabel = ((r.typeId === "transfer" || r.typeId === "checkin" || r.typeId === "checkout") && (r.from || r.fromAlias))
     ? (r.fromAlias || r.from)
@@ -2479,7 +2479,16 @@ function MobileRowCard({ r, prevRow, types, lang, T, ctx }) {
       </div>
       <div className="mt-card-bottom">
         <MobileCardMeta row={r} prevRow={prevRow} ctx={ctx} />
-        {stayLabel && <span className="mt-stay-note">{stayLabel}</span>}
+        {stayLabel && (
+          <span className="mt-stay-note-wrap" onClick={(e) => e.stopPropagation()}>
+            <span className="mt-stay-note-label">{T.stayAtDestination}</span>
+            <StayDurationField
+              value={r.stayDurationMin != null ? r.stayDurationMin : getDefaultStayMinutes(r.typeId)}
+              onChange={(m) => updateRow(r.id, { stayDurationMin: m })}
+              T={T} compact
+            />
+          </span>
+        )}
       </div>
     </div>
   );
@@ -5530,6 +5539,9 @@ function journalShortLocation(text) { return (text || "").split(",")[0].trim(); 
         .mt-editable.mt-time { min-width:60px; font-weight:700; color:var(--ink); padding-inline-end:2px; }
         .mt-computed-field { border-bottom:2px dashed #3E7CB1 !important; }
         .mt-stay-note { font-size:10.5px; color:var(--muted); margin-inline-start:2px; }
+        .mt-stay-note-wrap { display:inline-flex; align-items:center; gap:3px; font-size:10.5px; color:var(--muted); margin-inline-start:2px; }
+        .mt-stay-note-label { white-space:nowrap; }
+        .mt-stay-note-wrap select.mt-stay-select-compact { font-size:10.5px; color:var(--muted); width:auto; text-align:start; text-decoration:underline; text-underline-offset:2px; }
         .mt-time-cell { display:inline-flex; align-items:center; gap:2px; }
         .mt-editable.mt-time::-webkit-calendar-picker-indicator { padding:1px; margin-inline-start:1px; width:10px; height:10px; opacity:.6; }
         .mt-editable[type=number] { min-width:38px; padding-inline-start:1px; -moz-appearance:textfield; }
