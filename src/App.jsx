@@ -22,7 +22,7 @@ import { supabase, supabaseEnabled } from "./supabaseClient";
 /*  (OpenStreetMap Nominatim — free, no key), fixed-width indent column.   */
 /* ---------------------------------------------------------------------- */
 
-const APP_VERSION = "22.72.0";
+const APP_VERSION = "22.73.0";
 
 // Leaflet's default marker icon breaks under bundlers (Vite/Webpack) because it
 // references relative image paths. Point it at the CDN copies instead.
@@ -97,6 +97,14 @@ const HELP_TOPICS = {
     short_en: "Each record has a type (flight, hotel, attraction, etc.) with an icon and color. Add a custom type via the settings menu.",
     full_he: "סוג הרשומה קובע את הסמל, הצבע והשדות הרלוונטיים (למשל, מלון/אטרקציה לא דורשים 'מוצא'). ניתן לשנות סוג בלחיצה על סמל הרשומה ובחירה מרשימה, או להוסיף סוג חדש משלך דרך הגדרות ← הוסף סוג, עם בחירת סמל וצבע.",
     full_en: "The record type determines its icon, color, and relevant fields (e.g. hotel/attraction don't require an 'origin'). Change a type by clicking the record's icon and choosing from the list, or add your own new type via Settings ← Add Type, choosing an icon and color.",
+  },
+  record: {
+    icon: "Tag",
+    title_he: "עריכת רשומה", title_en: "Editing a Record",
+    short_he: "סוג, זמנים, שהות, עלות, קבצים, דירוג וחוויה אישית — כל מה שאפשר לערוך ברשומה אחת.",
+    short_en: "Type, times, stay duration, cost, files, rating and personal experience — everything editable on a record.",
+    full_he: "כרטיס עריכת רשומה כולל: בחירת סוג (עם סמל ואמצעי הגעה), שדות מוצא/יעד עם אימות מיקום דרך גוגל (ראו נושא נפרד), שעות התחלה/סיום עם סימון צבע — ירוק=מחושב אוטומטית, כחול=נמשך מהרשומה הקודמת, זהב=נמשך ממספר טיסה אמיתי, ללא סימון=הוזן ידנית; זמן שהות ביעד (משפיע על שעת ההתחלה של הרשומה הבאה, לא על הרשומה עצמה) נבחר מרשימה נפתחת; עלות ומטבע; הערות; העלאת תמונות/קבצים מצורפים; ודירוג אישי עם טקסט חוויה חופשי (לא מוצג בטבלה הראשית, אבל כן מופיע ביומן המסע).",
+    full_en: "The record editing card includes: type selection (with icon and arrival method), origin/destination fields with Google location verification (see separate topic), start/end times with color coding — green=auto-computed, blue=inherited from the previous record, gold=pulled from a real flight number, no color=manually entered; stay duration at the destination (affects the NEXT record's inherited start time, not this record itself) chosen from a dropdown; cost and currency; notes; uploading photos/attached files; and a personal rating with free-text experience (not shown in the main table, but does appear in the travel journal export).",
   },
   places: {
     icon: "MapPin",
@@ -2830,34 +2838,20 @@ function formatStayLabel(min, T) {
   return `${hours} ${T.hoursShort}`;
 }
 function StayDurationField({ value, onChange, T, max, compact }) {
-  const [open, setOpen] = useState(false);
   const current = value != null ? value : 0;
   const options = [];
   for (let m = 0; m <= (max || 360); m += 30) options.push(m);
   return (
-    <span style={{ position: "relative", display: "block" }}>
-      <button type="button" className={compact ? "mt-editable" : "mt-type-field-btn"} style={compact ? { width: "100%", textAlign: "center", padding: "2px 1px" } : undefined} onClick={() => setOpen(true)} title={T.stayDurationHint}>
-        {!compact && <Clock size={14} />}
-        <span className={compact ? undefined : "mt-type-text"}>{formatStayLabel(current, T)}</span>
-      </button>
-      {open && (
-        <div className="mt-modal-backdrop" onClick={() => setOpen(false)}>
-          <div className="mt-modal mt-type-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 220 }}>
-            <div className="mt-time-modal-header">
-              <span>{T.stayDuration}</span>
-              <button className="mt-btn ghost" style={{ padding: "4px 6px" }} onClick={() => setOpen(false)}><X size={16} /></button>
-            </div>
-            <div className="mt-type-list" style={{ maxHeight: 280 }}>
-              {options.map((m) => (
-                <button key={m} className={"opt" + (m === current ? " selected" : "")} onClick={() => { onChange(m); setOpen(false); }}>
-                  {formatStayLabel(m, T)}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </span>
+    <select
+      className={compact ? "mt-editable mt-stay-select-compact" : "mt-type-field-btn mt-stay-select"}
+      value={current}
+      onChange={(e) => onChange(Number(e.target.value))}
+      title={T.stayDurationHint}
+    >
+      {options.map((m) => (
+        <option key={m} value={m}>{formatStayLabel(m, T)}</option>
+      ))}
+    </select>
   );
 }
 function TypeFieldPicker({ typeId, types, lang, T, onChange, kindFilter, placeholder }) {
@@ -4455,7 +4449,7 @@ function journalShortLocation(text) { return (text || "").split(",")[0].trim(); 
       .jn-card-time-sep{color:var(--muted);font-weight:400;}
       .jn-card-meta{display:flex;align-items:center;gap:8px;margin-top:5px;font-size:12px;color:var(--muted);}
       .jn-card-arrival{font-size:14px;}
-      .jn-card-stay{color:var(--teal);font-weight:600;}
+      .jn-card-stay{color:var(--teal-dark);font-weight:800;font-size:12.5px;background:var(--teal-tint);padding:2px 8px;border-radius:6px;}
       .jn-notes{color:var(--muted);font-size:12px;margin-top:5px;}
       .jn-stars{color:var(--amber);font-size:13px;margin-top:5px;}
       .jn-experience-title{font-weight:700;font-size:12.5px;margin-top:8px;color:var(--ink);}
@@ -5488,6 +5482,8 @@ function journalShortLocation(text) { return (text || "").split(",")[0].trim(); 
         .mt-type-icon svg { width:12px; height:12px; color:#fff; }
         .mt-type-btn { border:none; background:none; padding:0; display:flex; align-items:center; gap:5px; font-size:12.8px; font-weight:500; color:var(--ink); max-width:100%; }
         .mt-type-field-btn { display:flex; align-items:center; gap:7px; width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 10px; background:var(--surface); font-size:13px; font-weight:500; color:var(--ink); box-sizing:border-box; position:relative; }
+        .mt-stay-select { cursor:pointer; appearance:auto; }
+        .mt-stay-select-compact { width:100%; text-align:center; padding:2px 1px; cursor:pointer; appearance:auto; background:transparent; border:none; font:inherit; color:inherit; }
         .mt-hovertip {
           direction: rtl; text-align: start; white-space: normal; width: max-content; max-width: min(200px, calc(100vw - 24px));
           background: var(--surface); color: var(--ink); font-size: 11.5px; font-weight: 500; line-height: 1.5;
@@ -6568,7 +6564,7 @@ function journalShortLocation(text) { return (text || "").split(",")[0].trim(); 
       {cardDraft && (
         <div className="mt-modal-backdrop" onClick={closeCard}>
           <div className="mt-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="mt-modal-header"><span style={{ display: "flex", alignItems: "center", gap: 6 }}><span className="mt-modal-title">{T.editRecord}</span><HelpButton topic="places" lang={lang} T={T} onOpenFull={openHelpTopic} openTopic={helpPopoverOpen} setOpenTopic={setHelpPopoverOpen} /></span><button className="mt-btn ghost" onClick={closeCard}><X size={16} /></button></div>
+            <div className="mt-modal-header"><span style={{ display: "flex", alignItems: "center", gap: 6 }}><span className="mt-modal-title">{T.editRecord}</span><HelpButton topic="record" lang={lang} T={T} onOpenFull={openHelpTopic} openTopic={helpPopoverOpen} setOpenTopic={setHelpPopoverOpen} /></span><button className="mt-btn ghost" onClick={closeCard}><X size={16} /></button></div>
             <div className="mt-modal-body">
               <div className="mt-field">
                 <label>{T.frame}</label>
